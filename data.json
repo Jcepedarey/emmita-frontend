@@ -1,0 +1,14 @@
+[
+    {
+      "_id": "6645fa4e8e3b",
+      "codigo": "SILLA-01",
+      "descripcion": "Silla Tiffany Blanca",
+      "cantidad_stock": 500,
+      "cantidad_disponible": 500,
+      "fechas_alquilado": [
+        { "inicio": "2024-06-15", "fin": "2024-06-15" },
+        { "inicio": "2024-06-20", "fin": "2024-06-20" }
+      ]
+    }
+  ]
+  

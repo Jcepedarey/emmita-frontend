@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Elementos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            margin: 10px 0;
+        }
+        button {
+            margin-left: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Lista de Elementos</h1>
+    <input type="text" id="newItem" placeholder="Escribe un elemento">
+    <button onclick="addItem()">Agregar</button>
+    <ul id="itemsList"></ul>
+
+    <script>
+        async function fetchData() {
+            const response = await fetch('http://localhost:3001/api/data');
+            const data = await response.json();
+            const list = document.getElementById('itemsList');
+            list.innerHTML = '';
+
+            data.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item.name;
+                const button = document.createElement('button');
+                button.textContent = 'Eliminar';
+                button.onclick = () => deleteItem(item.id);
+                li.appendChild(button);
+                list.appendChild(li);
+            });
+        }
+
+        async function addItem() {
+            const newItemInput = document.getElementById('newItem');
+            const name = newItemInput.value.trim();
+            if (!name) return;
+
+            const newItem = { id: Date.now(), name };
+
+            await fetch('http://localhost:3001/api/data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newItem)
+            });
+
+            newItemInput.value = '';
+            fetchData();
+        }
+
+        async function deleteItem(id) {
+            await fetch(`http://localhost:3001/api/data/${id}`, {
+                method: 'DELETE'
+            });
+
+            fetchData();
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
