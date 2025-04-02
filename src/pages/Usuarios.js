@@ -22,7 +22,6 @@ export default function Usuarios() {
   const guardarUsuario = async () => {
     const { nombre, email, password, rol } = form;
 
-    // ✅ Validaciones con SweetAlert
     if (!nombre || !email || !password) {
       return Swal.fire("Campos requeridos", "Todos los campos son obligatorios.", "warning");
     }
@@ -30,24 +29,17 @@ export default function Usuarios() {
       return Swal.fire("Correo inválido", "Ingresa un correo válido.", "error");
     }
 
-    if (editando) {
-      const { error } = await supabase
-        .from("usuarios")
-        .update({ nombre, email, password, rol })
-        .eq("id", editando);
-      if (!error) {
-        Swal.fire("Actualizado", "Usuario actualizado correctamente", "success");
-        setEditando(null);
-        limpiar();
-        cargarUsuarios();
-      }
-    } else {
-      const { error } = await supabase.from("usuarios").insert([{ nombre, email, password, rol }]);
-      if (!error) {
-        Swal.fire("Creado", "Usuario creado correctamente", "success");
-        limpiar();
-        cargarUsuarios();
-      }
+    const operacion = editando
+      ? supabase.from("usuarios").update({ nombre, email, password, rol }).eq("id", editando)
+      : supabase.from("usuarios").insert([{ nombre, email, password, rol }]);
+
+    const { error } = await operacion;
+
+    if (!error) {
+      Swal.fire(editando ? "Actualizado" : "Creado", `Usuario ${editando ? "actualizado" : "creado"} correctamente`, "success");
+      setEditando(null);
+      limpiar();
+      cargarUsuarios();
     }
   };
 
@@ -92,14 +84,15 @@ export default function Usuarios() {
   );
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h2>Gestión de Usuarios</h2>
+    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Usuarios</h2>
 
       <input
         type="text"
         placeholder="Buscar por nombre o correo"
         value={buscar}
         onChange={(e) => setBuscar(e.target.value)}
+        style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}
       />
 
       <h3>{editando ? "Editar Usuario" : "Crear Usuario"}</h3>
@@ -108,35 +101,55 @@ export default function Usuarios() {
         placeholder="Nombre"
         value={form.nombre}
         onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="email"
         placeholder="Correo"
         value={form.email}
         onChange={(e) => setForm({ ...form, email: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="password"
         placeholder="Contraseña"
         value={form.password}
         onChange={(e) => setForm({ ...form, password: e.target.value })}
-      /><br />
-      <select value={form.rol} onChange={(e) => setForm({ ...form, rol: e.target.value })}>
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
+      <select
+        value={form.rol}
+        onChange={(e) => setForm({ ...form, rol: e.target.value })}
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      >
         <option value="vendedor">Vendedor</option>
         <option value="admin">Administrador</option>
-      </select><br />
-      <button onClick={guardarUsuario}>
+      </select>
+      <button onClick={guardarUsuario} style={{ width: "100%", padding: "10px", marginBottom: "8px" }}>
         {editando ? "Actualizar" : "Guardar"}
       </button>
-      <button onClick={limpiar}>Cancelar</button>
+      <button onClick={limpiar} style={{ width: "100%", padding: "8px" }}>Cancelar</button>
 
-      <h3>Lista de Usuarios</h3>
-      <ul>
+      <h3 style={{ marginTop: "2rem" }}>Lista de Usuarios</h3>
+      <ul style={{ listStyle: "none", padding: 0 }}>
         {filtrados.map((u) => (
-          <li key={u.id}>
-            <strong>{u.nombre}</strong> - {u.email} - Rol: {u.rol} - Contraseña: ******<br />
-            <button onClick={() => editarUsuario(u)} title="Editar"><FaEdit /></button>
-            <button onClick={() => eliminarUsuario(u.id)} title="Eliminar"><FaTrash /></button>
+          <li key={u.id} style={{
+            marginBottom: "1rem",
+            border: "1px solid #ddd",
+            borderRadius: "8px",
+            padding: "10px"
+          }}>
+            <strong>{u.nombre}</strong> - {u.email}<br />
+            Rol: {u.rol}<br />
+            Contraseña: ******<br />
+            <div style={{ marginTop: "0.5rem" }}>
+              <button onClick={() => editarUsuario(u)} title="Editar" style={{ marginRight: "10px" }}>
+                <FaEdit />
+              </button>
+              <button onClick={() => eliminarUsuario(u.id)} title="Eliminar">
+                <FaTrash />
+              </button>
+            </div>
           </li>
         ))}
       </ul>

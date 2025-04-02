@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
-import { generarPDF } from "../utils/generarPDF"; // ✅ Agregado
+import { generarPDF } from "../utils/generarPDF";
 
 export default function BuscarDocumento() {
   const [tipo, setTipo] = useState("cotizaciones");
@@ -49,72 +49,61 @@ export default function BuscarDocumento() {
   };
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h2>Buscar Documento</h2>
+    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Buscar Documento</h2>
 
-      <div>
-        <label>Tipo:</label>
-        <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-          <option value="cotizaciones">Cotización</option>
-          <option value="ordenes_pedido">Orden de Pedido</option>
-        </select>
-      </div>
+      <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ width: "100%", marginBottom: "10px", padding: "8px" }}>
+        <option value="cotizaciones">Cotización</option>
+        <option value="ordenes_pedido">Orden de Pedido</option>
+      </select>
 
-      <div>
-        <label>ID de documento:</label>
-        <input
-          type="text"
-          value={filtros.id}
-          onChange={(e) => setFiltros({ ...filtros, id: e.target.value })}
-        />
-      </div>
+      <input
+        type="text"
+        placeholder="ID de documento"
+        value={filtros.id}
+        onChange={(e) => setFiltros({ ...filtros, id: e.target.value })}
+        style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
+      />
 
-      <div>
-        <label>Cliente:</label>
-        <select value={filtros.cliente} onChange={(e) => setFiltros({ ...filtros, cliente: e.target.value })}>
-          <option value="">-- Seleccionar --</option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
-      </div>
+      <select value={filtros.cliente} onChange={(e) => setFiltros({ ...filtros, cliente: e.target.value })} style={{ width: "100%", marginBottom: "10px", padding: "8px" }}>
+        <option value="">-- Seleccionar Cliente --</option>
+        {clientes.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.nombre}
+          </option>
+        ))}
+      </select>
 
-      <div>
-        <label>Fecha de creación:</label>
-        <input
-          type="date"
-          value={filtros.fechaCreacion}
-          onChange={(e) => setFiltros({ ...filtros, fechaCreacion: e.target.value })}
-        />
-      </div>
+      <input
+        type="date"
+        value={filtros.fechaCreacion}
+        onChange={(e) => setFiltros({ ...filtros, fechaCreacion: e.target.value })}
+        style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
+      />
 
       {tipo === "ordenes_pedido" && (
-        <div>
-          <label>Fecha del evento:</label>
-          <input
-            type="date"
-            value={filtros.fechaEvento}
-            onChange={(e) => setFiltros({ ...filtros, fechaEvento: e.target.value })}
-          />
-        </div>
+        <input
+          type="date"
+          value={filtros.fechaEvento}
+          onChange={(e) => setFiltros({ ...filtros, fechaEvento: e.target.value })}
+          style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
+        />
       )}
 
-      <button onClick={cargarDocumentos}>Buscar</button>
+      <button onClick={cargarDocumentos} style={{ width: "100%", marginBottom: "1rem", padding: "10px" }}>Buscar</button>
 
       <h3>Resultados</h3>
-      <ul>
+      <ul style={{ listStyle: "none", padding: 0 }}>
         {documentos.map((doc) => (
-          <li key={doc.id}>
+          <li key={doc.id} style={{ marginBottom: "1rem", border: "1px solid #ccc", borderRadius: "10px", padding: "10px" }}>
             <strong>ID:</strong> {doc.id}<br />
             <strong>Cliente:</strong> {doc.cliente_id}<br />
             <strong>Total:</strong> ${doc.total}<br />
             <strong>Fecha:</strong> {doc.fecha}<br />
             {doc.fecha_evento && <><strong>Evento:</strong> {doc.fecha_evento}<br /></>}
-            <button onClick={() => cargarEnCrear(doc)}>Editar</button>
-            <button onClick={() => eliminarDocumento(doc.id)}>Eliminar</button>
-            <button onClick={() => generarPDF(doc, tipo)}>Descargar PDF</button> {/* ✅ Agregado */}
+            <button onClick={() => cargarEnCrear(doc)} style={{ marginRight: "10px" }}>Editar</button>
+            <button onClick={() => eliminarDocumento(doc.id)} style={{ marginRight: "10px" }}>Eliminar</button>
+            <button onClick={() => generarPDF(doc, tipo)}>Descargar PDF</button>
           </li>
         ))}
       </ul>

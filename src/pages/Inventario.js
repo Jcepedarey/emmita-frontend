@@ -22,7 +22,6 @@ export default function Inventario() {
   const guardarProducto = async () => {
     const { nombre, descripcion, precio, stock, categoria } = form;
 
-    // ✅ Validaciones con SweetAlert
     if (!nombre || !precio || !stock) {
       return Swal.fire("Campos requeridos", "Nombre, precio y stock son obligatorios.", "warning");
     }
@@ -30,24 +29,17 @@ export default function Inventario() {
       return Swal.fire("Valores inválidos", "Precio y stock deben ser positivos.", "error");
     }
 
-    if (editandoId) {
-      const { error } = await supabase
-        .from("productos")
-        .update({ nombre, descripcion, precio, stock, categoria })
-        .eq("id", editandoId);
-      if (!error) {
-        Swal.fire("Actualizado", "Producto actualizado correctamente", "success");
-        setEditandoId(null);
-        limpiarFormulario();
-        obtenerProductos();
-      }
-    } else {
-      const { error } = await supabase.from("productos").insert([{ nombre, descripcion, precio, stock, categoria }]);
-      if (!error) {
-        Swal.fire("Guardado", "Producto guardado correctamente", "success");
-        limpiarFormulario();
-        obtenerProductos();
-      }
+    const operacion = editandoId
+      ? supabase.from("productos").update({ nombre, descripcion, precio, stock, categoria }).eq("id", editandoId)
+      : supabase.from("productos").insert([{ nombre, descripcion, precio, stock, categoria }]);
+
+    const { error } = await operacion;
+
+    if (!error) {
+      Swal.fire(editandoId ? "Actualizado" : "Guardado", `Producto ${editandoId ? "actualizado" : "guardado"} correctamente`, "success");
+      setEditandoId(null);
+      limpiarFormulario();
+      obtenerProductos();
     }
   };
 
@@ -91,14 +83,15 @@ export default function Inventario() {
   );
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h2>Gestión de Inventario</h2>
+    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Inventario</h2>
 
       <input
         type="text"
         placeholder="Buscar producto"
         value={buscar}
         onChange={(e) => setBuscar(e.target.value)}
+        style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}
       />
 
       <h3>{editandoId ? "Editar Producto" : "Agregar Producto"}</h3>
@@ -107,48 +100,61 @@ export default function Inventario() {
         placeholder="Nombre"
         value={form.nombre}
         onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="text"
         placeholder="Descripción"
         value={form.descripcion}
         onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="number"
         placeholder="Precio"
         value={form.precio}
         onChange={(e) => setForm({ ...form, precio: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="number"
         placeholder="Stock"
         value={form.stock}
         onChange={(e) => setForm({ ...form, stock: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="text"
         placeholder="Categoría"
         value={form.categoria}
         onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-      /><br />
-      <button onClick={guardarProducto}>
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
+      <button onClick={guardarProducto} style={{ width: "100%", padding: "10px", marginBottom: "8px" }}>
         {editandoId ? "Actualizar" : "Guardar"}
       </button>
-      <button onClick={limpiarFormulario}>Cancelar</button>
+      <button onClick={limpiarFormulario} style={{ width: "100%", padding: "8px" }}>Cancelar</button>
 
-      <h3>Lista de Productos</h3>
-      <ul>
+      <h3 style={{ marginTop: "2rem" }}>Lista de Productos</h3>
+      <ul style={{ listStyle: "none", padding: 0 }}>
         {productosFiltrados.map((producto) => (
-          <li key={producto.id}>
-            <strong>{producto.nombre}</strong> - {producto.descripcion} - ${producto.precio} - Stock: {producto.stock} - {producto.categoria}
-            <br />
-            <button onClick={() => editarProducto(producto)} title="Editar">
-              <FaEdit />
-            </button>
-            <button onClick={() => eliminarProducto(producto.id)} title="Eliminar">
-              <FaTrash />
-            </button>
+          <li key={producto.id} style={{
+            marginBottom: "1rem",
+            border: "1px solid #ddd",
+            borderRadius: "8px",
+            padding: "10px"
+          }}>
+            <strong>{producto.nombre}</strong><br />
+            {producto.descripcion}<br />
+            💲 {producto.precio} | Stock: {producto.stock} | {producto.categoria}
+            <div style={{ marginTop: "0.5rem" }}>
+              <button onClick={() => editarProducto(producto)} title="Editar" style={{ marginRight: "10px" }}>
+                <FaEdit />
+              </button>
+              <button onClick={() => eliminarProducto(producto.id)} title="Eliminar">
+                <FaTrash />
+              </button>
+            </div>
           </li>
         ))}
       </ul>

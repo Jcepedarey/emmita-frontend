@@ -22,7 +22,6 @@ const Clientes = () => {
   const guardarCliente = async () => {
     const { nombre, email, telefono, direccion } = form;
 
-    // ✅ Validaciones con SweetAlert
     if (!form.nombre.trim()) {
       return Swal.fire("Campo requerido", "El nombre es obligatorio", "warning");
     }
@@ -52,7 +51,6 @@ const Clientes = () => {
   };
 
   const eliminarCliente = async (id) => {
-    // ✅ Confirmación con SweetAlert
     const confirmar = await Swal.fire({
       title: "¿Eliminar este cliente?",
       text: "Esta acción no se puede deshacer",
@@ -87,17 +85,16 @@ const Clientes = () => {
   );
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h2>Gestión de Clientes</h2>
+    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+      <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Clientes</h2>
 
-      <div>
-        <input
-          type="text"
-          placeholder="Buscar por nombre, email o teléfono"
-          value={buscar}
-          onChange={(e) => setBuscar(e.target.value)}
-        />
-      </div>
+      <input
+        type="text"
+        placeholder="Buscar por nombre, email o teléfono"
+        value={buscar}
+        onChange={(e) => setBuscar(e.target.value)}
+        style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}
+      />
 
       <h3>{editando ? "Editar Cliente" : "Agregar Cliente"}</h3>
       <input
@@ -105,40 +102,53 @@ const Clientes = () => {
         placeholder="Nombre"
         value={form.nombre}
         onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="email"
         placeholder="Correo"
         value={form.email}
         onChange={(e) => setForm({ ...form, email: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="text"
         placeholder="Teléfono"
         value={form.telefono}
         onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-      /><br />
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
       <input
         type="text"
         placeholder="Dirección"
         value={form.direccion}
         onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-      /><br />
-      <button onClick={guardarCliente}>{editando ? "Actualizar" : "Guardar"}</button>
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
+      <button onClick={guardarCliente} style={{ width: "100%", padding: "10px", marginBottom: "1rem" }}>
+        {editando ? "Actualizar" : "Guardar"}
+      </button>
 
-      <h3>Lista de Clientes</h3>
-      <ul>
+      <h3 style={{ marginTop: "2rem" }}>Lista de Clientes</h3>
+      <ul style={{ listStyle: "none", padding: 0 }}>
         {filtrados.map((cliente) => (
-          <li key={cliente.id}>
-            <strong>{cliente.nombre}</strong> - {cliente.email} - {cliente.telefono}
-            <br />
-            {/* ✅ Botones con íconos */}
-            <button onClick={() => editarCliente(cliente)} title="Editar">
-              <FaEdit />
-            </button>
-            <button onClick={() => eliminarCliente(cliente.id)} title="Eliminar">
-              <FaTrash />
-            </button>
+          <li key={cliente.id} style={{
+            marginBottom: "1rem",
+            border: "1px solid #ddd",
+            borderRadius: "8px",
+            padding: "10px"
+          }}>
+            <strong>{cliente.nombre}</strong><br />
+            📧 {cliente.email || "Sin correo"}<br />
+            📞 {cliente.telefono || "Sin teléfono"}<br />
+            <div style={{ marginTop: "0.5rem" }}>
+              <button onClick={() => editarCliente(cliente)} title="Editar" style={{ marginRight: "10px" }}>
+                <FaEdit />
+              </button>
+              <button onClick={() => eliminarCliente(cliente.id)} title="Eliminar">
+                <FaTrash />
+              </button>
+            </div>
           </li>
         ))}
       </ul>

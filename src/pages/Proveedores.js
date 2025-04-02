@@ -26,13 +26,11 @@ export default function Proveedores() {
   };
 
   const guardarProveedor = async () => {
-    const { nombre, telefono, tipo_servicio } = formProv;
-
-    if (!nombre.trim()) {
+    if (!formProv.nombre.trim()) {
       return Swal.fire("Campo requerido", "El nombre del proveedor es obligatorio.", "warning");
     }
 
-    const { error } = await supabase.from("proveedores").insert([{ nombre, telefono, tipo_servicio }]);
+    const { error } = await supabase.from("proveedores").insert([formProv]);
     if (!error) {
       Swal.fire("Guardado", "Proveedor agregado correctamente.", "success");
       setFormProv({ nombre: "", telefono: "", tipo_servicio: "" });
@@ -51,7 +49,7 @@ export default function Proveedores() {
       return Swal.fire("Valores inválidos", "Los precios deben ser positivos.", "error");
     }
 
-    const { error } = await supabase.from("productos_proveedores").insert([{ proveedor_id, nombre, stock, precio_compra, precio_venta }]);
+    const { error } = await supabase.from("productos_proveedores").insert([formProd]);
     if (!error) {
       Swal.fire("Guardado", "Producto externo agregado correctamente.", "success");
       setFormProd({ proveedor_id: "", nombre: "", stock: "", precio_compra: "", precio_venta: "" });
@@ -83,82 +81,41 @@ export default function Proveedores() {
   );
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h2>Gestión de Proveedores</h2>
+    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center" }}>Gestión de Proveedores</h2>
 
       <h3>Agregar Proveedor</h3>
-      <input
-        type="text"
-        placeholder="Nombre"
-        value={formProv.nombre}
-        onChange={(e) => setFormProv({ ...formProv, nombre: e.target.value })}
-      /><br />
-      <input
-        type="text"
-        placeholder="Teléfono"
-        value={formProv.telefono}
-        onChange={(e) => setFormProv({ ...formProv, telefono: e.target.value })}
-      /><br />
-      <input
-        type="text"
-        placeholder="Tipo de servicio"
-        value={formProv.tipo_servicio}
-        onChange={(e) => setFormProv({ ...formProv, tipo_servicio: e.target.value })}
-      /><br />
-      <button onClick={guardarProveedor}>Guardar Proveedor</button>
+      <input placeholder="Nombre" value={formProv.nombre} onChange={(e) => setFormProv({ ...formProv, nombre: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <input placeholder="Teléfono" value={formProv.telefono} onChange={(e) => setFormProv({ ...formProv, telefono: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <input placeholder="Tipo de servicio" value={formProv.tipo_servicio} onChange={(e) => setFormProv({ ...formProv, tipo_servicio: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <button onClick={guardarProveedor} style={{ width: "100%", marginBottom: "1rem" }}>Guardar Proveedor</button>
 
       <h3>Agregar Producto Externo</h3>
-      <select
-        value={formProd.proveedor_id}
-        onChange={(e) => setFormProd({ ...formProd, proveedor_id: e.target.value })}
-      >
+      <select value={formProd.proveedor_id} onChange={(e) => setFormProd({ ...formProd, proveedor_id: e.target.value })} style={{ width: "100%", marginBottom: 8 }}>
         <option value="">-- Selecciona proveedor --</option>
         {proveedores.map((prov) => (
           <option key={prov.id} value={prov.id}>{prov.nombre}</option>
         ))}
-      </select><br />
-      <input
-        type="text"
-        placeholder="Nombre del producto"
-        value={formProd.nombre}
-        onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })}
-      /><br />
-      <input
-        type="number"
-        placeholder="Stock"
-        value={formProd.stock}
-        onChange={(e) => setFormProd({ ...formProd, stock: e.target.value })}
-      /><br />
-      <input
-        type="number"
-        placeholder="Precio de compra"
-        value={formProd.precio_compra}
-        onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })}
-      /><br />
-      <input
-        type="number"
-        placeholder="Precio de venta"
-        value={formProd.precio_venta}
-        onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })}
-      /><br />
-      <button onClick={guardarProductoProveedor}>Guardar Producto</button>
+      </select>
+      <input placeholder="Nombre del producto" value={formProd.nombre} onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <input type="number" placeholder="Stock" value={formProd.stock} onChange={(e) => setFormProd({ ...formProd, stock: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <input type="number" placeholder="Precio de compra" value={formProd.precio_compra} onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <input type="number" placeholder="Precio de venta" value={formProd.precio_venta} onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <button onClick={guardarProductoProveedor} style={{ width: "100%", marginBottom: "1rem" }}>Guardar Producto</button>
 
       <h3>Buscar productos de proveedor</h3>
-      <input
-        type="text"
-        placeholder="Buscar por nombre"
-        value={buscar}
-        onChange={(e) => setBuscar(e.target.value)}
-      />
+      <input placeholder="Buscar por nombre" value={buscar} onChange={(e) => setBuscar(e.target.value)} style={{ width: "100%", marginBottom: 12 }} />
 
-      <ul>
+      <ul style={{ listStyle: "none", padding: 0 }}>
         {productosFiltrados.map((prod) => (
-          <li key={prod.id}>
-            <strong>{prod.nombre}</strong> - Stock: {prod.stock} - Compra: ${prod.precio_compra} - Venta: ${prod.precio_venta}
-            <br />
-            <button onClick={() => eliminarProducto(prod.id)} title="Eliminar">
-              <FaTrash />
-            </button>
+          <li key={prod.id} style={{ padding: 10, border: "1px solid #ddd", marginBottom: 10, borderRadius: 8 }}>
+            <strong>{prod.nombre}</strong><br />
+            Stock: {prod.stock} - Compra: ${prod.precio_compra} - Venta: ${prod.precio_venta}
+            <div style={{ marginTop: "0.5rem" }}>
+              <button onClick={() => eliminarProducto(prod.id)} title="Eliminar">
+                <FaTrash />
+              </button>
+            </div>
           </li>
         ))}
       </ul>

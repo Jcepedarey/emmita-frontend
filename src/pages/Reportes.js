@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import { Bar, Pie } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend } from "chart.js";
-import { exportarCSV } from "../utils/exportarCSV"; // ✅ Importación
+import { exportarCSV } from "../utils/exportarCSV";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
@@ -39,6 +39,7 @@ export default function Reportes() {
   const guardarReporte = async () => {
     const { tipo, monto, descripcion } = form;
     if (!monto) return alert("Debes ingresar un monto");
+
     const { error } = await supabase.from("reportes").insert([{ tipo, monto, descripcion }]);
     if (!error) {
       setForm({ tipo: "ingreso", monto: "", descripcion: "" });
@@ -50,40 +51,29 @@ export default function Reportes() {
   const totalGastos = reportes.filter(r => r.tipo === "gasto").reduce((acc, r) => acc + parseFloat(r.monto), 0);
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h2>Reportes y Estadísticas</h2>
+    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center" }}>Reportes y Estadísticas</h2>
 
       <h3>Agregar ingreso o gasto</h3>
-      <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+      <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} style={{ width: "100%", marginBottom: 8 }}>
         <option value="ingreso">Ingreso</option>
         <option value="gasto">Gasto</option>
-      </select><br />
-      <input
-        type="number"
-        placeholder="Monto"
-        value={form.monto}
-        onChange={(e) => setForm({ ...form, monto: e.target.value })}
-      /><br />
-      <input
-        type="text"
-        placeholder="Descripción"
-        value={form.descripcion}
-        onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-      /><br />
-      <button onClick={guardarReporte}>Guardar</button>
+      </select>
+      <input type="number" placeholder="Monto" value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <input type="text" placeholder="Descripción" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
+      <button onClick={guardarReporte} style={{ width: "100%", marginBottom: "1rem" }}>Guardar</button>
 
       <h3>Resumen</h3>
-      <p><strong>Total ingresos:</strong> ${totalIngresos.toFixed(2)}</p>
-      <p><strong>Total gastos:</strong> ${totalGastos.toFixed(2)}</p>
+      <p><strong>Ingresos:</strong> ${totalIngresos.toFixed(2)}</p>
+      <p><strong>Gastos:</strong> ${totalGastos.toFixed(2)}</p>
       <p><strong>Balance:</strong> ${(totalIngresos - totalGastos).toFixed(2)}</p>
 
-      {/* ✅ Botón para exportar a Excel */}
-      <button onClick={() => exportarCSV(reportes, "reporte_financiero")}>
+      <button onClick={() => exportarCSV(reportes, "reporte_financiero")} style={{ width: "100%", marginBottom: "1.5rem" }}>
         Exportar a Excel (CSV)
       </button>
 
-      <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap", marginTop: "2rem" }}>
-        <div style={{ width: "300px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "2rem", marginBottom: "2rem" }}>
+        <div>
           <h4>Balance Gráfico</h4>
           <Pie
             data={{
@@ -98,7 +88,7 @@ export default function Reportes() {
           />
         </div>
 
-        <div style={{ width: "400px" }}>
+        <div>
           <h4>Productos más alquilados</h4>
           <Bar
             data={{
@@ -111,14 +101,26 @@ export default function Reportes() {
                 },
               ],
             }}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: {
+                  display: false,
+                },
+              },
+              scales: {
+                x: { ticks: { color: "#333" } },
+                y: { ticks: { color: "#333" } },
+              },
+            }}
           />
         </div>
       </div>
 
       <h3>Listado de ingresos/gastos</h3>
-      <ul>
+      <ul style={{ listStyle: "none", padding: 0 }}>
         {reportes.map((r) => (
-          <li key={r.id}>
+          <li key={r.id} style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>
             <strong>{r.tipo.toUpperCase()}</strong>: ${r.monto} - {r.descripcion || "Sin descripción"} - {r.fecha?.split("T")[0]}
           </li>
         ))}
