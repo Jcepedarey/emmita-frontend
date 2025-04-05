@@ -1,0 +1,19 @@
+.modal-grupo {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    max-width: 600px;
+    margin: auto;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+  
+  .modal-grupo h3 {
+    margin-top: 0;
+  }
+  
+  .modal-grupo input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+  }
+  
