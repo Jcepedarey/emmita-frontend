@@ -83,7 +83,7 @@ export default function Inventario() {
   );
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+    <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
       <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Inventario</h2>
 
       <input
@@ -91,58 +91,48 @@ export default function Inventario() {
         placeholder="Buscar producto"
         value={buscar}
         onChange={(e) => setBuscar(e.target.value)}
-        style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}
+        style={{ width: "100%", padding: "10px", marginBottom: "1rem", fontSize: "1rem" }}
       />
 
-      <h3>{editandoId ? "Editar Producto" : "Agregar Producto"}</h3>
-      <input
-        type="text"
-        placeholder="Nombre"
-        value={form.nombre}
-        onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="text"
-        placeholder="Descripción"
-        value={form.descripcion}
-        onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="number"
-        placeholder="Precio"
-        value={form.precio}
-        onChange={(e) => setForm({ ...form, precio: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="number"
-        placeholder="Stock"
-        value={form.stock}
-        onChange={(e) => setForm({ ...form, stock: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="text"
-        placeholder="Categoría"
-        value={form.categoria}
-        onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <button onClick={guardarProducto} style={{ width: "100%", padding: "10px", marginBottom: "8px" }}>
+      <h3 style={{ marginBottom: "1rem" }}>{editandoId ? "Editar Producto" : "Agregar Producto"}</h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <input type="text" placeholder="Nombre" value={form.nombre}
+          onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+          style={{ padding: "10px", fontSize: "1rem" }}
+        />
+        <input type="text" placeholder="Descripción" value={form.descripcion}
+          onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+          style={{ padding: "10px", fontSize: "1rem" }}
+        />
+        <input type="number" placeholder="Precio" value={form.precio}
+          onChange={(e) => setForm({ ...form, precio: e.target.value })}
+          style={{ padding: "10px", fontSize: "1rem" }}
+        />
+        <input type="number" placeholder="Stock" value={form.stock}
+          onChange={(e) => setForm({ ...form, stock: e.target.value })}
+          style={{ padding: "10px", fontSize: "1rem" }}
+        />
+        <input type="text" placeholder="Categoría" value={form.categoria}
+          onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+          style={{ padding: "10px", fontSize: "1rem" }}
+        />
+      </div>
+
+      <button onClick={guardarProducto} style={{ width: "100%", padding: "12px", marginTop: "10px", fontSize: "1rem" }}>
         {editandoId ? "Actualizar" : "Guardar"}
       </button>
-      <button onClick={limpiarFormulario} style={{ width: "100%", padding: "8px" }}>Cancelar</button>
+      <button onClick={limpiarFormulario} style={{ width: "100%", padding: "10px", fontSize: "1rem", marginTop: "8px" }}>
+        Cancelar
+      </button>
 
       <h3 style={{ marginTop: "2rem" }}>Lista de Productos</h3>
       <ul style={{ listStyle: "none", padding: 0 }}>
         {productosFiltrados.map((producto) => (
           <li key={producto.id} style={{
             marginBottom: "1rem",
-            border: "1px solid #ddd",
+            border: "1px solid #ccc",
             borderRadius: "8px",
-            padding: "10px"
+            padding: "12px"
           }}>
             <strong>{producto.nombre}</strong><br />
             {producto.descripcion}<br />

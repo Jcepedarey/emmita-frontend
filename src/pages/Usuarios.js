@@ -84,7 +84,7 @@ export default function Usuarios() {
   );
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+    <div style={{ padding: "1rem", maxWidth: "650px", margin: "auto" }}>
       <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Usuarios</h2>
 
       <input
@@ -137,11 +137,13 @@ export default function Usuarios() {
             marginBottom: "1rem",
             border: "1px solid #ddd",
             borderRadius: "8px",
-            padding: "10px"
+            padding: "10px",
+            background: "#f9f9f9"
           }}>
-            <strong>{u.nombre}</strong> - {u.email}<br />
-            Rol: {u.rol}<br />
-            Contraseña: ******<br />
+            <strong>{u.nombre}</strong><br />
+            📧 {u.email}<br />
+            🔐 Contraseña: ******<br />
+            🧩 Rol: {u.rol}
             <div style={{ marginTop: "0.5rem" }}>
               <button onClick={() => editarUsuario(u)} title="Editar" style={{ marginRight: "10px" }}>
                 <FaEdit />

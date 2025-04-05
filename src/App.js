@@ -1,8 +1,9 @@
 import React, { Suspense } from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import { CssBaseline, CircularProgress, Container } from "@mui/material";
-import Navbar from "./components/Navbar"; // Importamos el menú
-import ProtegidoPorRol from "./components/ProtegidoPorRol"; // ✅ Agregado
+import Navbar from "./components/Navbar";
+import ProtegidoPorRol from "./components/ProtegidoPorRol";
+import Navegacion from "./components/Navegacion";
 
 import Login from "./pages/Login";
 import Inicio from "./pages/Inicio";
@@ -11,9 +12,10 @@ import Clientes from "./pages/Clientes";
 import BuscarDocumento from "./pages/BuscarDocumento";
 import Trazabilidad from "./pages/Trazabilidad";
 import Proveedores from "./pages/Proveedores";
+import CotizacionesGuardadas from "./pages/CotizacionesGuardadas";
+import OrdenesGuardadas from "./pages/OrdenesGuardadas";
+import Exportar from "./pages/Exportar"; // ✅ NUEVO COMPONENTE IMPORTADO
 
-// Carga diferida de las páginas (CORRECTO)
-const Cotizaciones = React.lazy(() => import("./pages/Cotizaciones"));
 const Inventario = React.lazy(() => import("./pages/Inventario"));
 const Reportes = React.lazy(() => import("./pages/Reportes"));
 const Agenda = React.lazy(() => import("./pages/Agenda"));
@@ -25,6 +27,7 @@ function App() {
       <CssBaseline />
       <Router>
         <Navbar />
+        <Navegacion />
         <Container>
           <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
             <Routes>
@@ -33,9 +36,10 @@ function App() {
               <Route path="/crear-documento" element={<CrearDocumento />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/buscar" element={<BuscarDocumento />} />
+              <Route path="/cotizacionesguardadas" element={<CotizacionesGuardadas />} />
+              <Route path="/ordenesguardadas" element={<OrdenesGuardadas />} />
               <Route path="/trazabilidad" element={<Trazabilidad />} />
               <Route path="/proveedores" element={<Proveedores />} />
-              <Route path="/cotizaciones" element={<Cotizaciones />} />
               <Route
                 path="/inventario"
                 element={
@@ -60,7 +64,16 @@ function App() {
                   </ProtegidoPorRol>
                 }
               />
+              <Route
+                path="/exportar"
+                element={
+                  <ProtegidoPorRol rolRequerido="admin">
+                    <Exportar />
+                  </ProtegidoPorRol>
+                }
+              />
               <Route path="/agenda" element={<Agenda />} />
+              <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </Suspense>
         </Container>

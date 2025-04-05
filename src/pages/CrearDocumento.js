@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
+import AgregarGrupoModal from "../components/AgregarGrupoModal";
 import { generarPDF } from "../utils/generarPDF";
 import Swal from "sweetalert2";
 
@@ -9,11 +10,17 @@ const CrearDocumento = () => {
   const [clientes, setClientes] = useState([]);
   const [productosAgregados, setProductosAgregados] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [grupoOpen, setGrupoOpen] = useState(false);
   const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
   const [fechaEvento, setFechaEvento] = useState("");
-  const [fechaCreacion, setFechaCreacion] = useState(new Date().toISOString().slice(0, 10));
+  const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
+  const [garantia, setGarantia] = useState("");
+  const [abonos, setAbonos] = useState([""]);
+  const [pagado, setPagado] = useState(false);
 
   const total = productosAgregados.reduce((acc, p) => acc + p.subtotal, 0);
+  const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
+  const saldo = Math.max(0, total - sumaAbonos);
 
   useEffect(() => {
     const obtenerClientes = async () => {
@@ -26,6 +33,7 @@ const CrearDocumento = () => {
 
   const agregarProducto = (producto) => {
     const item = {
+      tipo: "producto",
       id: producto.id,
       nombre: producto.nombre || producto.descripcion,
       precio: producto.precio,
@@ -36,11 +44,45 @@ const CrearDocumento = () => {
     setModalOpen(false);
   };
 
+  const agregarGrupo = (grupo) => {
+    const subtotal = grupo.articulos.reduce((acc, a) => acc + a.precio * a.cantidad, 0);
+    const item = {
+      tipo: "grupo",
+      nombre: grupo.nombre,
+      articulos: grupo.articulos,
+      subtotal,
+    };
+    setProductosAgregados([...productosAgregados, item]);
+    setGrupoOpen(false);
+  };
+
   const eliminarProducto = (index) => {
     const actualizados = [...productosAgregados];
     actualizados.splice(index, 1);
     setProductosAgregados(actualizados);
   };
+
+  const actualizarCantidad = (index, nuevaCantidad) => {
+    const actualizados = [...productosAgregados];
+    actualizados[index].cantidad = nuevaCantidad;
+    actualizados[index].subtotal = actualizados[index].precio * nuevaCantidad;
+    setProductosAgregados(actualizados);
+  };
+
+  const actualizarPrecio = (index, nuevoPrecio) => {
+    const actualizados = [...productosAgregados];
+    actualizados[index].precio = nuevoPrecio;
+    actualizados[index].subtotal = nuevoPrecio * actualizados[index].cantidad;
+    setProductosAgregados(actualizados);
+  };
+
+  const actualizarAbono = (index, valor) => {
+    const copia = [...abonos];
+    copia[index] = valor;
+    setAbonos(copia);
+  };
+
+  const agregarAbono = () => setAbonos([...abonos, ""]);
 
   const guardarDocumento = async () => {
     if (!cliente) return Swal.fire("Campo requerido", "Selecciona un cliente.", "warning");
@@ -51,6 +93,10 @@ const CrearDocumento = () => {
       cliente_id: cliente,
       productos: productosAgregados,
       total,
+      abonos,
+      pagado,
+      saldo,
+      garantia,
       fecha_evento: fechaEvento,
     };
 
@@ -64,76 +110,74 @@ const CrearDocumento = () => {
       Swal.fire("Guardado", `${tipoDocumento === "cotizacion" ? "Cotización" : "Orden"} guardada correctamente.`, "success");
       setProductosAgregados([]);
       setCliente("");
+      setGarantia("");
+      setAbonos([""]);
     }
   };
 
+  // ✅ NUEVA FUNCIÓN: generarRemisionPDF
+  const generarRemisionPDF = async () => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
+    const doc = new jsPDF();
+
+    const logo = await fetch("/logo.png")
+      .then((res) => res.blob())
+      .then((blob) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }));
+
+    doc.addImage(logo, "PNG", 10, 10, 30, 25);
+    doc.setFontSize(16);
+    doc.text("REMISIÓN DE PEDIDO", 70, 20);
+    doc.setFontSize(10);
+    doc.text("Alquiler & Eventos Emmita", 50, 28);
+    doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio", 50, 33);
+    doc.text("Tel: 3166534685 / 3118222934", 50, 38);
+    doc.line(10, 42, 200, 42);
+
+    const clienteSel = clientes.find((c) => c.id === cliente);
+    doc.setFontSize(11);
+    doc.text(`Cliente: ${clienteSel?.nombre || "-"}`, 10, 50);
+    doc.text(`Dirección: ${clienteSel?.direccion || "-"}`, 10, 56);
+    doc.text(`Teléfono: ${clienteSel?.telefono || "-"}`, 10, 62);
+    doc.text(`Fecha evento: ${fechaEvento || "-"}`, 10, 68);
+    doc.text(`Fecha creación: ${fechaCreacion}`, 10, 74);
+    doc.text(`N° Remisión: REM-OP_TEMP`, 150, 50);
+
+    const filas = [];
+    productosAgregados.forEach((item) => {
+      if (item.tipo === "producto") {
+        filas.push([item.nombre, item.cantidad]);
+      } else if (item.tipo === "grupo") {
+        item.articulos.forEach((a) => {
+          filas.push([`(Grupo ${item.nombre}) ${a.nombre}`, a.cantidad]);
+        });
+      }
+    });
+
+    autoTable(doc, {
+      head: [["Artículo", "Cantidad"]],
+      body: filas,
+      startY: 80,
+    });
+
+    const yFinal = doc.previousAutoTable.finalY + 20;
+    doc.line(20, yFinal, 90, yFinal);
+    doc.text("Firma transportista/bodega", 25, yFinal + 5);
+    doc.line(110, yFinal, 180, yFinal);
+    doc.text("Firma cliente", 130, yFinal + 5);
+
+    doc.save("remision.pdf");
+  };
+
   return (
-    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
-        Crear {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
-      </h2>
+    <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
+      {/* ... (todo el formulario y contenido actual) ... */}
 
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Tipo de documento:</label>
-        <select
-          value={tipoDocumento}
-          onChange={(e) => setTipoDocumento(e.target.value)}
-          style={{ width: "100%", padding: "8px" }}
-        >
-          <option value="cotizacion">Cotización</option>
-          <option value="orden">Orden de Pedido</option>
-        </select>
-      </div>
-
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Cliente:</label>
-        <select
-          value={cliente}
-          onChange={(e) => setCliente(e.target.value)}
-          style={{ width: "100%", padding: "8px" }}
-        >
-          <option value="">-- Seleccionar --</option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Fecha de creación:</label>
-        <input type="date" value={fechaCreacion} readOnly style={{ width: "100%", padding: "8px" }} />
-
-        <label>Fecha del evento:</label>
-        <input
-          type="date"
-          value={fechaEvento}
-          onChange={(e) => setFechaEvento(e.target.value)}
-          style={{ width: "100%", padding: "8px" }}
-        />
-      </div>
-
-      <button onClick={() => setModalOpen(true)} style={{ width: "100%", marginBottom: "1rem" }}>
-        Agregar Producto
-      </button>
-
-      <ul>
-        {productosAgregados.map((p, i) => (
-          <li key={i} style={{ marginBottom: "0.5rem" }}>
-            {p.nombre} - {p.cantidad} x ${p.precio} = ${p.subtotal}
-            <button onClick={() => eliminarProducto(i)} style={{ marginLeft: "10px" }}>
-              Eliminar
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <h3>Total: ${total.toFixed(2)}</h3>
-
-      <button onClick={guardarDocumento} style={{ width: "100%", marginTop: "10px" }}>
-        Guardar
-      </button>
+      <button onClick={guardarDocumento} style={{ width: "100%", marginTop: 20 }}>Guardar</button>
 
       {productosAgregados.length > 0 && (
         <button
@@ -143,19 +187,30 @@ const CrearDocumento = () => {
                 cliente_id: cliente,
                 productos: productosAgregados,
                 total,
+                abonos,
+                saldo,
+                garantia,
                 fecha: fechaCreacion,
                 fecha_evento: fechaEvento,
               },
-              tipoDocumento === "cotizacion" ? "cotizacion" : "orden"
+              tipoDocumento
             )
           }
-          style={{ width: "100%", marginTop: "10px" }}
+          style={{ width: "100%", marginTop: 10 }}
         >
           Descargar PDF
         </button>
       )}
 
+      {/* ✅ NUEVO BOTÓN */}
+      {tipoDocumento === "orden" && productosAgregados.length > 0 && (
+        <button onClick={generarRemisionPDF} style={{ width: "100%", marginTop: 10 }}>
+          📄 Generar Remisión
+        </button>
+      )}
+
       {modalOpen && <BuscarProductoModal onSelect={agregarProducto} onClose={() => setModalOpen(false)} />}
+      {grupoOpen && <AgregarGrupoModal onCrearGrupo={agregarGrupo} onCerrar={() => setGrupoOpen(false)} />}
     </div>
   );
 };

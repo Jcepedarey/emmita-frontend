@@ -1,28 +1,38 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [cargando, setCargando] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      return Swal.fire("Campos requeridos", "Debes ingresar email y contraseña", "warning");
+    }
+
     try {
+      setCargando(true);
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/usuarios/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
+      setCargando(false);
 
       if (res.ok) {
         localStorage.setItem("usuario", JSON.stringify(data));
         navigate("/inicio");
       } else {
-        alert(data.error || "Login fallido");
+        Swal.fire("Acceso denegado", data.error || "Email o contraseña incorrectos", "error");
       }
     } catch (err) {
-      alert("Error de conexión");
+      setCargando(false);
+      Swal.fire("Error de conexión", "No se pudo conectar al servidor", "error");
     }
   };
 
@@ -34,14 +44,18 @@ export default function Login() {
         placeholder="Correo"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-      /><br /><br />
+        style={{ padding: "10px", marginBottom: "10px", width: "250px" }}
+      /><br />
       <input
         type="password"
         placeholder="Contraseña"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-      /><br /><br />
-      <button onClick={handleLogin}>Entrar</button>
+        style={{ padding: "10px", marginBottom: "20px", width: "250px" }}
+      /><br />
+      <button onClick={handleLogin} disabled={cargando} style={{ padding: "10px 30px" }}>
+        {cargando ? "Cargando..." : "Entrar"}
+      </button>
     </div>
   );
 }

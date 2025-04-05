@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
-const Clientes = () => {
+export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [buscar, setBuscar] = useState("");
-  const [form, setForm] = useState({ nombre: "", email: "", telefono: "", direccion: "" });
+  const [form, setForm] = useState({ nombre: "", telefono: "", direccion: "", correo: "" });
   const [editando, setEditando] = useState(null);
 
   useEffect(() => {
@@ -14,40 +14,64 @@ const Clientes = () => {
   }, []);
 
   const cargarClientes = async () => {
-    const { data, error } = await supabase.from("clientes").select("*");
+    const { data } = await supabase.from("clientes").select("*").order("id", { ascending: true });
     if (data) setClientes(data);
-    if (error) console.error("Error cargando clientes:", error);
+  };
+
+  const generarCodigoCliente = () => {
+    const codigos = clientes
+      .map(c => c.codigo)
+      .filter(Boolean)
+      .filter(c => c.startsWith("C") && !isNaN(parseInt(c.slice(1))))
+      .map(c => parseInt(c.slice(1)));
+
+    const siguiente = Math.max(...codigos, 1000) + 1;
+    if (siguiente > 9999) {
+      Swal.fire("Límite alcanzado", "No se pueden generar más códigos de cliente", "error");
+      return null;
+    }
+    return `C${siguiente}`;
   };
 
   const guardarCliente = async () => {
-    const { nombre, email, telefono, direccion } = form;
-
-    if (!form.nombre.trim()) {
-      return Swal.fire("Campo requerido", "El nombre es obligatorio", "warning");
-    }
-    if (form.email && !form.email.includes("@")) {
-      return Swal.fire("Correo inválido", "Ingresa un correo válido", "error");
+    const { nombre, telefono, direccion, correo } = form;
+    if (!nombre || !telefono) {
+      return Swal.fire("Campos requeridos", "Nombre y teléfono son obligatorios.", "warning");
     }
 
     if (editando) {
-      const { error } = await supabase
-        .from("clientes")
-        .update({ nombre, email, telefono, direccion })
+      const { error } = await supabase.from("clientes")
+        .update({ nombre, telefono, direccion, correo })
         .eq("id", editando);
       if (!error) {
-        Swal.fire("Actualizado", "Cliente actualizado correctamente", "success");
+        Swal.fire("Actualizado", "Cliente actualizado correctamente.", "success");
         setEditando(null);
-        setForm({ nombre: "", email: "", telefono: "", direccion: "" });
+        setForm({ nombre: "", telefono: "", direccion: "", correo: "" });
         cargarClientes();
       }
     } else {
-      const { error } = await supabase.from("clientes").insert([{ nombre, email, telefono, direccion }]);
+      const nuevoCodigo = generarCodigoCliente();
+      if (!nuevoCodigo) return;
+
+      const { error } = await supabase.from("clientes")
+        .insert([{ codigo: nuevoCodigo, nombre, telefono, direccion, correo }]);
+
       if (!error) {
-        Swal.fire("Guardado", "Cliente guardado correctamente", "success");
-        setForm({ nombre: "", email: "", telefono: "", direccion: "" });
+        Swal.fire("Guardado", "Cliente guardado correctamente.", "success");
+        setForm({ nombre: "", telefono: "", direccion: "", correo: "" });
         cargarClientes();
       }
     }
+  };
+
+  const editarCliente = (cliente) => {
+    setEditando(cliente.id);
+    setForm({
+      nombre: cliente.nombre,
+      telefono: cliente.telefono,
+      direccion: cliente.direccion,
+      correo: cliente.correo || "",
+    });
   };
 
   const eliminarCliente = async (id) => {
@@ -60,37 +84,25 @@ const Clientes = () => {
       cancelButtonText: "Cancelar",
     });
     if (!confirmar.isConfirmed) return;
-
     const { error } = await supabase.from("clientes").delete().eq("id", id);
     if (!error) {
-      Swal.fire("Eliminado", "Cliente eliminado correctamente", "success");
+      Swal.fire("Eliminado", "Cliente eliminado correctamente.", "success");
       cargarClientes();
     }
   };
 
-  const editarCliente = (cliente) => {
-    setEditando(cliente.id);
-    setForm({
-      nombre: cliente.nombre,
-      email: cliente.email || "",
-      telefono: cliente.telefono || "",
-      direccion: cliente.direccion || "",
-    });
-  };
-
   const filtrados = clientes.filter((c) =>
-    [c.nombre, c.telefono, c.email].some((campo) =>
-      campo?.toLowerCase().includes(buscar.toLowerCase())
-    )
+    [c.codigo, c.nombre, c.telefono, c.direccion, c.correo]
+      .some((campo) => campo?.toLowerCase().includes(buscar.toLowerCase()))
   );
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
-      <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Clientes</h2>
+    <div style={{ padding: "1rem", maxWidth: "650px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Clientes</h2>
 
       <input
         type="text"
-        placeholder="Buscar por nombre, email o teléfono"
+        placeholder="Buscar cliente"
         value={buscar}
         onChange={(e) => setBuscar(e.target.value)}
         style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}
@@ -102,13 +114,6 @@ const Clientes = () => {
         placeholder="Nombre"
         value={form.nombre}
         onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="email"
-        placeholder="Correo"
-        value={form.email}
-        onChange={(e) => setForm({ ...form, email: e.target.value })}
         style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
       />
       <input
@@ -125,35 +130,44 @@ const Clientes = () => {
         onChange={(e) => setForm({ ...form, direccion: e.target.value })}
         style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
       />
-      <button onClick={guardarCliente} style={{ width: "100%", padding: "10px", marginBottom: "1rem" }}>
+      <input
+        type="email"
+        placeholder="Correo electrónico"
+        value={form.correo}
+        onChange={(e) => setForm({ ...form, correo: e.target.value })}
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
+
+      <button onClick={guardarCliente} style={{ width: "100%", padding: "10px", marginBottom: "8px" }}>
         {editando ? "Actualizar" : "Guardar"}
       </button>
+      <button onClick={() => {
+        setEditando(null);
+        setForm({ nombre: "", telefono: "", direccion: "", correo: "" });
+      }} style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}>Cancelar</button>
 
-      <h3 style={{ marginTop: "2rem" }}>Lista de Clientes</h3>
+      <h3 style={{ marginTop: "1.5rem" }}>Lista de Clientes</h3>
       <ul style={{ listStyle: "none", padding: 0 }}>
-        {filtrados.map((cliente) => (
-          <li key={cliente.id} style={{
+        {filtrados.map((c) => (
+          <li key={c.id} style={{
             marginBottom: "1rem",
-            border: "1px solid #ddd",
+            border: "1px solid #ccc",
             borderRadius: "8px",
-            padding: "10px"
+            padding: "10px",
+            background: "#f9f9f9"
           }}>
-            <strong>{cliente.nombre}</strong><br />
-            📧 {cliente.email || "Sin correo"}<br />
-            📞 {cliente.telefono || "Sin teléfono"}<br />
+            <strong>{c.codigo || "Sin código"}</strong><br />
+            {c.nombre}<br />
+            📞 {c.telefono}<br />
+            📍 {c.direccion}<br />
+            📧 {c.correo}
             <div style={{ marginTop: "0.5rem" }}>
-              <button onClick={() => editarCliente(cliente)} title="Editar" style={{ marginRight: "10px" }}>
-                <FaEdit />
-              </button>
-              <button onClick={() => eliminarCliente(cliente.id)} title="Eliminar">
-                <FaTrash />
-              </button>
+              <button onClick={() => editarCliente(c)} style={{ marginRight: "10px" }}><FaEdit /></button>
+              <button onClick={() => eliminarCliente(c.id)}><FaTrash /></button>
             </div>
           </li>
         ))}
       </ul>
     </div>
   );
-};
-
-export default Clientes;
+}

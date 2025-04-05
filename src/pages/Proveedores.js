@@ -7,7 +7,7 @@ export default function Proveedores() {
   const [proveedores, setProveedores] = useState([]);
   const [productosProveedor, setProductosProveedor] = useState([]);
   const [formProv, setFormProv] = useState({ nombre: "", telefono: "", tipo_servicio: "" });
-  const [formProd, setFormProd] = useState({ proveedor_id: "", nombre: "", stock: "", precio_compra: "", precio_venta: "" });
+  const [formProd, setFormProd] = useState({ proveedor_id: "", nombre: "", precio_compra: "", precio_venta: "" });
   const [buscar, setBuscar] = useState("");
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function Proveedores() {
   };
 
   const guardarProductoProveedor = async () => {
-    const { proveedor_id, nombre, stock, precio_compra, precio_venta } = formProd;
+    const { proveedor_id, nombre, precio_compra, precio_venta } = formProd;
 
     if (!proveedor_id || !nombre || !precio_compra || !precio_venta) {
       return Swal.fire("Faltan datos", "Completa todos los campos requeridos.", "warning");
@@ -52,7 +52,7 @@ export default function Proveedores() {
     const { error } = await supabase.from("productos_proveedores").insert([formProd]);
     if (!error) {
       Swal.fire("Guardado", "Producto externo agregado correctamente.", "success");
-      setFormProd({ proveedor_id: "", nombre: "", stock: "", precio_compra: "", precio_venta: "" });
+      setFormProd({ proveedor_id: "", nombre: "", precio_compra: "", precio_venta: "" });
       cargarProductosProveedor();
     }
   };
@@ -81,8 +81,8 @@ export default function Proveedores() {
   );
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center" }}>Gestión de Proveedores</h2>
+    <div style={{ padding: "1rem", maxWidth: "650px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Proveedores</h2>
 
       <h3>Agregar Proveedor</h3>
       <input placeholder="Nombre" value={formProv.nombre} onChange={(e) => setFormProv({ ...formProv, nombre: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
@@ -98,7 +98,6 @@ export default function Proveedores() {
         ))}
       </select>
       <input placeholder="Nombre del producto" value={formProd.nombre} onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
-      <input type="number" placeholder="Stock" value={formProd.stock} onChange={(e) => setFormProd({ ...formProd, stock: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
       <input type="number" placeholder="Precio de compra" value={formProd.precio_compra} onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
       <input type="number" placeholder="Precio de venta" value={formProd.precio_venta} onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })} style={{ width: "100%", marginBottom: 8 }} />
       <button onClick={guardarProductoProveedor} style={{ width: "100%", marginBottom: "1rem" }}>Guardar Producto</button>
@@ -108,9 +107,9 @@ export default function Proveedores() {
 
       <ul style={{ listStyle: "none", padding: 0 }}>
         {productosFiltrados.map((prod) => (
-          <li key={prod.id} style={{ padding: 10, border: "1px solid #ddd", marginBottom: 10, borderRadius: 8 }}>
+          <li key={prod.id} style={{ padding: 10, border: "1px solid #ddd", marginBottom: 10, borderRadius: 8, background: "#fdfdfd" }}>
             <strong>{prod.nombre}</strong><br />
-            Stock: {prod.stock} - Compra: ${prod.precio_compra} - Venta: ${prod.precio_venta}
+            Stock: {prod.stock ?? "-"} - Compra: ${prod.precio_compra} - Venta: ${prod.precio_venta}
             <div style={{ marginTop: "0.5rem" }}>
               <button onClick={() => eliminarProducto(prod.id)} title="Eliminar">
                 <FaTrash />

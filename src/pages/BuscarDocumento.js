@@ -48,8 +48,17 @@ export default function BuscarDocumento() {
     window.location.href = "/crear-documento";
   };
 
+  const limpiarFiltros = () => {
+    setFiltros({ cliente: "", fechaCreacion: "", fechaEvento: "", id: "" });
+  };
+
+  const obtenerNombreCliente = (id) => {
+    const cliente = clientes.find((c) => c.id === id);
+    return cliente ? cliente.nombre : "Cliente no encontrado";
+  };
+
   return (
-    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+    <div style={{ padding: "1rem", maxWidth: "650px", margin: "auto" }}>
       <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Buscar Documento</h2>
 
       <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ width: "100%", marginBottom: "10px", padding: "8px" }}>
@@ -65,12 +74,14 @@ export default function BuscarDocumento() {
         style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
       />
 
-      <select value={filtros.cliente} onChange={(e) => setFiltros({ ...filtros, cliente: e.target.value })} style={{ width: "100%", marginBottom: "10px", padding: "8px" }}>
+      <select
+        value={filtros.cliente}
+        onChange={(e) => setFiltros({ ...filtros, cliente: e.target.value })}
+        style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
+      >
         <option value="">-- Seleccionar Cliente --</option>
         {clientes.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.nombre}
-          </option>
+          <option key={c.id} value={c.id}>{c.nombre}</option>
         ))}
       </select>
 
@@ -90,20 +101,36 @@ export default function BuscarDocumento() {
         />
       )}
 
-      <button onClick={cargarDocumentos} style={{ width: "100%", marginBottom: "1rem", padding: "10px" }}>Buscar</button>
+      <div style={{ display: "flex", gap: "10px", marginBottom: "1rem" }}>
+        <button onClick={cargarDocumentos} style={{ flex: 1, padding: "10px" }}>
+          Buscar
+        </button>
+        <button onClick={limpiarFiltros} style={{ flex: 1, padding: "10px" }}>
+          Limpiar
+        </button>
+      </div>
 
       <h3>Resultados</h3>
       <ul style={{ listStyle: "none", padding: 0 }}>
         {documentos.map((doc) => (
-          <li key={doc.id} style={{ marginBottom: "1rem", border: "1px solid #ccc", borderRadius: "10px", padding: "10px" }}>
+          <li key={doc.id} style={{
+            marginBottom: "1rem",
+            border: "1px solid #ccc",
+            borderRadius: "10px",
+            padding: "10px",
+            background: "#fdfdfd"
+          }}>
             <strong>ID:</strong> {doc.id}<br />
-            <strong>Cliente:</strong> {doc.cliente_id}<br />
+            <strong>Cliente:</strong> {obtenerNombreCliente(doc.cliente_id)}<br />
             <strong>Total:</strong> ${doc.total}<br />
-            <strong>Fecha:</strong> {doc.fecha}<br />
-            {doc.fecha_evento && <><strong>Evento:</strong> {doc.fecha_evento}<br /></>}
-            <button onClick={() => cargarEnCrear(doc)} style={{ marginRight: "10px" }}>Editar</button>
-            <button onClick={() => eliminarDocumento(doc.id)} style={{ marginRight: "10px" }}>Eliminar</button>
-            <button onClick={() => generarPDF(doc, tipo)}>Descargar PDF</button>
+            <strong>Fecha creación:</strong> {doc.fecha}<br />
+            {doc.fecha_evento && <><strong>Fecha evento:</strong> {doc.fecha_evento}<br /></>}
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px" }}>
+              <button onClick={() => cargarEnCrear(doc)}>Editar</button>
+              <button onClick={() => eliminarDocumento(doc.id)}>Eliminar</button>
+              <button onClick={() => generarPDF(doc, tipo)}>Descargar PDF</button>
+            </div>
           </li>
         ))}
       </ul>

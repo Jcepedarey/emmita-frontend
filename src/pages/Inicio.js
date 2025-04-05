@@ -7,7 +7,7 @@ const usuario = JSON.parse(localStorage.getItem("usuario"));
 const esAdmin = usuario?.rol === "admin";
 
 const iconos = [
-  { nombre: "Crear documento", ruta: "/cotizaciones" },
+  { nombre: "Crear documento", ruta: "/crear-documento" }, // ✅ Ruta corregida
   { nombre: "Clientes", ruta: "/clientes" },
   ...(esAdmin ? [{ nombre: "Inventario", ruta: "/inventario" }] : []),
   ...(esAdmin ? [{ nombre: "Usuarios", ruta: "/usuarios" }] : []),
@@ -74,7 +74,6 @@ export default function Inicio() {
       alertas.push(`📌 Hay ${notas.length} nota(s) agendada(s) para hoy.`);
     }
 
-    // 🛠️ Verificar productos con disponibilidad menor a 5
     const conteoPorProducto = {};
     pedidos?.forEach((p) => {
       p.productos?.forEach((prod) => {

@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import supabase from "../supabaseClient";
+import { useNavigate } from "react-router-dom";
 
 export default function Agenda() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
   const [notas, setNotas] = useState([]);
   const [nuevaNota, setNuevaNota] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     cargarNotas();
@@ -32,12 +34,29 @@ export default function Agenda() {
         titulo: "Nota",
         descripcion: nuevaNota,
         fecha,
+        documento_id: null,
+        tipo: null
       },
     ]);
 
     if (!error) {
       setNuevaNota("");
       cargarNotas();
+    }
+  };
+
+  const irADocumento = async (nota) => {
+    if (!nota.documento_id || !nota.tipo) return;
+
+    const tabla = nota.tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const { data, error } = await supabase
+      .from(tabla)
+      .select("*")
+      .eq("id", nota.documento_id)
+      .single();
+
+    if (!error && data) {
+      navigate("/crear-documento", { state: { documento: data, tipo: nota.tipo } });
     }
   };
 
@@ -58,6 +77,15 @@ export default function Agenda() {
           <li key={nota.id} style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>
             <strong>{nota.titulo}</strong><br />
             {nota.descripcion}
+            {nota.documento_id && nota.tipo && (
+              <>
+                <br />
+                <em>{nota.tipo === "cotizacion" ? "Cotización" : "Orden"} #{nota.documento_id}</em><br />
+                <button onClick={() => irADocumento(nota)} style={{ marginTop: "5px" }}>
+                  Ver documento
+                </button>
+              </>
+            )}
           </li>
         ))}
       </ul>
