@@ -14,10 +14,7 @@ const Navbar = () => {
 
   const navLinks = [
     { label: "Inicio", path: "/inicio" },
-    { label: "Inventario", path: "/inventario" },
-    { label: "Reportes", path: "/reportes" },
-    { label: "Agenda", path: "/agenda" },
-    { label: "Usuarios", path: "/usuarios" },
+    { label: "Login", path: "/" }
   ];
 
   return (

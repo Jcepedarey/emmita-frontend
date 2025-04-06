@@ -38,7 +38,7 @@ export default function Login() {
 
   return (
     <div style={{ textAlign: "center", marginTop: "100px" }}>
-      <h2>Iniciar sesión</h2>
+      <h2 style={{ marginBottom: "20px", fontSize: "1.6rem" }}>Iniciar sesión</h2>
       <input
         type="email"
         placeholder="Correo"
@@ -53,9 +53,16 @@ export default function Login() {
         onChange={(e) => setPassword(e.target.value)}
         style={{ padding: "10px", marginBottom: "20px", width: "250px" }}
       /><br />
-      <button onClick={handleLogin} disabled={cargando} style={{ padding: "10px 30px" }}>
+      <button
+        onClick={handleLogin}
+        disabled={cargando}
+        style={{ padding: "10px 30px", fontSize: "1rem", cursor: "pointer" }}
+      >
         {cargando ? "Cargando..." : "Entrar"}
       </button>
+      <div style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#888" }}>
+        ¿No tienes cuenta? Pronto podrás crearla desde aquí.
+      </div>
     </div>
   );
 }

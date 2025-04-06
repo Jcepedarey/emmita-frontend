@@ -2,31 +2,35 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
-
-const usuario = JSON.parse(localStorage.getItem("usuario"));
-const esAdmin = usuario?.rol === "admin";
-
-const iconos = [
-  { nombre: "Crear documento", ruta: "/crear-documento" }, // ✅ Ruta corregida
-  { nombre: "Clientes", ruta: "/clientes" },
-  ...(esAdmin ? [{ nombre: "Inventario", ruta: "/inventario" }] : []),
-  ...(esAdmin ? [{ nombre: "Usuarios", ruta: "/usuarios" }] : []),
-  ...(esAdmin ? [{ nombre: "Reportes", ruta: "/reportes" }] : []),
-  { nombre: "Buscar documento", ruta: "/buscar" },
-  { nombre: "Trazabilidad", ruta: "/trazabilidad" },
-  { nombre: "Calendario y agenda", ruta: "/agenda" },
-  { nombre: "Proveedores", ruta: "/proveedores" },
-];
+import { FaFileAlt, FaUserFriends, FaBoxes, FaSearch, FaFingerprint, FaCalendarAlt, FaTruck, FaChartBar, FaUsers } from "react-icons/fa";
 
 export default function Inicio() {
   const navigate = useNavigate();
   const [pedidosActivos, setPedidosActivos] = useState(0);
   const [cotizacionesSemana, setCotizacionesSemana] = useState(0);
+  const [fechaHora, setFechaHora] = useState(new Date());
+
+  const usuario = JSON.parse(localStorage.getItem("usuario"));
+  const esAdmin = usuario?.rol === "admin";
+
+  const iconos = [
+    { nombre: "Crear documento", ruta: "/crear-documento", icono: <FaFileAlt /> },
+    { nombre: "Clientes", ruta: "/clientes", icono: <FaUserFriends /> },
+    ...(esAdmin ? [{ nombre: "Inventario", ruta: "/inventario", icono: <FaBoxes /> }] : []),
+    ...(esAdmin ? [{ nombre: "Usuarios", ruta: "/usuarios", icono: <FaUsers /> }] : []),
+    ...(esAdmin ? [{ nombre: "Reportes", ruta: "/reportes", icono: <FaChartBar /> }] : []),
+    { nombre: "Buscar documento", ruta: "/buscar", icono: <FaSearch /> },
+    { nombre: "Trazabilidad", ruta: "/trazabilidad", icono: <FaFingerprint /> },
+    { nombre: "Calendario y agenda", ruta: "/agenda", icono: <FaCalendarAlt /> },
+    { nombre: "Proveedores", ruta: "/proveedores", icono: <FaTruck /> },
+  ];
 
   useEffect(() => {
+    const interval = setInterval(() => setFechaHora(new Date()), 1000);
     obtenerPedidosActivos();
     obtenerCotizacionesSemana();
     verificarAlertasHoy();
+    return () => clearInterval(interval);
   }, []);
 
   const obtenerPedidosActivos = async () => {
@@ -41,12 +45,10 @@ export default function Inicio() {
     const fechaInicio = new Date();
     fechaInicio.setDate(fechaInicio.getDate() - 7);
     const isoInicio = fechaInicio.toISOString();
-
     const { data } = await supabase
       .from("cotizaciones")
       .select("*")
       .gte("fecha", isoInicio);
-
     if (data) setCotizacionesSemana(data.length);
   };
 
@@ -103,13 +105,23 @@ export default function Inicio() {
     }
   };
 
-  return (
-    <div style={{ padding: "1rem", textAlign: "center" }}>
-      <h1 style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)" }}>Inicio</h1>
+  const handleLogout = () => {
+    localStorage.removeItem("usuario");
+    navigate("/");
+  };
 
-      <div style={{ margin: "20px auto" }}>
-        <img src="/logo192.png" alt="logo" style={{ width: "100px", maxWidth: "80%" }} />
+  return (
+    <div style={{ padding: "1rem", maxWidth: "1000px", margin: "auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <img src="/logo192.png" alt="logo" style={{ height: "50px" }} />
+        <div style={{ textAlign: "right" }}>
+          <div>{fechaHora.toLocaleString()}</div>
+          <div style={{ fontWeight: "bold" }}>{usuario?.nombre}</div>
+          <button onClick={handleLogout}>Cerrar sesión</button>
+        </div>
       </div>
+
+      <h1 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2.5rem)" }}>Menú Principal</h1>
 
       <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "20px" }}>
         <div style={{
@@ -151,8 +163,13 @@ export default function Inicio() {
               borderRadius: "10px",
               border: "1px solid #ccc",
               background: "#f9f9f9",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "10px"
             }}
           >
+            <div style={{ fontSize: "1.5rem" }}>{item.icono}</div>
             {item.nombre}
           </button>
         ))}
