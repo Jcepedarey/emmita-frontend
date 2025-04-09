@@ -6,6 +6,7 @@ import ProtegidoPorRol from "./components/ProtegidoPorRol";
 import Navegacion from "./components/Navegacion";
 
 import Login from "./pages/Login";
+import Registro from "./pages/Registro"; // ✅ NUEVO IMPORT
 import Inicio from "./pages/Inicio";
 import CrearDocumento from "./pages/CrearDocumento";
 import Clientes from "./pages/Clientes";
@@ -14,7 +15,7 @@ import Trazabilidad from "./pages/Trazabilidad";
 import Proveedores from "./pages/Proveedores";
 import CotizacionesGuardadas from "./pages/CotizacionesGuardadas";
 import OrdenesGuardadas from "./pages/OrdenesGuardadas";
-import Exportar from "./pages/Exportar"; // ✅ NUEVO COMPONENTE IMPORTADO
+import Exportar from "./pages/Exportar";
 
 const Inventario = React.lazy(() => import("./pages/Inventario"));
 const Reportes = React.lazy(() => import("./pages/Reportes"));
@@ -32,6 +33,7 @@ function App() {
           <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
             <Routes>
               <Route path="/" element={<Login />} />
+              <Route path="/registro" element={<Registro />} /> {/* ✅ NUEVA RUTA */}
               <Route path="/inicio" element={<Inicio />} />
               <Route path="/crear-documento" element={<CrearDocumento />} />
               <Route path="/clientes" element={<Clientes />} />
