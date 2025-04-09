@@ -2,15 +2,36 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
-import { FaFileAlt, FaUserFriends, FaBoxes, FaSearch, FaFingerprint, FaCalendarAlt, FaTruck, FaChartBar, FaUsers } from "react-icons/fa";
+import {
+  FaFileAlt, FaUserFriends, FaBoxes, FaSearch, FaFingerprint,
+  FaCalendarAlt, FaTruck, FaChartBar, FaUsers
+} from "react-icons/fa";
 
 export default function Inicio() {
   const navigate = useNavigate();
   const [pedidosActivos, setPedidosActivos] = useState(0);
   const [cotizacionesSemana, setCotizacionesSemana] = useState(0);
   const [fechaHora, setFechaHora] = useState(new Date());
+  const [usuario, setUsuario] = useState(null);
 
-  const usuario = JSON.parse(localStorage.getItem("usuario"));
+  useEffect(() => {
+    const u = JSON.parse(localStorage.getItem("usuario"));
+    if (!u) {
+      navigate("/");
+      return;
+    }
+    setUsuario(u);
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!usuario) return;
+    const interval = setInterval(() => setFechaHora(new Date()), 1000);
+    obtenerPedidosActivos();
+    obtenerCotizacionesSemana();
+    verificarAlertasHoy();
+    return () => clearInterval(interval);
+  }, [usuario]);
+
   const esAdmin = usuario?.rol === "admin";
 
   const iconos = [
@@ -24,14 +45,6 @@ export default function Inicio() {
     { nombre: "Calendario y agenda", ruta: "/agenda", icono: <FaCalendarAlt /> },
     { nombre: "Proveedores", ruta: "/proveedores", icono: <FaTruck /> },
   ];
-
-  useEffect(() => {
-    const interval = setInterval(() => setFechaHora(new Date()), 1000);
-    obtenerPedidosActivos();
-    obtenerCotizacionesSemana();
-    verificarAlertasHoy();
-    return () => clearInterval(interval);
-  }, []);
 
   const obtenerPedidosActivos = async () => {
     const { data } = await supabase
@@ -68,11 +81,11 @@ export default function Inicio() {
 
     const alertas = [];
 
-    if (pedidos && pedidos.length > 0) {
+    if (pedidos?.length) {
       alertas.push(`📦 Hay ${pedidos.length} pedido(s) programado(s) para hoy.`);
     }
 
-    if (notas && notas.length > 0) {
+    if (notas?.length) {
       alertas.push(`📌 Hay ${notas.length} nota(s) agendada(s) para hoy.`);
     }
 
@@ -92,7 +105,8 @@ export default function Inicio() {
     });
 
     if (productosEnAlerta.length > 0) {
-      alertas.push("⚠️ Productos con baja disponibilidad hoy:\n" + productosEnAlerta.map(p => `• ${p.nombre}`).join("\n"));
+      alertas.push("⚠️ Productos con baja disponibilidad hoy:\n" +
+        productosEnAlerta.map(p => `• ${p.nombre}`).join("\n"));
     }
 
     if (alertas.length > 0) {
@@ -110,9 +124,16 @@ export default function Inicio() {
     navigate("/");
   };
 
+  if (!usuario) return null;
+
   return (
     <div style={{ padding: "1rem", maxWidth: "1000px", margin: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 20
+      }}>
         <img src="/logo192.png" alt="logo" style={{ height: "50px" }} />
         <div style={{ textAlign: "right" }}>
           <div>{fechaHora.toLocaleString()}</div>
