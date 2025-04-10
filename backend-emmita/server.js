@@ -1,6 +1,6 @@
-const express = require("express"); 
+const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+require("dotenv").config(); // ✅ Carga el .env antes de todo lo demás
 const sequelize = require("./database");
 
 const app = express();

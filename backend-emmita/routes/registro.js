@@ -4,13 +4,14 @@ const router = express.Router();
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 const pool = require("../db");
+require("dotenv").config(); // ✅ Asegura que las variables de entorno estén disponibles
 
 // Configura tu correo (usa variables de entorno en producción)
 const transporter = nodemailer.createTransport({
   service: "hotmail",
   auth: {
     user: "alquileresemmita@hotmail.com",
-    pass: "tu_contraseña_de_correo", // ⚠️ Usa un token seguro si es posible
+    pass: process.env.HOTMAIL_PASSWORD, // ✅ Ahora se usa una variable segura
   },
 });
 
