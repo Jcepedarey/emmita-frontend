@@ -7,6 +7,7 @@ import Navegacion from "./components/Navegacion";
 
 import Login from "./pages/Login";
 import Registro from "./pages/Registro"; // ✅ NUEVO IMPORT
+import AutorizarUsuario from "./pages/AutorizarUsuario"; // ✅ NUEVA IMPORTACIÓN
 import Inicio from "./pages/Inicio";
 import CrearDocumento from "./pages/CrearDocumento";
 import Clientes from "./pages/Clientes";
@@ -33,7 +34,8 @@ function App() {
           <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
             <Routes>
               <Route path="/" element={<Login />} />
-              <Route path="/registro" element={<Registro />} /> {/* ✅ NUEVA RUTA */}
+              <Route path="/registro" element={<Registro />} />
+              <Route path="/autorizar" element={<AutorizarUsuario />} /> {/* ✅ NUEVA RUTA */}
               <Route path="/inicio" element={<Inicio />} />
               <Route path="/crear-documento" element={<CrearDocumento />} />
               <Route path="/clientes" element={<Clientes />} />

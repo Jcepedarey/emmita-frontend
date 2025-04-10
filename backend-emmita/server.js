@@ -1,4 +1,4 @@
-const express = require("express");
+const express = require("express"); 
 const cors = require("cors");
 require("dotenv").config();
 const sequelize = require("./database"); // Conexión a la base de datos
@@ -21,7 +21,9 @@ app.use("/api/productos", require("./routes/productos"));
 app.use("/api/ordenes", require("./routes/ordenes"));
 app.use("/api/proveedores", require("./routes/proveedores"));
 app.use("/api/trazabilidad", require("./routes/trazabilidad"));
-app.use("/api/usuarios", require("./routes/usuarios")); // ✅ NUEVA RUTA AÑADIDA
+app.use("/api/usuarios", require("./routes/usuarios"));
+app.use("/api/usuarios", require("./routes/registro"));    // 🆕 Ruta para solicitud de registro
+app.use("/api/usuarios", require("./routes/autorizar"));   // 🆕 Ruta para autorizar usuario
 
 // Manejo de errores en rutas no definidas
 app.use((req, res) => {
