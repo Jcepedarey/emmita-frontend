@@ -1,7 +1,7 @@
 const express = require("express"); 
 const cors = require("cors");
 require("dotenv").config();
-const sequelize = require("./database"); // Conexión a la base de datos
+const sequelize = require("./database");
 
 const app = express();
 
@@ -9,9 +9,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Ruta de prueba para verificar que el backend está corriendo
+// Ruta de prueba
 app.get("/api/test", (req, res) => {
-    res.json({ message: "✅ El backend funciona correctamente" });
+  res.json({ message: "✅ El backend funciona correctamente" });
 });
 
 // Rutas
@@ -22,23 +22,23 @@ app.use("/api/ordenes", require("./routes/ordenes"));
 app.use("/api/proveedores", require("./routes/proveedores"));
 app.use("/api/trazabilidad", require("./routes/trazabilidad"));
 app.use("/api/usuarios", require("./routes/usuarios"));
-app.use("/api/usuarios", require("./routes/registro"));    // 🆕 Ruta para solicitud de registro
-app.use("/api/usuarios", require("./routes/autorizar"));   // 🆕 Ruta para autorizar usuario
+app.use("/api/usuarios", require("./routes/registro"));       // ✅ solicitud de registro
+app.use("/api/usuarios", require("./routes/autorizar"));      // ✅ autorización de registro
 
-// Manejo de errores en rutas no definidas
+// Ruta 404
 app.use((req, res) => {
-    res.status(404).json({ error: "❌ Ruta no encontrada" });
+  res.status(404).json({ error: "❌ Ruta no encontrada" });
 });
 
-// Iniciar el servidor solo si la conexión a la base de datos es exitosa
+// Iniciar servidor
 const PORT = process.env.PORT || 3001;
 sequelize.authenticate()
-    .then(() => {
-        console.log("🟢 Conexión exitosa con la base de datos");
-        app.listen(PORT, () => {
-            console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-        });
-    })
-    .catch((error) => {
-        console.error("❌ Error de conexión a la base de datos:", error);
+  .then(() => {
+    console.log("🟢 Conexión exitosa con la base de datos");
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
     });
+  })
+  .catch((error) => {
+    console.error("❌ Error de conexión a la base de datos:", error);
+  });
