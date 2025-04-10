@@ -21,9 +21,9 @@ app.use("/api/productos", require("./routes/productos"));
 app.use("/api/ordenes", require("./routes/ordenes"));
 app.use("/api/proveedores", require("./routes/proveedores"));
 app.use("/api/trazabilidad", require("./routes/trazabilidad"));
-app.use("/api/usuarios", require("./routes/usuarios"));
-app.use("/api/usuarios", require("./routes/registro"));       // ✅ solicitud de registro
-app.use("/api/usuarios", require("./routes/autorizar"));      // ✅ autorización de registro
+app.use("/api/usuarios", require("./routes/usuarios")); // ✅ ÚNICA RUTA ACTIVA PARA /usuarios
+// app.use("/api/usuarios", require("./routes/registro"));       // ❌ Comentado para evitar conflicto
+// app.use("/api/usuarios", require("./routes/autorizar"));      // ❌ Comentado para evitar conflicto
 
 // Ruta 404
 app.use((req, res) => {
