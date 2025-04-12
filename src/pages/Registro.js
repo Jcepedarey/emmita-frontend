@@ -32,7 +32,7 @@ export default function Registro() {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/usuarios/solicitud-registro`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, identificacion, usuario, email, password }),
+        body: JSON.stringify({ nombre, identificacion, usuario, email, password, confirmar }), // ✅ se agregó confirmar
       });
 
       const data = await res.json();

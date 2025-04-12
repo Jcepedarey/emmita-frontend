@@ -1,7 +1,20 @@
+// ✅ CÓDIGO ACTUALIZADO de backend-emmita/routes/usuarios.js
 const express = require("express");
 const router = express.Router();
-const pool = require("../database");
+const pool = require("../db");
 const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
+const { v4: uuidv4 } = require("uuid");
+require("dotenv").config();
+
+// Configurar nodemailer
+const transporter = nodemailer.createTransport({
+  service: "hotmail",
+  auth: {
+    user: "alquileresemmita@hotmail.com",
+    pass: process.env.HOTMAIL_PASSWORD,
+  },
+});
 
 // ✅ Obtener todos los usuarios
 router.get("/", async (req, res) => {
@@ -37,41 +50,36 @@ router.post("/login", async (req, res) => {
   const valid = await bcrypt.compare(password, usuario.password);
   if (!valid) return res.status(400).json({ error: "Contraseña incorrecta" });
 
-  // Devolver usuario sin contraseña
   const { password: _, ...usuarioSeguro } = usuario;
   res.json(usuarioSeguro);
 });
-const nodemailer = require("nodemailer");
-const { v4: uuidv4 } = require("uuid");
 
-// POST /api/usuarios/solicitud-registro
+// ✅ Registro de nuevo usuario con código de autorización por correo
 router.post("/solicitud-registro", async (req, res) => {
-  const { nombre, identificacion, usuario, email, password } = req.body;
+  const { nombre, identificacion, usuario, email, password, confirmar } = req.body;
 
-  if (!nombre || !email || !password) {
+  if (!nombre || !email || !password || !confirmar || !identificacion || !usuario) {
     return res.status(400).json({ error: "Todos los campos son requeridos." });
+  }
+
+  if (password !== confirmar) {
+    return res.status(400).json({ error: "Las contraseñas no coinciden." });
   }
 
   const codigo = Math.floor(100000 + Math.random() * 900000).toString();
 
   try {
-    await pool.query(`
-      INSERT INTO solicitudes_usuarios (id, nombre, identificacion, usuario, correo, password, codigo)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [uuidv4(), nombre, identificacion, usuario, email, password, codigo]);
+    await pool.query(
+      `INSERT INTO solicitudes_usuarios (id, nombre, identificacion, usuario, correo, password, codigo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [uuidv4(), nombre, identificacion, usuario, email, password, codigo]
+    );
 
     await transporter.sendMail({
       from: "alquileresemmita@hotmail.com",
       to: "alquileresemmita@hotmail.com",
       subject: "Nueva solicitud de usuario",
-      text: `📩 Nueva solicitud de usuario:\n
-Nombre: ${nombre}
-Usuario: ${usuario}
-Correo: ${email}
-Identificación: ${identificacion}
-
-Código de autorización: ${codigo}
-Ingresa este código en el sistema para aprobar el acceso.`
+      text: `📩 Nueva solicitud de usuario:\n\nNombre: ${nombre}\nUsuario: ${usuario}\nCorreo: ${email}\nIdentificación: ${identificacion}\n\nCódigo de autorización: ${codigo}\nIngresa este código en el sistema para aprobar el acceso.`
     });
 
     res.json({ mensaje: "Solicitud enviada correctamente. Espera autorización por correo." });
