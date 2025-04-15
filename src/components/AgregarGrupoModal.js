@@ -1,3 +1,4 @@
+// C:\Users\pc\frontend-emmita\src\components\AgregarGrupoModal.js
 import React, { useState, useEffect } from "react";
 import supabase from "../supabaseClient";
 import "../estilos/GrupoModal.css";
@@ -38,12 +39,16 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
   };
 
   const guardarGrupo = () => {
-    if (!nombreGrupo || seleccionados.length === 0) return alert("Debes nombrar el grupo y agregar artículos.");
+    if (!nombreGrupo || seleccionados.length === 0) {
+      alert("Debes nombrar el grupo y agregar artículos.");
+      return;
+    }
+
     const subtotalGrupo = seleccionados.reduce((acc, p) => acc + p.subtotal, 0);
     const grupo = {
       nombre: nombreGrupo,
       subtotal: subtotalGrupo,
-      detalleGrupo: seleccionados
+      articulos: seleccionados // 🔄 Corrección aquí
     };
     onAgregarGrupo(grupo);
     onClose();
@@ -89,12 +94,22 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
           {seleccionados.map((item, index) => (
             <li key={item.id} style={{ listStyle: "none", marginBottom: "8px" }}>
               {item.nombre} <br />
-              Cantidad: 
-              <input type="number" min="1" value={item.cantidad}
-                onChange={(e) => actualizarCantidadPrecio(index, "cantidad", e.target.value)} style={{ width: "60px", margin: "0 5px" }} />
-              Precio: 
-              <input type="number" min="0" value={item.precio}
-                onChange={(e) => actualizarCantidadPrecio(index, "precio", e.target.value)} style={{ width: "70px", margin: "0 5px" }} />
+              Cantidad:
+              <input
+                type="number"
+                min="1"
+                value={item.cantidad}
+                onChange={(e) => actualizarCantidadPrecio(index, "cantidad", e.target.value)}
+                style={{ width: "60px", margin: "0 5px" }}
+              />
+              Precio:
+              <input
+                type="number"
+                min="0"
+                value={item.precio}
+                onChange={(e) => actualizarCantidadPrecio(index, "precio", e.target.value)}
+                style={{ width: "70px", margin: "0 5px" }}
+              />
               <strong> Subtotal: ${item.subtotal.toFixed(2)}</strong>
               <button onClick={() => eliminarDelGrupo(index)} style={{ marginLeft: "10px" }}>Quitar</button>
             </li>
