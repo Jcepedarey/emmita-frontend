@@ -115,7 +115,6 @@ const CrearDocumento = () => {
     }
   };
 
-  // ✅ NUEVA FUNCIÓN: generarRemisionPDF
   const generarRemisionPDF = async () => {
     const jsPDF = (await import("jspdf")).default;
     const autoTable = (await import("jspdf-autotable")).default;
@@ -175,7 +174,56 @@ const CrearDocumento = () => {
 
   return (
     <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
-      {/* ... (todo el formulario y contenido actual) ... */}
+      <h2>Crear {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}</h2>
+
+      <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)} style={{ width: "100%", marginBottom: "1rem" }}>
+        <option value="cotizacion">Cotización</option>
+        <option value="orden">Orden de Pedido</option>
+      </select>
+
+      <select value={cliente} onChange={(e) => setCliente(e.target.value)} style={{ width: "100%", marginBottom: "1rem" }}>
+        <option value="">-- Selecciona Cliente --</option>
+        {clientes.map((c) => (
+          <option key={c.id} value={c.id}>{c.nombre}</option>
+        ))}
+      </select>
+
+      <input
+        type="date"
+        value={fechaEvento}
+        onChange={(e) => setFechaEvento(e.target.value)}
+        style={{ width: "100%", marginBottom: "1rem" }}
+      />
+
+      <button onClick={() => setModalOpen(true)} style={{ marginBottom: "0.5rem" }}>Agregar producto</button>
+      <button onClick={() => setGrupoOpen(true)} style={{ marginLeft: "1rem", marginBottom: "1rem" }}>Agregar grupo</button>
+
+      {productosAgregados.map((p, index) => (
+        <div key={index} style={{ marginBottom: "0.5rem", borderBottom: "1px solid #ccc", paddingBottom: "0.5rem" }}>
+          <strong>{p.tipo === "grupo" ? `Grupo: ${p.nombre}` : p.nombre}</strong>
+          {p.tipo === "producto" && (
+            <>
+              <div>Precio: <input type="number" value={p.precio} onChange={(e) => actualizarPrecio(index, parseFloat(e.target.value))} /></div>
+              <div>Cantidad: <input type="number" value={p.cantidad} onChange={(e) => actualizarCantidad(index, parseFloat(e.target.value))} /></div>
+            </>
+          )}
+          <div>Subtotal: ${p.subtotal}</div>
+          <button onClick={() => eliminarProducto(index)}>❌ Eliminar</button>
+        </div>
+      ))}
+
+      <hr />
+      <div>Total: ${total}</div>
+      <div>Garantía (no se suma): <input type="number" value={garantia} onChange={(e) => setGarantia(e.target.value)} /></div>
+      <div>
+        Abonos:
+        {abonos.map((a, i) => (
+          <input key={i} type="number" value={a} onChange={(e) => actualizarAbono(i, e.target.value)} style={{ marginRight: "0.5rem" }} />
+        ))}
+        <button onClick={agregarAbono}>+ Abono</button>
+      </div>
+      <div>Pagado completamente: <input type="checkbox" checked={pagado} onChange={(e) => setPagado(e.target.checked)} /></div>
+      <div>Saldo restante: ${saldo}</div>
 
       <button onClick={guardarDocumento} style={{ width: "100%", marginTop: 20 }}>Guardar</button>
 
@@ -202,7 +250,6 @@ const CrearDocumento = () => {
         </button>
       )}
 
-      {/* ✅ NUEVO BOTÓN */}
       {tipoDocumento === "orden" && productosAgregados.length > 0 && (
         <button onClick={generarRemisionPDF} style={{ width: "100%", marginTop: 10 }}>
           📄 Generar Remisión
