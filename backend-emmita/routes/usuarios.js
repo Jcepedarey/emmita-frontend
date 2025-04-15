@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const pool = require("../db");
+const pool = require("../database"); // ✅ CAMBIADO desde "../db"
 const bcrypt = require("bcryptjs");
 const { v4: uuidv4 } = require("uuid");
 
