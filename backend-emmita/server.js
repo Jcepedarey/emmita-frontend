@@ -5,8 +5,12 @@ const sequelize = require("./database");
 
 const app = express();
 
-// Middlewares
-app.use(cors());
+// ✅ Middleware CORS para permitir el acceso desde Vercel
+app.use(cors({
+  origin: "https://emmita-frontend.vercel.app",
+  credentials: true,
+}));
+
 app.use(express.json());
 
 // Ruta de prueba

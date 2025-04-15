@@ -56,23 +56,6 @@ export default function Login() {
       <button onClick={handleLogin} disabled={cargando} style={{ padding: "10px 30px" }}>
         {cargando ? "Cargando..." : "Entrar"}
       </button>
-
-      <div style={{ marginTop: "20px" }}>
-        <span>¿No tienes cuenta?{" "}</span>
-        <button
-          onClick={() => navigate("/registro")}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#007bff",
-            textDecoration: "underline",
-            cursor: "pointer",
-            fontSize: "1rem"
-          }}
-        >
-          Crear cuenta
-        </button>
-      </div>
     </div>
   );
 }
