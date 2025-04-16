@@ -6,7 +6,7 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [buscar, setBuscar] = useState("");
-  const [form, setForm] = useState({ nombre: "", telefono: "", direccion: "", correo: "" });
+  const [form, setForm] = useState({ nombre: "", identificacion: "", telefono: "", direccion: "", correo: "" });
   const [editando, setEditando] = useState(null);
 
   useEffect(() => {
@@ -34,19 +34,19 @@ export default function Clientes() {
   };
 
   const guardarCliente = async () => {
-    const { nombre, telefono, direccion, correo } = form;
-    if (!nombre || !telefono) {
-      return Swal.fire("Campos requeridos", "Nombre y teléfono son obligatorios.", "warning");
+    const { nombre, identificacion, telefono, direccion, correo } = form;
+    if (!nombre || !identificacion || !telefono) {
+      return Swal.fire("Campos requeridos", "Nombre, identificación y teléfono son obligatorios.", "warning");
     }
 
     if (editando) {
       const { error } = await supabase.from("clientes")
-        .update({ nombre, telefono, direccion, correo })
+        .update({ nombre, identificacion, telefono, direccion, correo })
         .eq("id", editando);
       if (!error) {
         Swal.fire("Actualizado", "Cliente actualizado correctamente.", "success");
         setEditando(null);
-        setForm({ nombre: "", telefono: "", direccion: "", correo: "" });
+        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", correo: "" });
         cargarClientes();
       }
     } else {
@@ -54,11 +54,11 @@ export default function Clientes() {
       if (!nuevoCodigo) return;
 
       const { error } = await supabase.from("clientes")
-        .insert([{ codigo: nuevoCodigo, nombre, telefono, direccion, correo }]);
+        .insert([{ codigo: nuevoCodigo, nombre, identificacion, telefono, direccion, correo }]);
 
       if (!error) {
         Swal.fire("Guardado", "Cliente guardado correctamente.", "success");
-        setForm({ nombre: "", telefono: "", direccion: "", correo: "" });
+        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", correo: "" });
         cargarClientes();
       }
     }
@@ -68,6 +68,7 @@ export default function Clientes() {
     setEditando(cliente.id);
     setForm({
       nombre: cliente.nombre,
+      identificacion: cliente.identificacion || "",
       telefono: cliente.telefono,
       direccion: cliente.direccion,
       correo: cliente.correo || "",
@@ -92,7 +93,7 @@ export default function Clientes() {
   };
 
   const filtrados = clientes.filter((c) =>
-    [c.codigo, c.nombre, c.telefono, c.direccion, c.correo]
+    [c.codigo, c.nombre, c.identificacion, c.telefono, c.direccion, c.correo]
       .some((campo) => campo?.toLowerCase().includes(buscar.toLowerCase()))
   );
 
@@ -114,6 +115,13 @@ export default function Clientes() {
         placeholder="Nombre"
         value={form.nombre}
         onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
+      />
+      <input
+        type="text"
+        placeholder="Identificación"
+        value={form.identificacion}
+        onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
         style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
       />
       <input
@@ -143,7 +151,7 @@ export default function Clientes() {
       </button>
       <button onClick={() => {
         setEditando(null);
-        setForm({ nombre: "", telefono: "", direccion: "", correo: "" });
+        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", correo: "" });
       }} style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}>Cancelar</button>
 
       <h3 style={{ marginTop: "1.5rem" }}>Lista de Clientes</h3>
@@ -158,6 +166,7 @@ export default function Clientes() {
           }}>
             <strong>{c.codigo || "Sin código"}</strong><br />
             {c.nombre}<br />
+            🆔 {c.identificacion}<br />
             📞 {c.telefono}<br />
             📍 {c.direccion}<br />
             📧 {c.correo}
