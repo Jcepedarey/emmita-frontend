@@ -2,23 +2,21 @@ import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
 import AgregarGrupoModal from "../components/AgregarGrupoModal";
-import Swal from "sweetalert2";
 import { generarPDF } from "../utils/generarPDF";
+import Swal from "sweetalert2";
 
 const CrearDocumento = () => {
   const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
   const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
   const [fechaEvento, setFechaEvento] = useState("");
   const [clientes, setClientes] = useState([]);
-  const [clienteSeleccionado, setClienteSeleccionado] = useState("");
+  const [cliente, setCliente] = useState("");
   const [productosAgregados, setProductosAgregados] = useState([]);
   const [garantia, setGarantia] = useState("");
   const [abonos, setAbonos] = useState([""]);
   const [pagado, setPagado] = useState(false);
-  const [modalBuscarOpen, setModalBuscarOpen] = useState(false);
-  const [modalGrupoOpen, setModalGrupoOpen] = useState(false);
-  const [modalNuevoProducto, setModalNuevoProducto] = useState(false);
-  const [modalNuevoCliente, setModalNuevoCliente] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [grupoOpen, setGrupoOpen] = useState(false);
 
   const total = productosAgregados.reduce((acc, p) => acc + p.subtotal, 0);
   const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
@@ -42,19 +40,19 @@ const CrearDocumento = () => {
       subtotal: producto.precio,
     };
     setProductosAgregados([...productosAgregados, item]);
-    setModalBuscarOpen(false);
+    setModalOpen(false);
   };
 
   const agregarGrupo = (grupo) => {
-    const subtotal = grupo.articulos.reduce((acc, a) => acc + a.precio * a.cantidad, 0);
+    const subtotal = grupo.detalleGrupo.reduce((acc, a) => acc + a.precio * a.cantidad, 0);
     const item = {
       tipo: "grupo",
       nombre: grupo.nombre,
-      articulos: grupo.articulos,
+      articulos: grupo.detalleGrupo,
       subtotal,
     };
     setProductosAgregados([...productosAgregados, item]);
-    setModalGrupoOpen(false);
+    setGrupoOpen(false);
   };
 
   const eliminarProducto = (index) => {
@@ -84,189 +82,254 @@ const CrearDocumento = () => {
   };
 
   const agregarAbono = () => setAbonos([...abonos, ""]);
+  const guardarDocumento = async () => {
+    if (!cliente) return Swal.fire("Campo requerido", "Selecciona un cliente.", "warning");
+    if (productosAgregados.length === 0) return Swal.fire("Sin productos", "Agrega al menos un producto.", "info");
+    if (!fechaEvento) return Swal.fire("Fecha faltante", "Selecciona la fecha del evento.", "warning");
+
+    const datos = {
+      cliente_id: cliente,
+      productos: productosAgregados,
+      total,
+      abonos,
+      pagado,
+      saldo,
+      garantia,
+      fecha_evento: fechaEvento,
+      fecha: fechaCreacion
+    };
+
+    const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const { error } = await supabase.from(tabla).insert([datos]);
+
+    if (error) {
+      Swal.fire("Error", "Ocurrió un error al guardar el documento.", "error");
+      console.error(error);
+    } else {
+      Swal.fire("Guardado", `${tipoDocumento === "cotizacion" ? "Cotización" : "Orden"} guardada correctamente.`, "success");
+      setProductosAgregados([]);
+      setCliente("");
+      setGarantia("");
+      setAbonos([""]);
+    }
+  };
+
+  const generarRemisionPDF = async () => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
+    const doc = new jsPDF();
+
+    const logo = await fetch("/logo.png")
+      .then((res) => res.blob())
+      .then((blob) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }));
+
+    doc.addImage(logo, "PNG", 10, 10, 30, 25);
+    doc.setFontSize(16);
+    doc.text("REMISIÓN DE PEDIDO", 70, 20);
+    doc.setFontSize(10);
+    doc.text("Alquiler & Eventos Emmita", 50, 28);
+    doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio", 50, 33);
+    doc.text("Tel: 3166534685 / 3118222934", 50, 38);
+    doc.line(10, 42, 200, 42);
+
+    const clienteSel = clientes.find((c) => c.id === cliente);
+    doc.setFontSize(11);
+    doc.text(`Cliente: ${clienteSel?.nombre || "-"}`, 10, 50);
+    doc.text(`Dirección: ${clienteSel?.direccion || "-"}`, 10, 56);
+    doc.text(`Teléfono: ${clienteSel?.telefono || "-"}`, 10, 62);
+    doc.text(`Fecha evento: ${fechaEvento || "-"}`, 10, 68);
+    doc.text(`Fecha creación: ${fechaCreacion}`, 10, 74);
+    doc.text(`N° Remisión: REM-OP_TEMP`, 150, 50);
+
+    const filas = [];
+    productosAgregados.forEach((item) => {
+      if (item.tipo === "producto") {
+        filas.push([item.nombre, item.cantidad]);
+      } else if (item.tipo === "grupo") {
+        item.articulos.forEach((a) => {
+          filas.push([`(Grupo ${item.nombre}) ${a.nombre}`, a.cantidad]);
+        });
+      }
+    });
+
+    autoTable(doc, {
+      head: [["Artículo", "Cantidad"]],
+      body: filas,
+      startY: 80,
+    });
+
+    const yFinal = doc.previousAutoTable.finalY + 20;
+    doc.line(20, yFinal, 90, yFinal);
+    doc.text("Firma transportista/bodega", 25, yFinal + 5);
+    doc.line(110, yFinal, 180, yFinal);
+    doc.text("Firma cliente", 130, yFinal + 5);
+
+    doc.save("remision.pdf");
+  };
   return (
-    <div style={{ padding: "1rem", maxWidth: "900px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center" }}>📄 Crear Cotización u Orden de Pedido</h2>
+    <div style={{ padding: "1rem", maxWidth: "1000px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center" }}>📄 Crear {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}</h2>
 
-      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "10px" }}>
-        <div>
-          <label>Tipo de documento:</label><br />
-          <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
-            <option value="cotizacion">Cotización</option>
-            <option value="orden">Orden de Pedido</option>
-          </select>
-        </div>
+      {/* Tipo de documento */}
+      <div style={{ marginBottom: "10px" }}>
+        <label>
+          <input
+            type="radio"
+            name="tipoDocumento"
+            value="cotizacion"
+            checked={tipoDocumento === "cotizacion"}
+            onChange={() => setTipoDocumento("cotizacion")}
+          /> Cotización
+        </label>
+        <label style={{ marginLeft: "20px" }}>
+          <input
+            type="radio"
+            name="tipoDocumento"
+            value="orden"
+            checked={tipoDocumento === "orden"}
+            onChange={() => setTipoDocumento("orden")}
+          /> Orden de Pedido
+        </label>
+      </div>
 
+      {/* Fecha creación y fecha evento */}
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
+        <div>📅 Fecha creación: {fechaCreacion}</div>
         <div>
-          <label>Fecha creación:</label><br />
-          <input type="date" value={fechaCreacion} readOnly />
-        </div>
-
-        <div>
-          <label>Fecha del evento:</label><br />
-          <input type="date" value={fechaEvento} onChange={(e) => setFechaEvento(e.target.value)} />
+          📅 Fecha evento:{" "}
+          <input
+            type="date"
+            value={fechaEvento}
+            onChange={(e) => setFechaEvento(e.target.value)}
+          />
         </div>
       </div>
 
+      {/* Cliente */}
       <div style={{ marginBottom: "10px" }}>
-        <label>Cliente:</label><br />
-        <select value={cliente} onChange={(e) => setCliente(e.target.value)} style={{ width: "100%" }}>
-          <option value="">-- Selecciona un cliente --</option>
+        <label>👤 Cliente: </label>
+        <select value={cliente} onChange={(e) => setCliente(e.target.value)}>
+          <option value="">-- Seleccionar --</option>
           {clientes.map((c) => (
             <option key={c.id} value={c.id}>{c.nombre}</option>
           ))}
         </select>
-        <button onClick={() => window.location.href = "/clientes"} style={{ marginTop: "5px" }}>➕ Crear nuevo cliente</button>
       </div>
 
-      <div style={{ marginBottom: "10px", display: "flex", gap: "10px" }}>
-        <button onClick={() => setModalBuscarOpen(true)}>➕ Agregar artículo existente</button>
-        <button onClick={() => window.location.href = "/inventario"}>➕ Crear artículo nuevo</button>
-        <button onClick={() => setModalGrupoOpen(true)}>➕ Crear grupo de artículos</button>
-      </div>
-
-      {productosAgregados.length > 0 && (
-        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "15px" }}>
-          <thead>
-            <tr style={{ background: "#f0f0f0" }}>
-              <th>Cantidad</th>
-              <th>Descripción</th>
-              <th>Precio Unitario</th>
-              <th>Subtotal</th>
-              <th>Acción</th>
+      {/* Tabla de productos */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "10px" }}>
+        <thead>
+          <tr>
+            <th>Cantidad</th>
+            <th>Descripción</th>
+            <th>Valor Unitario</th>
+            <th>Subtotal</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {productosAgregados.map((item, index) => (
+            <tr key={index}>
+              <td>
+                {item.tipo === "producto" ? (
+                  <input
+                    type="number"
+                    value={item.cantidad}
+                    onChange={(e) => actualizarCantidad(index, parseInt(e.target.value))}
+                    style={{ width: "60px" }}
+                  />
+                ) : "-"}
+              </td>
+              <td>{item.tipo === "producto" ? item.nombre : `Grupo: ${item.nombre}`}</td>
+              <td>
+                {item.tipo === "producto" ? (
+                  <input
+                    type="number"
+                    value={item.precio}
+                    onChange={(e) => actualizarPrecio(index, parseFloat(e.target.value))}
+                    style={{ width: "80px" }}
+                  />
+                ) : "-"}
+              </td>
+              <td>${item.subtotal.toFixed(2)}</td>
+              <td><button onClick={() => eliminarProducto(index)}>🗑</button></td>
             </tr>
-          </thead>
-          <tbody>
-            {productosAgregados.map((item, index) => {
-              if (item.tipo === "producto") {
-                return (
-                  <tr key={index}>
-                    <td><input type="number" min="1" value={item.cantidad} onChange={(e) => actualizarCantidad(index, parseInt(e.target.value))} /></td>
-                    <td>{item.nombre}</td>
-                    <td><input type="number" min="0" value={item.precio} onChange={(e) => actualizarPrecio(index, parseFloat(e.target.value))} /></td>
-                    <td>${item.subtotal.toFixed(2)}</td>
-                    <td><button onClick={() => eliminarProducto(index)}>❌</button></td>
-                  </tr>
-                );
-              } else if (item.tipo === "grupo") {
-                return (
-                  <tr key={index}>
-                    <td colSpan="3"><strong>Grupo:</strong> {item.nombre}</td>
-                    <td>${item.subtotal.toFixed(2)}</td>
-                    <td><button onClick={() => eliminarProducto(index)}>❌</button></td>
-                  </tr>
-                );
-              } else {
-                return null;
-              }
-            })}
-          </tbody>
-        </table>
-      )}
-      {productosAgregados.length > 0 && (
-        <div style={{ marginTop: "20px", display: "flex", flexWrap: "wrap", gap: "20px", justifyContent: "space-between" }}>
-          <div style={{ flex: 1 }}>
-            <label>💰 Total:</label>
-            <p><strong>${total.toFixed(2)}</strong></p>
-          </div>
+          ))}
+        </tbody>
+      </table>
 
-          <div style={{ flex: 1 }}>
-            <label>💵 Abonos:</label>
-            {abonos.map((abono, i) => (
-              <input
-                key={i}
-                type="number"
-                placeholder={`Abono ${i + 1}`}
-                value={abono}
-                onChange={(e) => actualizarAbono(i, e.target.value)}
-                style={{ display: "block", width: "100%", marginBottom: "5px" }}
-              />
-            ))}
-            <button onClick={agregarAbono}>➕ Agregar abono</button>
-          </div>
-
-          <div style={{ flex: 1 }}>
-            <label>🔐 Garantía (Depósito):</label>
-            <input
-              type="number"
-              placeholder="Monto de garantía"
-              value={garantia}
-              onChange={(e) => setGarantia(e.target.value)}
-              style={{ width: "100%" }}
-            />
-          </div>
-
-          <div style={{ flex: 1 }}>
-            <label>📉 Saldo final:</label>
-            <p><strong>${saldo.toFixed(2)}</strong></p>
-            <label>
-              <input type="checkbox" checked={pagado} onChange={() => setPagado(!pagado)} />
-              Pedido completamente pagado
-            </label>
-          </div>
+      {/* Total, garantía y abonos */}
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
+        <div>
+          <h4>💰 Garantía:</h4>
+          <input
+            type="number"
+            value={garantia}
+            onChange={(e) => setGarantia(e.target.value)}
+            placeholder="Valor de la garantía"
+          />
         </div>
-      )}
+        <div>
+          <h4>💵 Abonos:</h4>
+          {abonos.map((abono, index) => (
+            <input
+              key={index}
+              type="number"
+              value={abono}
+              onChange={(e) => actualizarAbono(index, e.target.value)}
+              style={{ marginBottom: "5px", display: "block" }}
+            />
+          ))}
+          <button onClick={agregarAbono}>➕ Agregar Abono</button>
+        </div>
+        <div>
+          <h3>Total: ${total}</h3>
+          <h4>Saldo: ${saldo}</h4>
+        </div>
+      </div>
 
-      {/* BOTONES DE ACCIÓN */}
-      <div style={{ marginTop: "30px", textAlign: "center" }}>
-        <button onClick={guardarDocumento} style={{ width: "100%", padding: "10px" }}>💾 Guardar documento</button>
+      {/* Botones de acción */}
+      <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        <button onClick={() => setModalOpen(true)}>➕ Agregar artículo existente</button>
+        <button onClick={() => setGrupoOpen(true)}>📦 Crear grupo de artículos</button>
+        <button onClick={guardarDocumento}>💾 Guardar documento</button>
 
         {productosAgregados.length > 0 && (
-          <>
-            <button
-              onClick={() =>
-                generarPDF(
-                  {
-                    cliente_id: cliente,
-                    productos: productosAgregados,
-                    total,
-                    abonos,
-                    saldo,
-                    garantia,
-                    fecha: fechaCreacion,
-                    fecha_evento: fechaEvento,
-                    nombre_cliente: clientes.find((c) => c.id === cliente)?.nombre || "cliente"
-                  },
-                  tipoDocumento
-                )
-              }
-              style={{ width: "100%", marginTop: "10px", padding: "10px" }}
-            >
-              🖨️ Descargar PDF
-            </button>
+          <button
+            onClick={() =>
+              generarPDF(
+                {
+                  cliente_id: cliente,
+                  productos: productosAgregados,
+                  total,
+                  abonos,
+                  saldo,
+                  garantia,
+                  fecha: fechaCreacion,
+                  fecha_evento: fechaEvento,
+                },
+                tipoDocumento
+              )
+            }
+          >
+            🧾 Descargar PDF
+          </button>
+        )}
 
-            {tipoDocumento === "orden" && (
-              <button onClick={generarRemisionPDF} style={{ width: "100%", marginTop: "10px", padding: "10px" }}>
-                📄 Generar Remisión
-              </button>
-            )}
-          </>
+        {tipoDocumento === "orden" && productosAgregados.length > 0 && (
+          <button onClick={generarRemisionPDF}>📄 Generar Remisión</button>
         )}
       </div>
 
-      {/* MODALES */}
-      {modalBuscarOpen && (
-        <BuscarProductoModal
-          onSelect={(producto) => {
-            agregarProducto(producto);
-            setModalBuscarOpen(false);
-          }}
-          onClose={() => setModalBuscarOpen(false)}
-        />
-      )}
-
-      {modalGrupoOpen && (
-        <AgregarGrupoModal
-          onAgregarGrupo={(grupo) => {
-            agregarGrupo(grupo);
-            setModalGrupoOpen(false);
-          }}
-          onClose={() => setModalGrupoOpen(false)}
-        />
-      )}
+      {/* Modales */}
+      {modalOpen && <BuscarProductoModal onSelect={agregarProducto} onClose={() => setModalOpen(false)} />}
+      {grupoOpen && <AgregarGrupoModal onAgregarGrupo={agregarGrupo} onClose={() => setGrupoOpen(false)} />}
     </div>
   );
 };
 
 export default CrearDocumento;
-
