@@ -1,3 +1,4 @@
+// src/pages/CrearDocumento.js
 import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
@@ -6,18 +7,18 @@ import { generarPDF } from "../utils/generarPDF";
 import Swal from "sweetalert2";
 
 const CrearDocumento = () => {
-  const [clienteId, setClienteId] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
+  const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
+  const [fechaEvento, setFechaEvento] = useState("");
+
   const [clientes, setClientes] = useState([]);
-  const [busquedaCliente, setBusquedaCliente] = useState("");
-  const [mostrarFormularioCliente, setMostrarFormularioCliente] = useState(false);
-  const [nuevoCliente, setNuevoCliente] = useState({ nombre: "", email: "", telefono: "", direccion: "" });
+  const [clienteId, setClienteId] = useState("");
+  const [clienteBusqueda, setClienteBusqueda] = useState("");
 
   const [productosAgregados, setProductosAgregados] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [grupoOpen, setGrupoOpen] = useState(false);
-  const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
-  const [fechaEvento, setFechaEvento] = useState("");
-  const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
+
   const [garantia, setGarantia] = useState("");
   const [abonos, setAbonos] = useState([""]);
   const [pagado, setPagado] = useState(false);
@@ -28,188 +29,300 @@ const CrearDocumento = () => {
 
   useEffect(() => {
     const obtenerClientes = async () => {
-      const { data, error } = await supabase.from("clientes").select("*").order("nombre", { ascending: true });
+      const { data, error } = await supabase.from("clientes").select("*");
       if (data) setClientes(data);
       if (error) console.error("Error cargando clientes:", error);
     };
     obtenerClientes();
   }, []);
-  const clientesFiltrados = clientes.filter((c) => {
-    const texto = busquedaCliente.toLowerCase();
-    return (
-      c.nombre?.toLowerCase().includes(texto) ||
-      c.email?.toLowerCase().includes(texto) ||
-      c.telefono?.includes(texto) ||
-      c.direccion?.toLowerCase().includes(texto)
-    );
-  });
+  const agregarProducto = (producto) => {
+    const item = {
+      tipo: "producto",
+      id: producto.id,
+      nombre: producto.nombre,
+      precio: producto.precio,
+      cantidad: 1,
+      subtotal: producto.precio,
+    };
+    setProductosAgregados([...productosAgregados, item]);
+    setModalOpen(false);
+  };
 
-  const guardarNuevoCliente = async () => {
-    const { nombre, email, telefono, direccion } = nuevoCliente;
+  const agregarGrupo = (grupo) => {
+    const subtotal = grupo.articulos.reduce((acc, a) => acc + a.precio * a.cantidad, 0);
+    const item = {
+      tipo: "grupo",
+      nombre: grupo.nombre,
+      articulos: grupo.articulos,
+      subtotal,
+    };
+    setProductosAgregados([...productosAgregados, item]);
+    setGrupoOpen(false);
+  };
 
-    if (!nombre || !telefono) {
-      return Swal.fire("Campos requeridos", "Nombre y teléfono son obligatorios", "warning");
-    }
+  const eliminarProducto = (index) => {
+    const actualizados = [...productosAgregados];
+    actualizados.splice(index, 1);
+    setProductosAgregados(actualizados);
+  };
 
-    const { data, error } = await supabase.from("clientes").insert([{ nombre, email, telefono, direccion }]);
+  const actualizarCantidad = (index, nuevaCantidad) => {
+    const actualizados = [...productosAgregados];
+    actualizados[index].cantidad = nuevaCantidad;
+    actualizados[index].subtotal = actualizados[index].precio * nuevaCantidad;
+    setProductosAgregados(actualizados);
+  };
+
+  const actualizarPrecio = (index, nuevoPrecio) => {
+    const actualizados = [...productosAgregados];
+    actualizados[index].precio = nuevoPrecio;
+    actualizados[index].subtotal = nuevoPrecio * actualizados[index].cantidad;
+    setProductosAgregados(actualizados);
+  };
+
+  const actualizarAbono = (index, valor) => {
+    const copia = [...abonos];
+    copia[index] = valor;
+    setAbonos(copia);
+  };
+
+  const agregarAbono = () => setAbonos([...abonos, ""]);
+
+  const obtenerNombreCliente = () => {
+    const cliente = clientes.find((c) => c.id === clienteId);
+    return cliente ? cliente.nombre : "";
+  };
+  const guardarDocumento = async () => {
+    if (!clienteId) return Swal.fire("Falta cliente", "Selecciona o crea un cliente.", "warning");
+    if (!fechaEvento) return Swal.fire("Falta fecha", "Selecciona la fecha del evento.", "warning");
+    if (productosAgregados.length === 0) return Swal.fire("Sin productos", "Agrega al menos un artículo.", "warning");
+
+    const datos = {
+      cliente_id: clienteId,
+      productos: productosAgregados,
+      total,
+      abonos,
+      pagado,
+      saldo,
+      garantia,
+      fecha_evento: fechaEvento,
+      fecha: fechaCreacion,
+    };
+
+    const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const { error } = await supabase.from(tabla).insert([datos]);
 
     if (error) {
-      Swal.fire("Error", "No se pudo guardar el cliente", "error");
-      console.error("Error guardando cliente:", error);
+      Swal.fire("Error", "No se pudo guardar el documento.", "error");
     } else {
-      Swal.fire("Guardado", "Cliente creado correctamente", "success");
-      setMostrarFormularioCliente(false);
-      setNuevoCliente({ nombre: "", email: "", telefono: "", direccion: "" });
-      const { data: actualizados } = await supabase.from("clientes").select("*").order("nombre");
-      setClientes(actualizados || []);
+      Swal.fire("Guardado", "Documento guardado exitosamente.", "success");
+      setProductosAgregados([]);
+      setAbonos([""]);
+      setGarantia("");
+      setClienteBusqueda("");
+      setClienteId("");
     }
   };
-      {/* 🔍 Buscar cliente */}
-      <div style={{ marginBottom: "20px" }}>
-        <label><strong>Buscar cliente:</strong></label>
+
+  const generarRemisionPDF = async () => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
+    const doc = new jsPDF();
+
+    const logo = await fetch("/logo.png")
+      .then((res) => res.blob())
+      .then((blob) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }));
+
+    doc.addImage(logo, "PNG", 10, 10, 30, 25);
+    doc.setFontSize(16);
+    doc.text("REMISIÓN DE PEDIDO", 70, 20);
+    doc.setFontSize(10);
+    doc.text("Alquiler & Eventos Emmita", 50, 28);
+    doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio", 50, 33);
+    doc.text("Tel: 3166534685 / 3118222934", 50, 38);
+    doc.line(10, 42, 200, 42);
+
+    const clienteSel = clientes.find((c) => c.id === clienteId);
+    doc.setFontSize(11);
+    doc.text(`Cliente: ${clienteSel?.nombre || "-"}`, 10, 50);
+    doc.text(`Dirección: ${clienteSel?.direccion || "-"}`, 10, 56);
+    doc.text(`Teléfono: ${clienteSel?.telefono || "-"}`, 10, 62);
+    doc.text(`Fecha evento: ${fechaEvento || "-"}`, 10, 68);
+    doc.text(`Fecha creación: ${fechaCreacion}`, 10, 74);
+    doc.text(`N° Remisión: REM-OP_TEMP`, 150, 50);
+
+    const filas = [];
+    productosAgregados.forEach((item) => {
+      if (item.tipo === "producto") {
+        filas.push([item.nombre, item.cantidad]);
+      } else if (item.tipo === "grupo") {
+        item.articulos.forEach((a) => {
+          filas.push([`(Grupo ${item.nombre}) ${a.nombre}`, a.cantidad]);
+        });
+      }
+    });
+
+    autoTable(doc, {
+      head: [["Artículo", "Cantidad"]],
+      body: filas,
+      startY: 80,
+    });
+
+    const yFinal = doc.previousAutoTable.finalY + 20;
+    doc.line(20, yFinal, 90, yFinal);
+    doc.text("Firma transportista/bodega", 25, yFinal + 5);
+    doc.line(110, yFinal, 180, yFinal);
+    doc.text("Firma cliente", 130, yFinal + 5);
+
+    doc.save("remision.pdf");
+  };
+  return (
+    <div style={{ padding: "1rem", maxWidth: "1100px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center" }}>📄 Crear Documento</h2>
+
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+        <div>
+          <label>Tipo de documento:</label>
+          <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+            <option value="cotizacion">Cotización</option>
+            <option value="orden">Orden de pedido</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Fecha creación:</label>
+          <input type="date" value={fechaCreacion} disabled />
+        </div>
+
+        <div>
+          <label>Fecha evento:</label>
+          <input type="date" value={fechaEvento} onChange={(e) => setFechaEvento(e.target.value)} />
+        </div>
+      </div>
+
+      <hr />
+
+      <div>
+        <label>Buscar cliente:</label>
         <input
           type="text"
-          value={busquedaCliente}
-          onChange={(e) => setBusquedaCliente(e.target.value)}
-          placeholder="Nombre, correo, teléfono o dirección"
-          style={{ width: "100%", padding: "8px", marginBottom: "8px" }}
+          value={clienteBusqueda}
+          onChange={(e) => setClienteBusqueda(e.target.value)}
+          placeholder="Nombre, cédula, teléfono o código"
+          style={{ width: "100%", marginBottom: "10px" }}
         />
-
-        <button onClick={() => setMostrarFormularioCliente(!mostrarFormularioCliente)} style={{ marginBottom: "10px" }}>
-          {mostrarFormularioCliente ? "Cancelar creación" : "Crear nuevo cliente"}
-        </button>
-
-        {mostrarFormularioCliente && (
-          <div style={{ marginBottom: "10px", background: "#f3f3f3", padding: "10px", borderRadius: "5px" }}>
-            <h4>Nuevo Cliente</h4>
-            <input
-              type="text"
-              placeholder="Nombre"
-              value={nuevoCliente.nombre}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })}
-              style={{ width: "100%", padding: "6px", marginBottom: "6px" }}
-            />
-            <input
-              type="email"
-              placeholder="Correo (opcional)"
-              value={nuevoCliente.email}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, email: e.target.value })}
-              style={{ width: "100%", padding: "6px", marginBottom: "6px" }}
-            />
-            <input
-              type="text"
-              placeholder="Teléfono"
-              value={nuevoCliente.telefono}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, telefono: e.target.value })}
-              style={{ width: "100%", padding: "6px", marginBottom: "6px" }}
-            />
-            <input
-              type="text"
-              placeholder="Dirección (opcional)"
-              value={nuevoCliente.direccion}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, direccion: e.target.value })}
-              style={{ width: "100%", padding: "6px", marginBottom: "6px" }}
-            />
-            <button onClick={guardarNuevoCliente} style={{ marginTop: "5px" }}>Guardar Cliente</button>
-          </div>
-        )}
-
         {clientesFiltrados.length > 0 && (
-          <div style={{ maxHeight: "100px", overflowY: "auto", marginBottom: "10px" }}>
-            {clientesFiltrados.map((c) => (
-              <div
-                key={c.id}
+          <ul style={{ border: "1px solid #ccc", maxHeight: "100px", overflowY: "auto", padding: "5px" }}>
+            {clientesFiltrados.map((cliente) => (
+              <li
+                key={cliente.id}
+                style={{ cursor: "pointer" }}
                 onClick={() => {
-                  setClienteId(c.id);
-                  setBusquedaCliente(`${c.nombre} (${c.telefono})`);
-                }}
-                style={{
-                  cursor: "pointer",
-                  background: "#eee",
-                  marginBottom: "4px",
-                  padding: "5px",
-                  borderRadius: "5px"
+                  setClienteId(cliente.id);
+                  setClienteBusqueda(cliente.nombre);
                 }}
               >
-                {c.nombre} - {c.telefono}
-              </div>
+                {cliente.nombre} - {cliente.telefono}
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
-      {/* 📦 Tabla de productos agregados */}
-      <h3>Artículos del documento</h3>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "10px" }}>
-        <thead>
-          <tr>
-            <th style={th}>Cantidad</th>
-            <th style={th}>Descripción</th>
-            <th style={th}>Valor unitario</th>
-            <th style={th}>Subtotal</th>
-            <th style={th}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {productosAgregados.map((item, index) => (
-            <tr key={index}>
-              <td style={td}>
-                {item.tipo === "producto" ? (
-                  <input
-                    type="number"
-                    value={item.cantidad}
-                    min="1"
-                    onChange={(e) => actualizarCantidad(index, parseInt(e.target.value))}
-                    style={{ width: "60px" }}
-                  />
-                ) : (
-                  item.articulos.reduce((acc, a) => acc + a.cantidad, 0)
-                )}
-              </td>
-              <td style={td}>{item.nombre}</td>
-              <td style={td}>${item.precio}</td>
-              <td style={td}>${item.subtotal.toFixed(2)}</td>
-              <td style={td}>
-                <button onClick={() => eliminarProducto(index)}>❌</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
 
-      {/* 💰 Totales, garantía, abonos */}
-      <div style={{ display: "flex", marginTop: "20px", gap: "20px" }}>
-        <div style={{ flex: 1 }}>
-          <label><strong>Garantía (depósito en $):</strong></label>
+      <hr />
+
+      <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+        <button onClick={() => setModalOpen(true)}>➕ Agregar artículo</button>
+        <button onClick={() => setGrupoOpen(true)}>📦 Crear grupo</button>
+        <button onClick={crearNuevoProducto}>➕ Nuevo producto</button>
+      </div>
+
+      {productosAgregados.length > 0 && (
+        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
+          <thead>
+            <tr style={{ backgroundColor: "#f2f2f2" }}>
+              <th>Cantidad</th>
+              <th>Descripción</th>
+              <th>Valor unitario</th>
+              <th>Subtotal</th>
+              <th>Eliminar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {productosAgregados.map((item, index) => (
+              <tr key={index}>
+                <td>
+                  {item.tipo === "producto" ? (
+                    <input
+                      type="number"
+                      value={item.cantidad}
+                      onChange={(e) => actualizarCantidad(index, parseFloat(e.target.value))}
+                      style={{ width: "60px" }}
+                    />
+                  ) : (
+                    "-"
+                  )}
+                </td>
+                <td>{item.nombre}</td>
+                <td>
+                  {item.tipo === "producto" ? (
+                    <input
+                      type="number"
+                      value={item.precio}
+                      onChange={(e) => actualizarPrecio(index, parseFloat(e.target.value))}
+                      style={{ width: "80px" }}
+                    />
+                  ) : (
+                    "-"
+                  )}
+                </td>
+                <td>${item.subtotal.toFixed(2)}</td>
+                <td>
+                  <button onClick={() => eliminarProducto(index)}>❌</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "20px" }}>
+        <div>
+          <label>Abonos:</label>
+          {abonos.map((abono, index) => (
+            <input
+              key={index}
+              type="number"
+              value={abono}
+              onChange={(e) => actualizarAbono(index, e.target.value)}
+              style={{ display: "block", marginBottom: "5px" }}
+            />
+          ))}
+          <button onClick={agregarAbono}>➕ Otro abono</button>
+        </div>
+
+        <div>
+          <label>Garantía:</label>
           <input
             type="number"
             value={garantia}
             onChange={(e) => setGarantia(e.target.value)}
-            style={{ width: "100%", padding: "6px", marginTop: "4px" }}
           />
         </div>
-        <div style={{ flex: 2 }}>
-          <label><strong>Abonos:</strong></label>
-          {abonos.map((abono, i) => (
-            <input
-              key={i}
-              type="number"
-              value={abono}
-              onChange={(e) => actualizarAbono(i, e.target.value)}
-              style={{ width: "100%", marginBottom: "6px", padding: "6px" }}
-            />
-          ))}
-          <button onClick={agregarAbono} style={{ marginTop: "5px" }}>+ Agregar abono</button>
-        </div>
-        <div style={{ flex: 1 }}>
-          <label><strong>Total:</strong></label>
-          <div>${total}</div>
-          <label><strong>Saldo:</strong></label>
-          <div>${saldo}</div>
+
+        <div>
+          <strong>Total: ${total.toFixed(2)}</strong><br />
+          <strong>Saldo: ${saldo.toFixed(2)}</strong>
         </div>
       </div>
 
-      {/* 📎 Acciones finales */}
-      <button onClick={guardarDocumento} style={{ width: "100%", marginTop: "20px" }}>💾 Guardar documento</button>
+      <hr />
+
+      <button onClick={guardarDocumento} style={{ width: "100%", marginTop: 20 }}>💾 Guardar documento</button>
 
       {productosAgregados.length > 0 && (
         <button
@@ -217,6 +330,7 @@ const CrearDocumento = () => {
             generarPDF(
               {
                 cliente_id: clienteId,
+                nombre_cliente: clienteBusqueda,
                 productos: productosAgregados,
                 total,
                 abonos,
@@ -224,14 +338,13 @@ const CrearDocumento = () => {
                 garantia,
                 fecha: fechaCreacion,
                 fecha_evento: fechaEvento,
-                nombre_cliente: obtenerNombreCliente(clienteId),
               },
               tipoDocumento
             )
           }
           style={{ width: "100%", marginTop: 10 }}
         >
-          🧾 Descargar PDF
+          📥 Descargar PDF
         </button>
       )}
 
@@ -246,9 +359,5 @@ const CrearDocumento = () => {
     </div>
   );
 };
-
-// 🧩 Estilos tabla
-const th = { border: "1px solid #ccc", padding: "6px", background: "#eee", textAlign: "left" };
-const td = { border: "1px solid #ccc", padding: "6px" };
 
 export default CrearDocumento;
