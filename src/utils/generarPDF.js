@@ -30,18 +30,18 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   // DATOS DEL DOCUMENTO
   doc.setFontSize(12);
   doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 45);
-  doc.text(`Cliente ID: ${documento.cliente_id}`, 10, 52);
-  doc.text(`Fecha creación: ${documento.fecha?.split("T")[0] || "-"}`, 10, 58);
+  doc.text(`Cliente: ${documento.nombre_cliente || "Cliente seleccionado"}`, 10, 52);
+  doc.text(`Fecha creación: ${documento.fecha || "-"}`, 10, 58);
   if (documento.fecha_evento) {
-    doc.text(`Fecha evento: ${documento.fecha_evento?.split("T")[0]}`, 10, 64);
+    doc.text(`Fecha evento: ${documento.fecha_evento}`, 10, 64);
   }
 
   // TABLA DE PRODUCTOS
   const filas = (documento.productos || []).map((p) => [
     p.nombre,
-    p.cantidad,
-    `$${p.precio}`,
-    `$${p.subtotal || p.precio * p.cantidad}`,
+    p.cantidad || "-",
+    `$${p.precio || 0}`,
+    `$${p.subtotal || (p.precio || 0) * (p.cantidad || 1)}`
   ]);
 
   autoTable(doc, {
@@ -53,7 +53,7 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   let y = doc.previousAutoTable.finalY + 10;
 
   // GARANTÍA
-  if (documento.garantia) {
+  if (documento.garantia && documento.garantia !== "0") {
     doc.text(`GARANTÍA: $${documento.garantia}`, 10, y);
     y += 8;
   }
@@ -73,7 +73,7 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   doc.text(`TOTAL: $${documento.total}`, 150, y);
   y += 8;
   if (documento.abonos?.length > 0) {
-    const totalAbonos = documento.abonos.reduce((a, b) => a + b, 0);
+    const totalAbonos = documento.abonos.reduce((a, b) => a + parseFloat(b || 0), 0);
     const saldo = documento.total - totalAbonos;
     doc.text(`SALDO FINAL: $${saldo}`, 150, y);
   }
@@ -87,9 +87,6 @@ export async function generarPDF(documento, tipo = "cotizacion") {
 
   // NOMBRE DEL ARCHIVO
   const prefix = tipo === "cotizacion" ? "cot" : "ord";
-  const id = documento.id || "documento";
-  const nombreCliente = documento.nombre_cliente || "cliente";
-  const nombreArchivo = `${prefix}_${id}_${nombreCliente.replace(/\s+/g, "_")}.pdf`;
-
+  const nombreArchivo = `${prefix}_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(nombreArchivo);
 }

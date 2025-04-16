@@ -295,28 +295,32 @@ const CrearDocumento = () => {
       </button>
 
       {productosAgregados.length > 0 && (
-        <button
-          onClick={() =>
-            generarPDF(
-              {
-                cliente_id: cliente,
-                productos: productosAgregados,
-                total,
-                abonos,
-                saldo,
-                garantia,
-                fecha: fechaCreacion,
-                fecha_evento: fechaEvento,
-              },
-              tipoDocumento
-            )
-          }
-          style={{ width: "100%", marginTop: 10 }}
-        >
-          📄 Descargar PDF
-        </button>
-      )}
+  <button
+    onClick={async () => {
+      const clienteSel = clientes.find((c) => c.id === cliente);
+      if (!clienteSel) {
+        return Swal.fire("Falta cliente", "Selecciona un cliente para generar el PDF.", "warning");
+      }
 
+      await generarPDF(
+        {
+          cliente: clienteSel,
+          productos: productosAgregados,
+          total,
+          abonos,
+          saldo,
+          garantia,
+          fecha: fechaCreacion,
+          fecha_evento: fechaEvento,
+        },
+        tipoDocumento
+      );
+    }}
+    style={{ width: "100%", marginTop: 10 }}
+  >
+    📥 Descargar PDF
+  </button>
+)}
       {tipoDocumento === "orden" && productosAgregados.length > 0 && (
         <button onClick={generarRemisionPDF} style={{ width: "100%", marginTop: 10 }}>
           📦 Generar Remisión
