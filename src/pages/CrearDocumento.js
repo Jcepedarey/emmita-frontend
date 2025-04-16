@@ -11,8 +11,8 @@ const CrearDocumento = () => {
   const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
   const [fechaEvento, setFechaEvento] = useState("");
   const [clientes, setClientes] = useState([]);
-  const [cliente, setCliente] = useState(null);
-  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [clienteId, setClienteId] = useState("");
+  const [clienteBusqueda, setClienteBusqueda] = useState("");
   const [productosAgregados, setProductosAgregados] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [grupoOpen, setGrupoOpen] = useState(false);
