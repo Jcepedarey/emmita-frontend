@@ -106,34 +106,27 @@ const CrearDocumento = () => {
 
   const guardarDocumento = async () => {
     if (!clienteId || productosAgregados.length === 0) {
-      Swal.fire("Datos incompletos", "Selecciona cliente y al menos un producto", "warning");
-      return;
+      return Swal.fire("Campos faltantes", "Debe seleccionar cliente y productos.", "warning");
     }
-
-    const productos = [...productosAgregados, ...gruposAgregados.map(g => ({
-      nombre: `GRUPO: ${g.nombre}`,
-      cantidad: 1,
-      precio: g.subtotal,
-      subtotal: g.subtotal
-    }))];
-
-    const total = productos.reduce((acc, p) => acc + p.subtotal, 0);
+  
     const datos = {
       cliente_id: clienteId,
-      productos,
-      total,
-      fecha_evento: fechaEvento,
-      garantia,
-      abonos,
-      estado: tipoDocumento === "orden" ? "confirmada" : "pendiente"
+      productos: productosAgregados,
+      total: total,
+      fecha_evento: fechaEvento || null,
+      garantia: garantia ? parseFloat(garantia) : 0,
+      abonos: abonos.filter(a => a !== ""), // eliminamos abonos vacíos
+      estado: pagado ? "pagado" : "pendiente"
     };
-
-    const tabla = tipoDocumento === "orden" ? "ordenes_pedido" : "cotizaciones";
-    const { error } = await supabase.from(tabla).insert([datos]);
-
-    if (!error) {
-      Swal.fire("Guardado", `${tipoDocumento === "orden" ? "Orden" : "Cotización"} guardada correctamente`, "success");
-    } else {
+  
+    const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+  
+    try {
+      const { error } = await supabase.from(tabla).insert([datos]);
+      if (error) throw error;
+  
+      Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente`, "success");
+    } catch (error) {
       console.error(error);
       Swal.fire("Error", "No se pudo guardar el documento", "error");
     }
