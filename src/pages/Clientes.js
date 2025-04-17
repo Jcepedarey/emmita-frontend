@@ -1,4 +1,4 @@
-// Cambio menor para forzar deploy
+// Cambios menor para forzar deploy
 import React, { useState, useEffect } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
