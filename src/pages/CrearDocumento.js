@@ -1,3 +1,4 @@
+// C:\Users\pc\frontend-emmita\src\pages\CrearDocumento.js
 import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
@@ -5,6 +6,7 @@ import AgregarGrupoModal from "../components/AgregarGrupoModal";
 import CrearClienteModal from "../components/CrearClienteModal";
 import { generarPDF } from "../utils/generarPDF";
 import Swal from "sweetalert2";
+
 const CrearDocumento = () => {
   const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
   const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
@@ -12,7 +14,10 @@ const CrearDocumento = () => {
   const [clientes, setClientes] = useState([]);
   const [clienteId, setClienteId] = useState("");
   const [busquedaCliente, setBusquedaCliente] = useState("");
+
   const [productosAgregados, setProductosAgregados] = useState([]);
+  const [gruposAgregados, setGruposAgregados] = useState([]);
+
   const [garantia, setGarantia] = useState("");
   const [abonos, setAbonos] = useState([""]);
   const [pagado, setPagado] = useState(false);
@@ -22,360 +27,320 @@ const CrearDocumento = () => {
   const [modalGrupo, setModalGrupo] = useState(false);
   const [modalCrearCliente, setModalCrearCliente] = useState(false);
 
-  const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
-  const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
-  const saldo = Math.max(0, total - sumaAbonos);
-  const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: 0 });
-  const [nuevoCliente, setNuevoCliente] = useState({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
-  
-  const actualizarCantidad = (index, cantidad) => {
-    const nuevos = [...productosAgregados];
-    nuevos[index].cantidad = cantidad;
-    nuevos[index].subtotal = cantidad * nuevos[index].precio;
-    setProductosAgregados(nuevos);
-  };
-  
-  const eliminarProducto = (index) => {
-    const nuevos = [...productosAgregados];
-    nuevos.splice(index, 1);
-    setProductosAgregados(nuevos);
-  };
-  
-  const agregarAbono = () => {
-    if (!abonos[abonos.length - 1] || isNaN(abonos[abonos.length - 1])) return;
-    setAbonos([...abonos, ""]);
-  };
-  
-  const generarRemisionPDF = () => {
-    Swal.fire("📄 Remisión", "Esta función se encuentra en desarrollo o fue llamada sin datos.", "info");
-  };
-  
-  const crearClienteDesdeDocumento = async (clienteData) => {
-    setClienteId(clienteData.id);
-    setModalCrearCliente(false);
-    setNuevoCliente({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
-  };
+  const [nuevoProducto, setNuevoProducto] = useState({
+    nombre: "",
+    descripcion: "",
+    precio: "",
+    stock: "",
+    categoria: ""
+  });
+
+  const [nuevoCliente, setNuevoCliente] = useState({
+    nombre: "",
+    identificacion: "",
+    telefono: "",
+    direccion: "",
+    email: ""
+  });
+
   useEffect(() => {
-    const cargarClientes = async () => {
-      const { data } = await supabase.from("clientes").select("*");
-      if (data) setClientes(data);
-    };
     cargarClientes();
   }, []);
-  const clientesFiltrados = clientes.filter((c) =>
-    [c.nombre, c.identificacion, c.telefono, c.codigo].some((campo) =>
-      campo?.toLowerCase().includes(busquedaCliente.toLowerCase())
-    )
-  );
 
-  const agregarProducto = (producto) => {
-    const item = {
-      tipo: "producto",
-      id: producto.id,
-      nombre: producto.nombre,
-      precio: producto.precio,
-      cantidad: 1,
-      subtotal: producto.precio,
-    };
-    setProductosAgregados([...productosAgregados, item]);
-    setModalBuscarProducto(false);
+  const cargarClientes = async () => {
+    const { data } = await supabase.from("clientes").select("*").order("nombre", { ascending: true });
+    if (data) setClientes(data);
   };
 
-  const crearNuevoProducto = async (producto) => {
-    const { data, error } = await supabase.from("productos").insert([producto]).select();
-    if (error) {
-      Swal.fire("Error", "No se pudo crear el producto.", "error");
-    } else {
-      agregarProducto(data[0]);
+  const clientesFiltrados = clientes.filter((cliente) =>
+    [cliente.nombre, cliente.identificacion, cliente.telefono, cliente.codigo]
+      .some(campo => campo?.toLowerCase().includes(busquedaCliente.toLowerCase()))
+  );
+  const agregarProducto = (producto) => {
+    const existente = productosAgregados.find(p => p.id === producto.id);
+    if (existente) {
+      Swal.fire("Ya agregado", "Este producto ya está en la lista", "info");
+      return;
     }
-    setModalCrearProducto(false);
+
+    const nuevo = {
+      ...producto,
+      cantidad: 1,
+      subtotal: producto.precio
+    };
+    setProductosAgregados([...productosAgregados, nuevo]);
+  };
+
+  const actualizarCantidad = (index, valor) => {
+    const copia = [...productosAgregados];
+    copia[index].cantidad = parseFloat(valor);
+    copia[index].subtotal = copia[index].cantidad * copia[index].precio;
+    setProductosAgregados(copia);
+  };
+
+  const eliminarProducto = (index) => {
+    const copia = [...productosAgregados];
+    copia.splice(index, 1);
+    setProductosAgregados(copia);
   };
 
   const agregarGrupo = (grupo) => {
-    const subtotal = grupo.detalleGrupo.reduce((acc, a) => acc + a.precio * a.cantidad, 0);
-    const item = {
-      tipo: "grupo",
-      nombre: grupo.nombre,
-      articulos: grupo.detalleGrupo,
-      subtotal,
-    };
-    setProductosAgregados([...productosAgregados, item]);
-    setModalGrupo(false);
+    setGruposAgregados([...gruposAgregados, grupo]);
   };
 
-  const actualizarAbono = (index, valor) => {
+  const agregarAbono = () => {
+    setAbonos([...abonos, ""]);
+  };
+
+  const actualizarAbono = (i, valor) => {
     const copia = [...abonos];
-    copia[index] = valor;
+    copia[i] = valor;
     setAbonos(copia);
   };
 
   const guardarDocumento = async () => {
-    if (!clienteId) return Swal.fire("Falta cliente", "Selecciona un cliente.", "warning");
-    if (productosAgregados.length === 0) return Swal.fire("Sin productos", "Agrega productos.", "info");
-    if (!fechaEvento) return Swal.fire("Fecha faltante", "Selecciona la fecha del evento.", "warning");
+    if (!clienteId || productosAgregados.length === 0) {
+      Swal.fire("Datos incompletos", "Selecciona cliente y al menos un producto", "warning");
+      return;
+    }
 
+    const productos = [...productosAgregados, ...gruposAgregados.map(g => ({
+      nombre: `GRUPO: ${g.nombre}`,
+      cantidad: 1,
+      precio: g.subtotal,
+      subtotal: g.subtotal
+    }))];
+
+    const total = productos.reduce((acc, p) => acc + p.subtotal, 0);
     const datos = {
       cliente_id: clienteId,
-      productos: productosAgregados,
+      productos,
       total,
-      abonos,
-      pagado,
-      saldo,
-      garantia,
       fecha_evento: fechaEvento,
+      garantia,
+      abonos,
+      estado: tipoDocumento === "orden" ? "confirmada" : "pendiente"
     };
 
-    const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const tabla = tipoDocumento === "orden" ? "ordenes_pedido" : "cotizaciones";
     const { error } = await supabase.from(tabla).insert([datos]);
 
-    if (error) {
-      Swal.fire("Error", "No se pudo guardar el documento.", "error");
+    if (!error) {
+      Swal.fire("Guardado", `${tipoDocumento === "orden" ? "Orden" : "Cotización"} guardada correctamente`, "success");
     } else {
-      Swal.fire("Guardado", `${tipoDocumento === "cotizacion" ? "Cotización" : "Orden"} guardada con éxito`, "success");
-      setProductosAgregados([]);
-      setClienteId("");
-      setGarantia("");
-      setAbonos([""]);
+      console.error(error);
+      Swal.fire("Error", "No se pudo guardar el documento", "error");
     }
   };
+
+  const generarRemisionPDF = () => {
+    const productosDetalle = [
+      ...productosAgregados,
+      ...gruposAgregados.flatMap(grupo => grupo.articulos.map(p => ({
+        nombre: `[${grupo.nombre}] ${p.nombre}`,
+        cantidad: p.cantidad,
+        precio: 0,
+        subtotal: 0
+      })))
+    ];
+
+    const documento = {
+      nombre_cliente: obtenerNombreCliente(),
+      fecha: fechaCreacion,
+      fecha_evento: fechaEvento,
+      productos: productosDetalle,
+      garantia: 0,
+      abonos: [],
+      total: 0
+    };
+
+    generarPDF(documento, "remision");
+  };
+
+  const obtenerNombreCliente = () => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    return cliente ? cliente.nombre : "";
+  };
   return (
-    <div style={{ padding: "1rem", maxWidth: "900px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center" }}>Crear Documento</h2>
+    <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center" }}>Crear {tipoDocumento === "orden" ? "Orden de Pedido" : "Cotización"}</h2>
 
-      {/* Tipo de documento */}
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Tipo de documento:</label>
-        <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
-          <option value="cotizacion">Cotización</option>
-          <option value="orden">Orden de Pedido</option>
-        </select>
-      </div>
-
-      {/* Fechas */}
-      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
+        <div>
+          <label>Tipo de documento:</label>
+          <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+            <option value="cotizacion">Cotización</option>
+            <option value="orden">Orden de Pedido</option>
+          </select>
+        </div>
+        <div>
           <label>Fecha de creación:</label>
-          <input type="text" value={fechaCreacion} readOnly style={{ width: "100%" }} />
+          <input type="date" value={fechaCreacion} disabled />
         </div>
-        <div style={{ flex: 1 }}>
+        <div>
           <label>Fecha del evento:</label>
-          <input type="date" value={fechaEvento} onChange={(e) => setFechaEvento(e.target.value)} style={{ width: "100%" }} />
+          <input type="date" value={fechaEvento} onChange={(e) => setFechaEvento(e.target.value)} />
         </div>
       </div>
 
-      {/* Buscar o crear cliente */}
-      <div style={{ marginBottom: "1rem" }}>
+      <div>
         <label>Buscar cliente:</label>
         <input
           type="text"
-          placeholder="Nombre, identificación o teléfono"
+          placeholder="Nombre, identificación o código"
           value={busquedaCliente}
           onChange={(e) => setBusquedaCliente(e.target.value)}
-          style={{ width: "100%", marginBottom: "0.5rem" }}
         />
-        {clientesFiltrados.length > 0 && (
-          <ul style={{ maxHeight: "100px", overflowY: "auto", listStyle: "none", padding: 0 }}>
-            {clientesFiltrados.map((c) => (
-              <li
-                key={c.id}
-                onClick={() => {
-                  setClienteId(c.id);
-                  setBusquedaCliente("");
-                }}
-                style={{ padding: "5px", borderBottom: "1px solid #ddd", cursor: "pointer" }}
-              >
-                {c.nombre} - {c.identificacion} - {c.telefono}
-              </li>
-            ))}
-          </ul>
-        )}
-        <button onClick={() => setModalCrearCliente(true)} style={{ marginTop: "0.5rem" }}>
-          ➕ Crear nuevo cliente
-        </button>
+        <ul>
+          {clientesFiltrados.map((c) => (
+            <li key={c.id} style={{ cursor: "pointer" }} onClick={() => setClienteId(c.id)}>
+              {c.codigo} - {c.nombre} - {c.identificacion}
+            </li>
+          ))}
+        </ul>
+        <button onClick={() => setModalCrearCliente(true)}>➕ Crear cliente</button>
       </div>
 
-      {/* Tabla de productos */}
+      <hr />
+
       <div>
-        <table style={{ width: "100%", marginTop: "1rem", borderCollapse: "collapse" }}>
+        <h4>Productos agregados:</h4>
+        <table style={{ width: "100%", marginBottom: "1rem" }}>
           <thead>
-            <tr style={{ background: "#f0f0f0" }}>
-              <th>Cantidad</th>
+            <tr>
               <th>Descripción</th>
-              <th>Valor Unitario</th>
+              <th>Cantidad</th>
+              <th>Valor unitario</th>
               <th>Subtotal</th>
-              <th>❌</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {productosAgregados.map((item, index) => (
+            {productosAgregados.map((p, index) => (
               <tr key={index}>
+                <td>{p.nombre}</td>
                 <td>
-                  {item.tipo === "producto" ? (
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.cantidad}
-                      onChange={(e) => actualizarCantidad(index, parseInt(e.target.value))}
-                      style={{ width: "60px" }}
-                    />
-                  ) : item.articulos.reduce((acc, a) => acc + a.cantidad, 0)}
+                  <input
+                    type="number"
+                    min="1"
+                    value={p.cantidad}
+                    onChange={(e) => actualizarCantidad(index, e.target.value)}
+                  />
                 </td>
-                <td>{item.nombre}</td>
-                <td>${item.precio}</td>
-                <td>${item.subtotal}</td>
+                <td>${p.precio}</td>
+                <td>${p.subtotal.toFixed(2)}</td>
                 <td>
                   <button onClick={() => eliminarProducto(index)}>🗑️</button>
                 </td>
               </tr>
             ))}
+            {gruposAgregados.map((g, i) => (
+              <tr key={`grupo-${i}`}>
+                <td><strong>GRUPO: {g.nombre}</strong></td>
+                <td>1</td>
+                <td>${g.subtotal}</td>
+                <td>${g.subtotal}</td>
+                <td></td>
+              </tr>
+            ))}
           </tbody>
         </table>
+
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button onClick={() => setModalBuscarProducto(true)}>🔍 Agregar Producto desde Inventario</button>
+          <button onClick={() => setModalCrearProducto(true)}>➕ Crear Nuevo Producto</button>
+          <button onClick={() => setModalGrupo(true)}>📦 Crear Grupo de Artículos</button>
+        </div>
       </div>
-      {/* Totales, garantía y abonos */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1rem" }}>
-        <div style={{ width: "30%" }}>
-          <label>Garantía:</label>
+
+      <hr />
+      <div style={{ marginTop: "1rem" }}>
+        <div>
+          <label>Garantía ($):</label>
           <input
             type="number"
             value={garantia}
-            onChange={(e) => setGarantia(parseFloat(e.target.value) || 0)}
-            style={{ width: "100%" }}
+            onChange={(e) => setGarantia(e.target.value)}
           />
         </div>
 
-        <div style={{ width: "30%" }}>
+        <div>
           <label>Abonos:</label>
-          {abonos.map((abono, index) => (
+          {abonos.map((abono, i) => (
             <input
-              key={index}
+              key={i}
               type="number"
               value={abono}
-              onChange={(e) => actualizarAbono(index, e.target.value)}
-              style={{ width: "100%", marginBottom: "5px" }}
+              onChange={(e) => actualizarAbono(i, e.target.value)}
+              style={{ marginRight: "5px", marginBottom: "5px" }}
             />
           ))}
-          <button onClick={agregarAbono}>➕ Otro abono</button>
+          <button onClick={agregarAbono}>➕ Abono</button>
         </div>
 
-        <div style={{ width: "30%" }}>
-          <h4>Total: ${total}</h4>
-          <h4>Saldo: ${saldo}</h4>
+        <div>
+          <label>
+            <input
+              type="checkbox"
+              checked={pagado}
+              onChange={(e) => setPagado(e.target.checked)}
+            />
+            Pedido totalmente pagado
+          </label>
         </div>
+
+        <h3>Total: ${total.toFixed(2)}</h3>
+        <h3>Saldo: ${saldo.toFixed(2)}</h3>
       </div>
 
-      {/* Botones principales */}
-      <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "10px" }}>
-        <button onClick={guardarDocumento}>💾 Guardar documento</button>
-        <button
-          onClick={() =>
-            generarPDF({
-              cliente_id: clienteId,
-              productos: productosAgregados,
-              total,
-              abonos,
-              saldo,
-              garantia,
-              fecha: fechaCreacion,
-              fecha_evento: fechaEvento,
-            }, tipoDocumento)
-          }
-        >
-          📄 Descargar PDF
-        </button>
+      <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+        <button onClick={guardarDocumento}>💾 Guardar</button>
+        <button onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)}>📄 Descargar PDF</button>
         {tipoDocumento === "orden" && productosAgregados.length > 0 && (
-          <button onClick={generarRemisionPDF}>🚚 Generar remisión</button>
+          <button onClick={() => generarRemisionPDF(obtenerDatosPDF())}>📦 Generar Remisión</button>
         )}
       </div>
 
-      {/* Botones de agregar artículos */}
-      <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
-        <button onClick={() => setModalOpen(true)}>📦 Agregar producto del inventario</button>
-        <button onClick={() => setGrupoOpen(true)}>🧩 Crear grupo (set)</button>
-        <button onClick={() => setCrearProductoOpen(true)}>➕ Crear nuevo producto</button>
-      </div>
-
       {/* Modales */}
-      {modalOpen && (
+      {modalBuscarProducto && (
         <BuscarProductoModal
-          onSelect={agregarProducto}
-          onClose={() => setModalOpen(false)}
+          onSelect={producto => {
+            agregarProducto(producto);
+            setModalBuscarProducto(false);
+          }}
+          onClose={() => setModalBuscarProducto(false)}
         />
       )}
 
-      {grupoOpen && (
+      {modalGrupo && (
         <AgregarGrupoModal
-          onCrearGrupo={agregarGrupo}
-          onCerrar={() => setGrupoOpen(false)}
+          onAgregarGrupo={grupo => {
+            setGruposAgregados([...gruposAgregados, grupo]);
+            setModalGrupo(false);
+          }}
+          onClose={() => setModalGrupo(false)}
         />
       )}
 
-      {crearProductoOpen && (
-        <div className="modal">
-          <div className="modal-content">
-            <h3>Crear nuevo producto</h3>
-            <input
-              type="text"
-              placeholder="Nombre"
-              value={nuevoProducto.nombre}
-              onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })}
-            />
-            <input
-              type="text"
-              placeholder="Descripción"
-              value={nuevoProducto.descripcion}
-              onChange={(e) => setNuevoProducto({ ...nuevoProducto, descripcion: e.target.value })}
-            />
-            <input
-              type="number"
-              placeholder="Precio"
-              value={nuevoProducto.precio}
-              onChange={(e) => setNuevoProducto({ ...nuevoProducto, precio: parseFloat(e.target.value) })}
-            />
-            <button onClick={crearNuevoProducto}>Guardar producto</button>
-            <button onClick={() => setCrearProductoOpen(false)}>Cancelar</button>
-          </div>
-        </div>
+      {modalCrearProducto && (
+        <BuscarProductoModal
+          onSelect={producto => {
+            agregarProducto(producto);
+            setModalCrearProducto(false);
+          }}
+          onClose={() => setModalCrearProducto(false)}
+        />
       )}
 
-      {/* Modal para crear cliente */}
       {modalCrearCliente && (
-        <div className="modal">
-          <div className="modal-content">
-            <h3>Crear nuevo cliente</h3>
-            <input
-              type="text"
-              placeholder="Nombre"
-              value={nuevoCliente.nombre}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })}
-            />
-            <input
-              type="text"
-              placeholder="Identificación"
-              value={nuevoCliente.identificacion}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, identificacion: e.target.value })}
-            />
-            <input
-              type="text"
-              placeholder="Teléfono"
-              value={nuevoCliente.telefono}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, telefono: e.target.value })}
-            />
-            <input
-              type="text"
-              placeholder="Dirección"
-              value={nuevoCliente.direccion}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, direccion: e.target.value })}
-            />
-            <input
-              type="email"
-              placeholder="Correo"
-              value={nuevoCliente.correo}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, correo: e.target.value })}
-            />
-            <button onClick={crearClienteDesdeDocumento}>Guardar cliente</button>
-            <button onClick={() => setModalCrearCliente(false)}>Cancelar</button>
-          </div>
-        </div>
+        <CrearClienteModal
+          onClienteCreado={(nuevoCliente) => {
+            setClientes(prev => [...prev, nuevoCliente]);
+            setClienteId(nuevoCliente.id);
+            setModalCrearCliente(false);
+          }}
+          onClose={() => setModalCrearCliente(false)}
+        />
       )}
     </div>
   );
