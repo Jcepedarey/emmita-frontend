@@ -2,11 +2,9 @@ import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
 import AgregarGrupoModal from "../components/AgregarGrupoModal";
-import BuscarProductoModal from "../components/BuscarProductoModal";
 import CrearClienteModal from "../components/CrearClienteModal";
 import { generarPDF } from "../utils/generarPDF";
 import Swal from "sweetalert2";
-
 const CrearDocumento = () => {
   const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
   const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
