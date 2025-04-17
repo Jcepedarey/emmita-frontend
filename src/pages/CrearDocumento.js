@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
 import AgregarGrupoModal from "../components/AgregarGrupoModal";
-import CrearProductoModal from "../components/CrearProductoModal";
+import BuscarProductoModal from "../components/BuscarProductoModal";
 import CrearClienteModal from "../components/CrearClienteModal";
 import { generarPDF } from "../utils/generarPDF";
 import Swal from "sweetalert2";
