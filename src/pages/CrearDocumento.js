@@ -11,6 +11,7 @@ const CrearDocumento = () => {
   const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
   const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
   const [fechaEvento, setFechaEvento] = useState("");
+
   const [clientes, setClientes] = useState([]);
   const [clienteId, setClienteId] = useState("");
   const [busquedaCliente, setBusquedaCliente] = useState("");
@@ -43,6 +44,10 @@ const CrearDocumento = () => {
     email: ""
   });
 
+  const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
+  const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
+  const saldo = Math.max(0, total - sumaAbonos);
+
   useEffect(() => {
     cargarClientes();
   }, []);
@@ -56,6 +61,7 @@ const CrearDocumento = () => {
     [cliente.nombre, cliente.identificacion, cliente.telefono, cliente.codigo]
       .some(campo => campo?.toLowerCase().includes(busquedaCliente.toLowerCase()))
   );
+
   const agregarProducto = (producto) => {
     const existente = productosAgregados.find(p => p.id === producto.id);
     if (existente) {
@@ -161,6 +167,26 @@ const CrearDocumento = () => {
     const cliente = clientes.find(c => c.id === clienteId);
     return cliente ? cliente.nombre : "";
   };
+
+  // ✅ NUEVO: función para generar datos del PDF
+  const obtenerDatosPDF = () => ({
+    tipo: tipoDocumento,
+    nombre_cliente: obtenerNombreCliente(),
+    fecha: fechaCreacion,
+    fecha_evento: fechaEvento,
+    productos: [
+      ...productosAgregados,
+      ...gruposAgregados.map(g => ({
+        nombre: `GRUPO: ${g.nombre}`,
+        cantidad: 1,
+        precio: g.subtotal,
+        subtotal: g.subtotal
+      }))
+    ],
+    garantia,
+    abonos,
+    total
+  });
   return (
     <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
       <h2 style={{ textAlign: "center" }}>Crear {tipoDocumento === "orden" ? "Orden de Pedido" : "Cotización"}</h2>
