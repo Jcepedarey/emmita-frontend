@@ -28,15 +28,26 @@ const CrearDocumento = () => {
   const [modalCrearProducto, setModalCrearProducto] = useState(false);
   const [modalCrearCliente, setModalCrearCliente] = useState(false);
 
+  useEffect(() => {
+    const cargarClientes = async () => {
+      const { data } = await supabase.from("clientes").select("*").order("nombre", { ascending: true });
+      if (data) setClientes(data);
+    };
+    cargarClientes();
+  }, []);
   const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
   const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
   const saldo = Math.max(0, total - sumaAbonos);
-
 
   const seleccionarCliente = (cliente) => {
     setClienteSeleccionado(cliente);
     Swal.fire("Cliente seleccionado", `${cliente.nombre} (${cliente.identificacion})`, "success");
   };
+
+  const clientesFiltrados = clientes.filter((c) =>
+    [c.nombre, c.identificacion, c.telefono, c.email, c.direccion]
+      .some((campo) => campo?.toLowerCase().includes(busquedaCliente.toLowerCase()))
+  );
 
   const agregarProducto = (producto) => {
     const nuevo = {
@@ -77,21 +88,21 @@ const CrearDocumento = () => {
       return Swal.fire("Faltan datos", "Debes seleccionar un cliente y agregar al menos un producto.", "warning");
     }
 
-    const datos = {
+    const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const dataGuardar = {
       cliente_id: clienteSeleccionado.id,
       productos: productosAgregados,
       total,
-      fecha_evento: fechaEvento || null,
+      fecha_evento: fechaEvento,
       garantia: parseFloat(garantia || 0),
       abonos,
-      estado: "pendiente"
+      estado: pagado ? "pagado" : "pendiente",
     };
 
-    const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const { error } = await supabase.from(tabla).insert([dataGuardar]);
 
-    const { error } = await supabase.from(tabla).insert([datos]);
     if (!error) {
-      Swal.fire("Documento guardado", `La ${tipoDocumento} fue guardada exitosamente.`, "success");
+      Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
     } else {
       console.error(error);
       Swal.fire("Error", "No se pudo guardar el documento", "error");
@@ -99,102 +110,128 @@ const CrearDocumento = () => {
   };
 
   const obtenerDatosPDF = () => ({
-    tipo: tipoDocumento,
     nombre_cliente: clienteSeleccionado?.nombre,
+    identificacion: clienteSeleccionado?.identificacion,
     telefono: clienteSeleccionado?.telefono,
     direccion: clienteSeleccionado?.direccion,
     email: clienteSeleccionado?.email,
-    fecha: new Date().toISOString().split("T")[0],
-    fecha_evento: fechaEvento,
     productos: productosAgregados,
-    garantia,
+    total,
     abonos,
-    total
+    garantia,
+    fecha: fechaCreacion,
+    fecha_evento: fechaEvento
   });
 
-  const crearClienteDesdeDocumento = async (clienteNuevo) => {
-    setClientes([...clientes, clienteNuevo]);
-    setClienteSeleccionado(clienteNuevo);
+  const agregarGrupo = (grupo) => {
+    setProductosAgregados([
+      ...productosAgregados,
+      {
+        nombre: grupo.nombre,
+        cantidad: 1,
+        precio: grupo.subtotal,
+        subtotal: grupo.subtotal,
+        es_grupo: true,
+        productos: grupo.articulos
+      }
+    ]);
+    setModalGrupo(false);
+  };
+
+  const crearClienteDesdeDocumento = (cliente) => {
+    setClientes([...clientes, cliente]);
+    setClienteSeleccionado(cliente);
     setModalCrearCliente(false);
-    Swal.fire("Cliente creado", "El cliente fue agregado y seleccionado correctamente.", "success");
   };
   return (
-    <div style={{ maxWidth: "1100px", margin: "auto", padding: "20px" }}>
-      <h2 style={{ textAlign: "center" }}>Crear {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}</h2>
+    <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center" }}>📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}</h2>
 
-      <div style={{ display: "flex", gap: "20px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <button onClick={() => setTipoDocumento("cotizacion")} style={{ backgroundColor: tipoDocumento === "cotizacion" ? "#1976d2" : "#e0e0e0", color: tipoDocumento === "cotizacion" ? "white" : "black", padding: "10px 20px" }}>Cotización</button>
-        <button onClick={() => setTipoDocumento("orden")} style={{ backgroundColor: tipoDocumento === "orden" ? "#1976d2" : "#e0e0e0", color: tipoDocumento === "orden" ? "white" : "black", padding: "10px 20px" }}>Orden de Pedido</button>
+      <div style={{ marginBottom: "15px" }}>
+        <label>Tipo de documento: </label>
+        <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+          <option value="cotizacion">Cotización</option>
+          <option value="orden">Orden de Pedido</option>
+        </select>
       </div>
 
-      <div style={{ display: "flex", gap: "20px", marginBottom: "20px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
-          <label>Fecha creación:</label>
-          <input type="text" value={fechaCreacion} disabled style={{ width: "100%" }} />
+          <label>Fecha de creación:</label>
+          <input type="date" value={fechaCreacion} disabled style={{ width: "100%" }} />
         </div>
         <div style={{ flex: 1 }}>
-          <label>Fecha evento:</label>
+          <label>Fecha del evento:</label>
           <input type="date" value={fechaEvento} onChange={(e) => setFechaEvento(e.target.value)} style={{ width: "100%" }} />
         </div>
       </div>
 
-      <div style={{ marginBottom: "10px" }}>
-        <label>Buscar cliente (nombre, teléfono, identificación):</label>
+      <hr style={{ margin: "20px 0" }} />
+
+      <label>Buscar cliente:</label>
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
         <input
           type="text"
-          placeholder="Buscar..."
+          placeholder="Nombre, identificación o teléfono"
           value={busquedaCliente}
           onChange={(e) => setBusquedaCliente(e.target.value)}
-          style={{ width: "100%", padding: "8px" }}
+          style={{ flex: 1 }}
         />
-        <button onClick={() => setModalCrearCliente(true)} style={{ marginTop: "5px" }}>➕ Crear Cliente</button>
+        <button onClick={() => setModalCrearCliente(true)}>➕ Crear cliente</button>
       </div>
-      {clientesFiltrados.length > 0 && (
-        <ul style={{ border: "1px solid #ccc", padding: "10px", marginTop: "10px", borderRadius: "6px" }}>
+
+      {busquedaCliente && clientesFiltrados.length > 0 && (
+        <ul style={{ marginTop: "10px", listStyle: "none", padding: 0 }}>
           {clientesFiltrados.map((cliente) => (
-            <li key={cliente.id} style={{ marginBottom: "8px", cursor: "pointer" }} onClick={() => seleccionarCliente(cliente)}>
-              {cliente.nombre} - {cliente.identificacion} - {cliente.telefono}
+            <li key={cliente.id}>
+              <button onClick={() => seleccionarCliente(cliente)} style={{ width: "100%", textAlign: "left" }}>
+                {cliente.nombre} - {cliente.identificacion} - {cliente.telefono}
+              </button>
             </li>
           ))}
         </ul>
       )}
 
       {clienteSeleccionado && (
-        <div style={{ background: "#f5f5f5", padding: "10px", marginTop: "10px", borderRadius: "6px" }}>
-          <strong>Cliente seleccionado:</strong>
-          <p>📛 {clienteSeleccionado.nombre}</p>
-          <p>🆔 {clienteSeleccionado.identificacion}</p>
-          <p>📞 {clienteSeleccionado.telefono}</p>
-          <p>📍 {clienteSeleccionado.direccion}</p>
-          <p>📧 {clienteSeleccionado.email}</p>
+        <div style={{ marginTop: "15px", padding: "10px", backgroundColor: "#f1f1f1", borderRadius: "6px" }}>
+          <strong>Cliente seleccionado:</strong><br />
+          🧑 {clienteSeleccionado.nombre}<br />
+          🆔 {clienteSeleccionado.identificacion}<br />
+          📞 {clienteSeleccionado.telefono}<br />
+          📍 {clienteSeleccionado.direccion}<br />
+          ✉️ {clienteSeleccionado.email}
         </div>
       )}
+      <hr style={{ margin: "30px 0" }} />
+      <h3>Productos o Grupos Agregados</h3>
 
-      <hr />
-
-      <div style={{ marginTop: "20px" }}>
-        <button onClick={() => setModalBuscarProducto(true)} style={{ marginRight: "10px" }}>📦 Agregar Producto</button>
-        <button onClick={() => setModalGrupo(true)}>📦 Crear Grupo</button>
-      </div>
-
-      <table style={{ width: "100%", marginTop: "20px", borderCollapse: "collapse" }}>
+      <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
         <thead>
-          <tr style={{ background: "#1976d2", color: "white" }}>
-            <th style={{ padding: "10px" }}>Cantidad</th>
-            <th style={{ padding: "10px" }}>Descripción</th>
-            <th style={{ padding: "10px" }}>Valor unitario</th>
-            <th style={{ padding: "10px" }}>Subtotal</th>
+          <tr>
+            <th style={{ borderBottom: "1px solid #ccc" }}>Cantidad</th>
+            <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
+            <th style={{ borderBottom: "1px solid #ccc" }}>Valor Unitario</th>
+            <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {productosAgregados.map((p, i) => (
-            <tr key={i}>
-              <td style={{ padding: "6px", textAlign: "center" }}>{p.cantidad}</td>
-              <td style={{ padding: "6px" }}>{p.nombre}</td>
-              <td style={{ padding: "6px", textAlign: "right" }}>${p.precio.toLocaleString("es-CO")}</td>
-              <td style={{ padding: "6px", textAlign: "right" }}>${p.subtotal.toLocaleString("es-CO")}</td>
-              <td style={{ padding: "6px" }}><button onClick={() => eliminarProducto(i)}>❌</button></td>
+          {productosAgregados.map((item, index) => (
+            <tr key={index}>
+              <td>
+                <input
+                  type="number"
+                  value={item.cantidad}
+                  min="1"
+                  onChange={(e) => actualizarCantidad(index, e.target.value)}
+                  style={{ width: "60px" }}
+                  disabled={item.es_grupo}
+                />
+              </td>
+              <td>{item.nombre}</td>
+              <td>${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
+              <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
+              <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
             </tr>
           ))}
         </tbody>
@@ -231,8 +268,8 @@ const CrearDocumento = () => {
       </div>
 
       <div style={{ marginTop: "20px", textAlign: "right" }}>
-        <p><strong>Total:</strong> ${total.toLocaleString("es-CO")}</p>
-        <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO")}</p>
+        <p><strong>Total:</strong> ${total.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+        <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
       </div>
 
       <div style={{ marginTop: "30px" }}>
@@ -260,19 +297,23 @@ const CrearDocumento = () => {
           onClose={() => setModalBuscarProducto(false)}
         />
       )}
-
+      {modalCrearProducto && (
+        <BuscarProductoModal
+          onSelect={agregarProducto}
+          onClose={() => setModalCrearProducto(false)}
+        />
+      )}
       {modalGrupo && (
         <AgregarGrupoModal
           onAgregarGrupo={agregarGrupo}
           onClose={() => setModalGrupo(false)}
         />
       )}
-
       {modalCrearCliente && (
         <CrearClienteModal
           onClienteCreado={(cliente) => {
-            setClienteSeleccionado(cliente);
             setClientes([...clientes, cliente]);
+            seleccionarCliente(cliente);
             setModalCrearCliente(false);
           }}
           onClose={() => setModalCrearCliente(false)}
@@ -280,18 +321,6 @@ const CrearDocumento = () => {
       )}
     </div>
   );
-};
-
-const agregarGrupo = (grupo) => {
-  setProductosAgregados([...productosAgregados, {
-    nombre: grupo.nombre,
-    cantidad: 1,
-    precio: grupo.subtotal,
-    subtotal: grupo.subtotal,
-    es_grupo: true,
-    productos: grupo.articulos
-  }]);
-  setModalGrupo(false);
 };
 
 export default CrearDocumento;
