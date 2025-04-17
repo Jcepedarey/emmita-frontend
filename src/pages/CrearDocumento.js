@@ -25,7 +25,36 @@ const CrearDocumento = () => {
   const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
   const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
   const saldo = Math.max(0, total - sumaAbonos);
-
+  const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: 0 });
+  const [nuevoCliente, setNuevoCliente] = useState({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
+  
+  const actualizarCantidad = (index, cantidad) => {
+    const nuevos = [...productosAgregados];
+    nuevos[index].cantidad = cantidad;
+    nuevos[index].subtotal = cantidad * nuevos[index].precio;
+    setProductosAgregados(nuevos);
+  };
+  
+  const eliminarProducto = (index) => {
+    const nuevos = [...productosAgregados];
+    nuevos.splice(index, 1);
+    setProductosAgregados(nuevos);
+  };
+  
+  const agregarAbono = () => {
+    if (!abonos[abonos.length - 1] || isNaN(abonos[abonos.length - 1])) return;
+    setAbonos([...abonos, ""]);
+  };
+  
+  const generarRemisionPDF = () => {
+    Swal.fire("📄 Remisión", "Esta función se encuentra en desarrollo o fue llamada sin datos.", "info");
+  };
+  
+  const crearClienteDesdeDocumento = async (clienteData) => {
+    setClienteId(clienteData.id);
+    setModalCrearCliente(false);
+    setNuevoCliente({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
+  };
   useEffect(() => {
     const cargarClientes = async () => {
       const { data } = await supabase.from("clientes").select("*");
