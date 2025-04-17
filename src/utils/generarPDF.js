@@ -50,8 +50,8 @@ export async function generarPDF(documento, tipo = "cotizacion") {
     startY: 70,
   });
 
-  let y = (doc.previousAutoTable?.finalY || 80) + 10;
-
+  let y = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : 90;
+  
   // GARANTÍA
   if (documento.garantia && documento.garantia !== "0") {
     doc.text(`GARANTÍA: $${documento.garantia}`, 10, y);
