@@ -17,32 +17,21 @@ const CrearDocumento = () => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [busquedaCliente, setBusquedaCliente] = useState("");
 
-  const [productosAgregados, setProductosAgregados] = useState([]);
-
   const [garantia, setGarantia] = useState("");
   const [abonos, setAbonos] = useState([""]);
   const [pagado, setPagado] = useState(false);
 
+  const [productosAgregados, setProductosAgregados] = useState([]);
+  const [modalGrupo, setModalGrupo] = useState(false);
+
   const [modalBuscarProducto, setModalBuscarProducto] = useState(false);
   const [modalCrearProducto, setModalCrearProducto] = useState(false);
-  const [modalGrupo, setModalGrupo] = useState(false);
   const [modalCrearCliente, setModalCrearCliente] = useState(false);
 
   const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
   const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
   const saldo = Math.max(0, total - sumaAbonos);
-  useEffect(() => {
-    const cargarClientes = async () => {
-      const { data } = await supabase.from("clientes").select("*").order("nombre", { ascending: true });
-      if (data) setClientes(data);
-    };
-    cargarClientes();
-  }, []);
 
-  const clientesFiltrados = clientes.filter((c) =>
-    [c.nombre, c.identificacion, c.telefono, c.email, c.direccion]
-      .some((campo) => campo?.toLowerCase().includes(busquedaCliente.toLowerCase()))
-  );
 
   const seleccionarCliente = (cliente) => {
     setClienteSeleccionado(cliente);
