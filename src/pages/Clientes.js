@@ -6,7 +6,13 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [buscar, setBuscar] = useState("");
-  const [form, setForm] = useState({ nombre: "", identificacion: "", telefono: "", direccion: "", correo: "" });
+  const [form, setForm] = useState({
+    nombre: "",
+    identificacion: "",
+    telefono: "",
+    direccion: "",
+    correo: ""
+  });
   const [editando, setEditando] = useState(null);
 
   useEffect(() => {
@@ -71,7 +77,7 @@ export default function Clientes() {
       identificacion: cliente.identificacion || "",
       telefono: cliente.telefono,
       direccion: cliente.direccion,
-      correo: cliente.correo || "",
+      correo: cliente.correo || ""
     });
   };
 
@@ -93,7 +99,7 @@ export default function Clientes() {
   };
 
   const filtrados = clientes.filter((c) =>
-    [c.codigo, c.nombre, c.identificacion, c.telefono, c.direccion, c.correo]
+    [c.codigo, c.nombre, c.telefono, c.direccion, c.correo]
       .some((campo) => campo?.toLowerCase().includes(buscar.toLowerCase()))
   );
 
