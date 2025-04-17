@@ -1,4 +1,3 @@
-// Cambios menor para forzar deploy
 import React, { useState, useEffect } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
@@ -12,7 +11,7 @@ export default function Clientes() {
     identificacion: "",
     telefono: "",
     direccion: "",
-    correo: ""
+    email: ""
   });
   const [editando, setEditando] = useState(null);
 
@@ -41,19 +40,19 @@ export default function Clientes() {
   };
 
   const guardarCliente = async () => {
-    const { nombre, identificacion, telefono, direccion, correo } = form;
+    const { nombre, identificacion, telefono, direccion, email } = form;
     if (!nombre || !identificacion || !telefono) {
       return Swal.fire("Campos requeridos", "Nombre, identificación y teléfono son obligatorios.", "warning");
     }
 
     if (editando) {
       const { error } = await supabase.from("clientes")
-        .update({ nombre, identificacion, telefono, direccion, correo })
+        .update({ nombre, identificacion, telefono, direccion, email })
         .eq("id", editando);
       if (!error) {
         Swal.fire("Actualizado", "Cliente actualizado correctamente.", "success");
         setEditando(null);
-        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", correo: "" });
+        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
         cargarClientes();
       }
     } else {
@@ -61,11 +60,11 @@ export default function Clientes() {
       if (!nuevoCodigo) return;
 
       const { error } = await supabase.from("clientes")
-        .insert([{ codigo: nuevoCodigo, nombre, identificacion, telefono, direccion, correo }]);
+        .insert([{ codigo: nuevoCodigo, nombre, identificacion, telefono, direccion, email }]);
 
       if (!error) {
         Swal.fire("Guardado", "Cliente guardado correctamente.", "success");
-        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", correo: "" });
+        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
         cargarClientes();
       }
     }
@@ -78,10 +77,9 @@ export default function Clientes() {
       identificacion: cliente.identificacion || "",
       telefono: cliente.telefono,
       direccion: cliente.direccion,
-      correo: cliente.correo || ""
+      email: cliente.email || ""
     });
   };
-
   const eliminarCliente = async (id) => {
     const confirmar = await Swal.fire({
       title: "¿Eliminar este cliente?",
@@ -100,7 +98,7 @@ export default function Clientes() {
   };
 
   const filtrados = clientes.filter((c) =>
-    [c.codigo, c.nombre, c.telefono, c.direccion, c.correo]
+    [c.codigo, c.nombre, c.telefono, c.direccion, c.email]
       .some((campo) => campo?.toLowerCase().includes(buscar.toLowerCase()))
   );
 
@@ -148,8 +146,8 @@ export default function Clientes() {
       <input
         type="email"
         placeholder="Correo electrónico"
-        value={form.correo}
-        onChange={(e) => setForm({ ...form, correo: e.target.value })}
+        value={form.email}
+        onChange={(e) => setForm({ ...form, email: e.target.value })}
         style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
       />
 
@@ -158,7 +156,7 @@ export default function Clientes() {
       </button>
       <button onClick={() => {
         setEditando(null);
-        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", correo: "" });
+        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
       }} style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}>Cancelar</button>
 
       <h3 style={{ marginTop: "1.5rem" }}>Lista de Clientes</h3>
@@ -176,7 +174,7 @@ export default function Clientes() {
             🆔 {c.identificacion}<br />
             📞 {c.telefono}<br />
             📍 {c.direccion}<br />
-            📧 {c.correo}
+            📧 {c.email}
             <div style={{ marginTop: "0.5rem" }}>
               <button onClick={() => editarCliente(c)} style={{ marginRight: "10px" }}><FaEdit /></button>
               <button onClick={() => eliminarCliente(c.id)}><FaTrash /></button>
