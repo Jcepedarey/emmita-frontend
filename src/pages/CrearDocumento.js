@@ -237,6 +237,20 @@ const CrearDocumento = () => {
         </tbody>
       </table>
 
+      <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+  <button onClick={() => setModalBuscarProducto(true)} style={{ padding: "8px 12px" }}>
+    🔍 Agregar Producto desde Inventario
+  </button>
+
+  <button onClick={() => setModalCrearProducto(true)} style={{ padding: "8px 12px" }}>
+    ➕ Crear Nuevo Producto
+  </button>
+
+  <button onClick={() => setModalGrupo(true)} style={{ padding: "8px 12px" }}>
+    📦 Crear Grupo de Artículos
+  </button>
+</div>
+
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
         <div style={{ flex: "1" }}>
           <label>Garantía ($):</label>
