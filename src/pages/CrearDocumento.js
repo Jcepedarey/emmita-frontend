@@ -344,16 +344,16 @@ const CrearDocumento = () => {
           onClose={() => setModalGrupo(false)}
         />
       )}
-      {modalCrearCliente && (
-        <CrearClienteModal
-          onClienteCreado={(cliente) => {
-            setClientes([...clientes, cliente]);
-            setClienteId(cliente.id);
-            setModalCrearCliente(false);
-          }}
-          onClose={() => setModalCrearCliente(false)}
-        />
-      )}
+     {modalCrearCliente && (
+  <CrearClienteModal
+    onClienteCreado={(cliente) => {
+      setClientes([...clientes, cliente]);
+      setClienteSeleccionado(cliente); // ✅ Este es el correcto
+      setModalCrearCliente(false);
+    }}
+    onClose={() => setModalCrearCliente(false)}
+  />
+)}
     </div>
   );
 };
