@@ -304,12 +304,11 @@ const CrearDocumento = () => {
           </button>
         )}
 
-        {/* ✅ NUEVO BOTÓN LIMPIAR */}
-        <button
+                {/* ✅ NUEVO BOTÓN LIMPIAR */}
+                <button
           onClick={() => {
-            setClienteId("");
+            setClienteSeleccionado(null);
             setProductosAgregados([]);
-            setGruposAgregados([]);
             setGarantia("");
             setAbonos([""]);
             setPagado(false);
@@ -317,7 +316,8 @@ const CrearDocumento = () => {
           }}
           style={{
             padding: "10px 20px",
-            backgroundColor: "#f44336",
+            marginLeft: "10px",
+            backgroundColor: "#e53935",
             color: "white"
           }}
         >
@@ -344,16 +344,16 @@ const CrearDocumento = () => {
           onClose={() => setModalGrupo(false)}
         />
       )}
-     {modalCrearCliente && (
-  <CrearClienteModal
-    onClienteCreado={(cliente) => {
-      setClientes([...clientes, cliente]);
-      setClienteSeleccionado(cliente); // ✅ Este es el correcto
-      setModalCrearCliente(false);
-    }}
-    onClose={() => setModalCrearCliente(false)}
-  />
-)}
+      {modalCrearCliente && (
+        <CrearClienteModal
+          onClienteCreado={(cliente) => {
+            setClientes([...clientes, cliente]);
+            setClienteSeleccionado(cliente); // ✅ Correcto
+            setModalCrearCliente(false);
+          }}
+          onClose={() => setModalCrearCliente(false)}
+        />
+      )}
     </div>
   );
 };
