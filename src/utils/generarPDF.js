@@ -30,31 +30,43 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   // DATOS DEL DOCUMENTO
   doc.setFontSize(12);
   doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 45);
+
   doc.text(`Cliente: ${documento.nombre_cliente || "Cliente seleccionado"}`, 10, 52);
-  doc.text(`Fecha creación: ${documento.fecha || "-"}`, 10, 58);
+  if (documento.identificacion) doc.text(`Identificación: ${documento.identificacion}`, 10, 58);
+  if (documento.telefono) doc.text(`Teléfono: ${documento.telefono}`, 10, 64);
+  if (documento.direccion) doc.text(`Dirección: ${documento.direccion}`, 10, 70);
+  if (documento.email) doc.text(`Correo: ${documento.email}`, 10, 76);
+
+  let startY = 82;
+
+  if (documento.fecha) {
+    doc.setFontSize(11);
+    doc.text(`Fecha creación: ${documento.fecha}`, 150, 45);
+  }
   if (documento.fecha_evento) {
-    doc.text(`Fecha evento: ${documento.fecha_evento}`, 10, 64);
+    doc.setFontSize(11);
+    doc.text(`Fecha evento: ${documento.fecha_evento}`, 150, 52);
   }
 
   // TABLA DE PRODUCTOS
   const filas = (documento.productos || []).map((p) => [
-    p.nombre,
     p.cantidad || "-",
-    `$${p.precio || 0}`,
-    `$${p.subtotal || (p.precio || 0) * (p.cantidad || 1)}`
+    p.nombre,
+    `$${Number(p.precio).toLocaleString("es-CO")}`,
+    `$${Number(p.subtotal || (p.precio || 0) * (p.cantidad || 1)).toLocaleString("es-CO")}`
   ]);
 
   autoTable(doc, {
-    head: [["Producto", "Cantidad", "Precio", "Subtotal"]],
+    head: [["Cantidad", "Producto", "Precio", "Subtotal"]],
     body: filas,
-    startY: 70,
+    startY: startY,
   });
 
-  let y = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : 90;
-  
+  let y = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : startY + 20;
+
   // GARANTÍA
   if (documento.garantia && documento.garantia !== "0") {
-    doc.text(`GARANTÍA: $${documento.garantia}`, 10, y);
+    doc.text(`GARANTÍA: $${Number(documento.garantia).toLocaleString("es-CO")}`, 10, y);
     y += 8;
   }
 
@@ -63,19 +75,19 @@ export async function generarPDF(documento, tipo = "cotizacion") {
     doc.text("ABONOS:", 10, y);
     documento.abonos.forEach((abono, i) => {
       y += 6;
-      doc.text(`• Abono ${i + 1}: $${abono}`, 15, y);
+      doc.text(`• Abono ${i + 1}: $${Number(abono).toLocaleString("es-CO")}`, 15, y);
     });
     y += 8;
   }
 
   // TOTAL y SALDO FINAL
   doc.setFontSize(12);
-  doc.text(`TOTAL: $${documento.total}`, 150, y);
+  doc.text(`TOTAL: $${Number(documento.total).toLocaleString("es-CO")}`, 150, y);
   y += 8;
   if (documento.abonos?.length > 0) {
     const totalAbonos = documento.abonos.reduce((a, b) => a + parseFloat(b || 0), 0);
     const saldo = documento.total - totalAbonos;
-    doc.text(`SALDO FINAL: $${saldo}`, 150, y);
+    doc.text(`SALDO FINAL: $${Number(saldo).toLocaleString("es-CO")}`, 150, y);
   }
 
   // PIE DE PÁGINA

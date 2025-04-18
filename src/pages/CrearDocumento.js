@@ -238,18 +238,18 @@ const CrearDocumento = () => {
       </table>
 
       <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-  <button onClick={() => setModalBuscarProducto(true)} style={{ padding: "8px 12px" }}>
-    🔍 Agregar Producto desde Inventario
-  </button>
+        <button onClick={() => setModalBuscarProducto(true)} style={{ padding: "8px 12px" }}>
+          🔍 Agregar Producto desde Inventario
+        </button>
 
-  <button onClick={() => setModalCrearProducto(true)} style={{ padding: "8px 12px" }}>
-    ➕ Crear Nuevo Producto
-  </button>
+        <button onClick={() => setModalCrearProducto(true)} style={{ padding: "8px 12px" }}>
+          ➕ Crear Nuevo Producto
+        </button>
 
-  <button onClick={() => setModalGrupo(true)} style={{ padding: "8px 12px" }}>
-    📦 Crear Grupo de Artículos
-  </button>
-</div>
+        <button onClick={() => setModalGrupo(true)} style={{ padding: "8px 12px" }}>
+          📦 Crear Grupo de Artículos
+        </button>
+      </div>
 
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
         <div style={{ flex: "1" }}>
@@ -286,8 +286,8 @@ const CrearDocumento = () => {
         <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
       </div>
 
-      <div style={{ marginTop: "30px" }}>
-        <button onClick={guardarDocumento} style={{ padding: "10px 20px", marginRight: "10px" }}>
+      <div style={{ marginTop: "30px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
+        <button onClick={guardarDocumento} style={{ padding: "10px 20px" }}>
           💾 Guardar Documento
         </button>
 
@@ -298,13 +298,34 @@ const CrearDocumento = () => {
         {tipoDocumento === "orden" && productosAgregados.length > 0 && (
           <button
             onClick={() => generarRemision(obtenerDatosPDF())}
-            style={{ padding: "10px 20px", marginLeft: "10px", backgroundColor: "#4CAF50", color: "white" }}
+            style={{ padding: "10px 20px", backgroundColor: "#4CAF50", color: "white" }}
           >
             📦 Generar Remisión
           </button>
         )}
+
+        {/* ✅ NUEVO BOTÓN LIMPIAR */}
+        <button
+          onClick={() => {
+            setClienteId("");
+            setProductosAgregados([]);
+            setGruposAgregados([]);
+            setGarantia("");
+            setAbonos([""]);
+            setPagado(false);
+            setBusquedaCliente("");
+          }}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "#f44336",
+            color: "white"
+          }}
+        >
+          🧹 Limpiar módulo
+        </button>
       </div>
 
+      {/* Modales */}
       {modalBuscarProducto && (
         <BuscarProductoModal
           onSelect={agregarProducto}
@@ -327,7 +348,7 @@ const CrearDocumento = () => {
         <CrearClienteModal
           onClienteCreado={(cliente) => {
             setClientes([...clientes, cliente]);
-            seleccionarCliente(cliente);
+            setClienteId(cliente.id);
             setModalCrearCliente(false);
           }}
           onClose={() => setModalCrearCliente(false)}
