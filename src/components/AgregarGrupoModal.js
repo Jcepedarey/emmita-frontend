@@ -14,19 +14,18 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       const { data: inventario } = await supabase.from("productos").select("*");
       const { data: proveedores } = await supabase
         .from("productos_proveedor")
-        .select("*, proveedor:proveedor_id (nombre)");
+        .select("id, nombre, descripcion, precio, proveedor_id");
 
       const convertidos = (proveedores || []).map((p) => ({
-        ...p,
-        id: `prov-${p.id}`, // ID personalizado para evitar conflicto con inventario
-        nombre_original: p.nombre,
-        nombre: `${p.nombre} (Proveedor)`,
+        id: `prov-${p.id}`,
+        nombre: p.nombre,
+        descripcion: p.descripcion || "",
+        precio: parseFloat(p.precio),
         es_proveedor: true
       }));
 
       const todos = [...(inventario || []), ...convertidos];
       setProductos(todos);
-      console.log("🧪 Productos disponibles:", todos); // ← para depurar
     };
 
     cargarProductos();
@@ -40,8 +39,8 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       {
         ...producto,
         cantidad: 1,
-        precio: parseFloat(producto.precio),
         subtotal: parseFloat(producto.precio),
+        precio: parseFloat(producto.precio),
         es_proveedor: !!producto.es_proveedor
       }
     ]);
@@ -50,7 +49,8 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
   const actualizarCantidadPrecio = (index, campo, valor) => {
     const actualizados = [...seleccionados];
     actualizados[index][campo] = parseFloat(valor);
-    actualizados[index].subtotal = actualizados[index].cantidad * actualizados[index].precio;
+    actualizados[index].subtotal =
+      actualizados[index].cantidad * actualizados[index].precio;
     setSeleccionados(actualizados);
   };
 
@@ -72,16 +72,16 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       subtotal: subtotalGrupo,
       articulos: seleccionados
     };
-
     onAgregarGrupo(grupo);
     onClose();
   };
 
   const filtrados = productos.filter((p) => {
-    const textoBusqueda = busqueda.toLowerCase();
-    const nombreBuscado = (p.nombre_original || p.nombre || "").toLowerCase();
-    const descripcion = (p.descripcion || "").toLowerCase();
-    return nombreBuscado.includes(textoBusqueda) || descripcion.includes(textoBusqueda);
+    const texto = busqueda.toLowerCase();
+    return (
+      p.nombre?.toLowerCase().includes(texto) ||
+      p.descripcion?.toLowerCase().includes(texto)
+    );
   });
 
   return (
@@ -109,7 +109,12 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
           {filtrados.map((p) => (
             <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
               {p.nombre} - ${parseFloat(p.precio).toLocaleString("es-CO", { maximumFractionDigits: 0 })}
-              <button style={{ marginLeft: "10px" }} onClick={() => agregarAlGrupo(p)}>Agregar</button>
+              <button
+                style={{ marginLeft: "10px" }}
+                onClick={() => agregarAlGrupo(p)}
+              >
+                Agregar
+              </button>
             </li>
           ))}
         </ul>
@@ -117,14 +122,19 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
         <h4 style={{ marginTop: "15px" }}>Artículos del grupo:</h4>
         <ul style={{ padding: 0 }}>
           {seleccionados.map((item, index) => (
-            <li key={item.id} style={{ listStyle: "none", marginBottom: "8px" }}>
+            <li
+              key={item.id}
+              style={{ listStyle: "none", marginBottom: "8px" }}
+            >
               {item.nombre} <br />
               Cantidad:
               <input
                 type="number"
                 min="1"
                 value={item.cantidad}
-                onChange={(e) => actualizarCantidadPrecio(index, "cantidad", e.target.value)}
+                onChange={(e) =>
+                  actualizarCantidadPrecio(index, "cantidad", e.target.value)
+                }
                 style={{ width: "60px", margin: "0 5px" }}
               />
               Precio:
@@ -132,18 +142,29 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
                 type="number"
                 min="0"
                 value={item.precio}
-                onChange={(e) => actualizarCantidadPrecio(index, "precio", e.target.value)}
+                onChange={(e) =>
+                  actualizarCantidadPrecio(index, "precio", e.target.value)
+                }
                 style={{ width: "70px", margin: "0 5px" }}
               />
-              <strong> Subtotal: ${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</strong>
-              <button onClick={() => eliminarDelGrupo(index)} style={{ marginLeft: "10px" }}>Quitar</button>
+              <strong>
+                Subtotal: ${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+              </strong>
+              <button
+                onClick={() => eliminarDelGrupo(index)}
+                style={{ marginLeft: "10px" }}
+              >
+                Quitar
+              </button>
             </li>
           ))}
         </ul>
 
         <div style={{ marginTop: "15px", textAlign: "center" }}>
           <button onClick={guardarGrupo}>Guardar grupo</button>
-          <button onClick={onClose} style={{ marginLeft: "10px" }}>Cancelar</button>
+          <button onClick={onClose} style={{ marginLeft: "10px" }}>
+            Cancelar
+          </button>
         </div>
       </div>
     </div>
