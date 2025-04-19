@@ -17,9 +17,10 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       const convertidos = (proveedores || []).map(p => ({
         ...p,
         nombre: `${p.nombre} (Proveedor)`,
-        es_proveedor: true,
-        id: `prov-${p.id}` // ✅ importante para evitar conflicto de ID
+        nombre_original: p.nombre,
+        es_proveedor: true
       }));
+      
 
       const todos = [...(inventario || []), ...convertidos];
       setProductos(todos);
@@ -71,10 +72,14 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
     onClose();
   };
 
-  const filtrados = productos.filter(p =>
-    p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const filtrados = productos.filter(p => {
+    const textoBusqueda = busqueda.toLowerCase();
+    const nombreOriginal = p.nombre_original || p.nombre; // nombre sin decoración
+    return (
+      nombreOriginal.toLowerCase().includes(textoBusqueda) ||
+      (p.descripcion && p.descripcion.toLowerCase().includes(textoBusqueda))
+    );
+  });
 
   return (
     <div className="modal">
