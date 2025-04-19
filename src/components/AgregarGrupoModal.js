@@ -12,26 +12,28 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
   useEffect(() => {
     const cargarProductos = async () => {
       const { data: inventario } = await supabase.from("productos").select("*");
-      const { data: proveedores } = await supabase.from("productos_proveedor").select("*");
-  
-      const convertidos = (proveedores || []).map(p => ({
+      const { data: proveedores } = await supabase
+        .from("productos_proveedor")
+        .select("*, proveedor:proveedor_id (nombre)");
+
+      const convertidos = (proveedores || []).map((p) => ({
         ...p,
-        id: `prov-${p.id}`, // Para evitar conflictos de ID
-        nombre_original: p.nombre,          // Esto es clave para el filtro
-        nombre: `${p.nombre} (Proveedor)`,  // Esto es lo que se muestra
-        precio: p.precio_venta,
-        es_proveedor: true,
+        id: `prov-${p.id}`, // ID personalizado para evitar conflicto con inventario
+        nombre_original: p.nombre,
+        nombre: `${p.nombre} (Proveedor)`,
+        es_proveedor: true
       }));
-  
+
       const todos = [...(inventario || []), ...convertidos];
       setProductos(todos);
+      console.log("🧪 Productos disponibles:", todos); // ← para depurar
     };
-  
+
     cargarProductos();
-  }, []);  
+  }, []);
 
   const agregarAlGrupo = (producto) => {
-    if (seleccionados.some(p => p.id === producto.id)) return;
+    if (seleccionados.some((p) => p.id === producto.id)) return;
 
     setSeleccionados([
       ...seleccionados,
@@ -57,6 +59,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
     actualizados.splice(index, 1);
     setSeleccionados(actualizados);
   };
+
   const guardarGrupo = () => {
     if (!nombreGrupo || seleccionados.length === 0) {
       alert("Debes nombrar el grupo y agregar artículos.");
@@ -69,16 +72,16 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       subtotal: subtotalGrupo,
       articulos: seleccionados
     };
+
     onAgregarGrupo(grupo);
     onClose();
   };
 
-  const filtrados = productos.filter(p => {
+  const filtrados = productos.filter((p) => {
     const textoBusqueda = busqueda.toLowerCase();
-    return (
-      (p.nombre_original || p.nombre)?.toLowerCase().includes(textoBusqueda) ||
-      (p.descripcion && p.descripcion.toLowerCase().includes(textoBusqueda))
-    );
+    const nombreBuscado = (p.nombre_original || p.nombre || "").toLowerCase();
+    const descripcion = (p.descripcion || "").toLowerCase();
+    return nombreBuscado.includes(textoBusqueda) || descripcion.includes(textoBusqueda);
   });
 
   return (
@@ -103,13 +106,12 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
         />
 
         <ul style={{ maxHeight: "150px", overflowY: "auto", padding: 0 }}>
-        {filtrados.map((p) => (
-  <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
-    {p.nombre} - ${p.precio?.toLocaleString("es-CO")}
-    <button style={{ marginLeft: "10px" }} onClick={() => agregarAlGrupo(p)}>Agregar</button>
-  </li>
-))}
-
+          {filtrados.map((p) => (
+            <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
+              {p.nombre} - ${parseFloat(p.precio).toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+              <button style={{ marginLeft: "10px" }} onClick={() => agregarAlGrupo(p)}>Agregar</button>
+            </li>
+          ))}
         </ul>
 
         <h4 style={{ marginTop: "15px" }}>Artículos del grupo:</h4>
@@ -133,7 +135,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
                 onChange={(e) => actualizarCantidadPrecio(index, "precio", e.target.value)}
                 style={{ width: "70px", margin: "0 5px" }}
               />
-              <strong> Subtotal: ${item.subtotal.toLocaleString("es-CO")}</strong>
+              <strong> Subtotal: ${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</strong>
               <button onClick={() => eliminarDelGrupo(index)} style={{ marginLeft: "10px" }}>Quitar</button>
             </li>
           ))}
