@@ -11,17 +11,34 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
 
   useEffect(() => {
     const cargarProductos = async () => {
-      const { data } = await supabase.from("productos").select("*");
-      if (data) setProductos(data);
+      const { data: inventario } = await supabase.from("productos").select("*");
+      const { data: proveedores } = await supabase.from("productos_proveedor").select("*, proveedor:proveedor_id (nombre)");
+  
+      const convertidos = (proveedores || []).map(p => ({
+        ...p,
+        nombre: `${p.nombre} (Proveedor)`,
+        es_proveedor: true
+      }));
+  
+      const todos = [...(inventario || []), ...convertidos];
+      setProductos(todos);
     };
+  
     cargarProductos();
   }, []);
 
   const agregarAlGrupo = (producto) => {
     if (seleccionados.some(p => p.id === producto.id)) return;
+  
     setSeleccionados([
       ...seleccionados,
-      { ...producto, cantidad: 1, precio: producto.precio, subtotal: producto.precio }
+      {
+        ...producto,
+        cantidad: 1,
+        precio: parseFloat(producto.precio),
+        subtotal: parseFloat(producto.precio),
+        es_proveedor: !!producto.es_proveedor
+      }
     ]);
   };
 
