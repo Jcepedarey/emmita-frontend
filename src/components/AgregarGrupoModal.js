@@ -12,22 +12,23 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
   useEffect(() => {
     const cargarProductos = async () => {
       const { data: inventario } = await supabase.from("productos").select("*");
+  
       const { data: proveedores } = await supabase
-        .from("productos_proveedor")
-        .select("id, nombre, descripcion, precio, proveedor_id");
-
+        .from("productos_proveedores") // ✅ nombre corregido
+        .select("id, nombre, descripcion, precio_venta");
+  
       const convertidos = (proveedores || []).map((p) => ({
         id: `prov-${p.id}`,
         nombre: p.nombre,
         descripcion: p.descripcion || "",
-        precio: parseFloat(p.precio),
+        precio: parseFloat(p.precio_venta), // 👈 usamos precio de venta
         es_proveedor: true
       }));
-
+  
       const todos = [...(inventario || []), ...convertidos];
       setProductos(todos);
     };
-
+  
     cargarProductos();
   }, []);
 
