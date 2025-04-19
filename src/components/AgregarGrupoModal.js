@@ -14,9 +14,9 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
         .from("productos")
         .select("id, nombre, descripcion, precio");
 
-      const { data: proveedores } = await supabase
-        .from("productos_proveedores")
-        .select("id, nombre, descripcion, precio_venta");
+        const { data: proveedores } = await supabase
+        .from("productos_proveedores") // ✅ Nombre correcto
+        .select("*, proveedor:proveedor_id (nombre)");      
 
       const inventarioNormalizado = (inventario || []).map((p) => ({
         id: p.id,
