@@ -12,22 +12,26 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
   useEffect(() => {
     const cargarProductos = async () => {
       const { data: inventario } = await supabase.from("productos").select("*");
-      const { data: proveedores } = await supabase.from("productos_proveedor").select("*, proveedor:proveedor_id (nombre)");
-
-      const convertidos = (proveedores || []).map(p => ({
+      const { data: proveedores } = await supabase
+        .from("productos_proveedor")
+        .select("*, proveedor:proveedor_id (nombre)");
+  
+      const convertidos = (proveedores || []).map((p) => ({
         ...p,
+        id: `prov-${p.id}`, // ⚠️ Necesario para que no choquen los ID
         nombre: `${p.nombre} (Proveedor)`,
         nombre_original: p.nombre,
-        es_proveedor: true
+        precio: p.precio_venta,
+        es_proveedor: true,
       }));
-      
-
+  
       const todos = [...(inventario || []), ...convertidos];
       setProductos(todos);
     };
-
+  
     cargarProductos();
   }, []);
+  
 
   const agregarAlGrupo = (producto) => {
     if (seleccionados.some(p => p.id === producto.id)) return;
@@ -74,9 +78,8 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
 
   const filtrados = productos.filter(p => {
     const textoBusqueda = busqueda.toLowerCase();
-    const nombreOriginal = p.nombre_original || p.nombre; // nombre sin decoración
     return (
-      nombreOriginal.toLowerCase().includes(textoBusqueda) ||
+      (p.nombre_original || p.nombre)?.toLowerCase().includes(textoBusqueda) ||
       (p.descripcion && p.descripcion.toLowerCase().includes(textoBusqueda))
     );
   });
@@ -103,12 +106,13 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
         />
 
         <ul style={{ maxHeight: "150px", overflowY: "auto", padding: 0 }}>
-          {filtrados.map((p) => (
-            <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
-              {p.nombre} - ${parseFloat(p.precio).toLocaleString("es-CO")}
-              <button style={{ marginLeft: "10px" }} onClick={() => agregarAlGrupo(p)}>Agregar</button>
-            </li>
-          ))}
+        {filtrados.map((p) => (
+  <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
+    {p.nombre} - ${p.precio?.toLocaleString("es-CO")}
+    <button style={{ marginLeft: "10px" }} onClick={() => agregarAlGrupo(p)}>Agregar</button>
+  </li>
+))}
+
         </ul>
 
         <h4 style={{ marginTop: "15px" }}>Artículos del grupo:</h4>
