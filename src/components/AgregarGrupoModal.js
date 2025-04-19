@@ -14,11 +14,11 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       const { data: inventario } = await supabase.from("productos").select("*");
       const { data: proveedores } = await supabase
         .from("productos_proveedor")
-        .select("*, proveedor:proveedor_id (nombre)");
+        .select("*");
   
       const convertidos = (proveedores || []).map((p) => ({
         ...p,
-        id: `prov-${p.id}`, // ⚠️ Necesario para que no choquen los ID
+        id: `prov-${p.id}`,
         nombre: `${p.nombre} (Proveedor)`,
         nombre_original: p.nombre,
         precio: p.precio_venta,
@@ -30,8 +30,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
     };
   
     cargarProductos();
-  }, []);
-  
+  }, []);  
 
   const agregarAlGrupo = (producto) => {
     if (seleccionados.some(p => p.id === producto.id)) return;
