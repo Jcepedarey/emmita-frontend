@@ -1,4 +1,3 @@
-// C:\Users\pc\frontend-emmita\src\components\AgregarGrupoModal.js
 import React, { useState, useEffect } from "react";
 import supabase from "../supabaseClient";
 import "../estilos/GrupoModal.css";
@@ -11,24 +10,33 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
 
   useEffect(() => {
     const cargarProductos = async () => {
-      const { data: inventario } = await supabase.from("productos").select("*");
-  
+      const { data: inventario } = await supabase
+        .from("productos")
+        .select("id, nombre, descripcion, precio");
+
       const { data: proveedores } = await supabase
-        .from("productos_proveedores") // ✅ nombre corregido
+        .from("productos_proveedores")
         .select("id, nombre, descripcion, precio_venta");
-  
-      const convertidos = (proveedores || []).map((p) => ({
+
+      const inventarioNormalizado = (inventario || []).map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        descripcion: p.descripcion || "",
+        precio: parseFloat(p.precio),
+        es_proveedor: false,
+      }));
+
+      const proveedoresNormalizado = (proveedores || []).map((p) => ({
         id: `prov-${p.id}`,
         nombre: p.nombre,
         descripcion: p.descripcion || "",
-        precio: parseFloat(p.precio_venta), // 👈 usamos precio de venta
-        es_proveedor: true
+        precio: parseFloat(p.precio_venta),
+        es_proveedor: true,
       }));
-  
-      const todos = [...(inventario || []), ...convertidos];
-      setProductos(todos);
+
+      setProductos([...inventarioNormalizado, ...proveedoresNormalizado]);
     };
-  
+
     cargarProductos();
   }, []);
 
@@ -40,10 +48,8 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       {
         ...producto,
         cantidad: 1,
-        subtotal: parseFloat(producto.precio),
-        precio: parseFloat(producto.precio),
-        es_proveedor: !!producto.es_proveedor
-      }
+        subtotal: producto.precio,
+      },
     ]);
   };
 
@@ -67,11 +73,14 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       return;
     }
 
-    const subtotalGrupo = seleccionados.reduce((acc, p) => acc + p.subtotal, 0);
+    const subtotalGrupo = seleccionados.reduce(
+      (acc, p) => acc + p.subtotal,
+      0
+    );
     const grupo = {
       nombre: nombreGrupo,
       subtotal: subtotalGrupo,
-      articulos: seleccionados
+      articulos: seleccionados,
     };
     onAgregarGrupo(grupo);
     onClose();
@@ -109,7 +118,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
         <ul style={{ maxHeight: "150px", overflowY: "auto", padding: 0 }}>
           {filtrados.map((p) => (
             <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
-              {p.nombre} - ${parseFloat(p.precio).toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+              {p.nombre} - ${p.precio.toLocaleString("es-CO")}
               <button
                 style={{ marginLeft: "10px" }}
                 onClick={() => agregarAlGrupo(p)}
@@ -149,7 +158,8 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
                 style={{ width: "70px", margin: "0 5px" }}
               />
               <strong>
-                Subtotal: ${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+                {" "}
+                Subtotal: ${item.subtotal.toLocaleString("es-CO")}
               </strong>
               <button
                 onClick={() => eliminarDelGrupo(index)}
