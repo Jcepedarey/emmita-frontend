@@ -13,23 +13,24 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
     const cargarProductos = async () => {
       const { data: inventario } = await supabase.from("productos").select("*");
       const { data: proveedores } = await supabase.from("productos_proveedor").select("*, proveedor:proveedor_id (nombre)");
-  
+
       const convertidos = (proveedores || []).map(p => ({
         ...p,
         nombre: `${p.nombre} (Proveedor)`,
-        es_proveedor: true
+        es_proveedor: true,
+        id: `prov-${p.id}` // ✅ importante para evitar conflicto de ID
       }));
-  
+
       const todos = [...(inventario || []), ...convertidos];
       setProductos(todos);
     };
-  
+
     cargarProductos();
   }, []);
 
   const agregarAlGrupo = (producto) => {
     if (seleccionados.some(p => p.id === producto.id)) return;
-  
+
     setSeleccionados([
       ...seleccionados,
       {
@@ -54,7 +55,6 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
     actualizados.splice(index, 1);
     setSeleccionados(actualizados);
   };
-
   const guardarGrupo = () => {
     if (!nombreGrupo || seleccionados.length === 0) {
       alert("Debes nombrar el grupo y agregar artículos.");
@@ -65,7 +65,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
     const grupo = {
       nombre: nombreGrupo,
       subtotal: subtotalGrupo,
-      articulos: seleccionados // 🔄 Corrección aquí
+      articulos: seleccionados
     };
     onAgregarGrupo(grupo);
     onClose();
@@ -100,7 +100,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
         <ul style={{ maxHeight: "150px", overflowY: "auto", padding: 0 }}>
           {filtrados.map((p) => (
             <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
-              {p.nombre} - ${p.precio}
+              {p.nombre} - ${parseFloat(p.precio).toLocaleString("es-CO")}
               <button style={{ marginLeft: "10px" }} onClick={() => agregarAlGrupo(p)}>Agregar</button>
             </li>
           ))}
@@ -127,7 +127,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
                 onChange={(e) => actualizarCantidadPrecio(index, "precio", e.target.value)}
                 style={{ width: "70px", margin: "0 5px" }}
               />
-              <strong> Subtotal: ${item.subtotal.toFixed(2)}</strong>
+              <strong> Subtotal: ${item.subtotal.toLocaleString("es-CO")}</strong>
               <button onClick={() => eliminarDelGrupo(index)} style={{ marginLeft: "10px" }}>Quitar</button>
             </li>
           ))}
