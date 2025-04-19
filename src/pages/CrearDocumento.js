@@ -4,6 +4,7 @@ import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
 import AgregarGrupoModal from "../components/AgregarGrupoModal";
 import CrearClienteModal from "../components/CrearClienteModal";
+import BuscarProductoProveedorModal from "../components/BuscarProductoProveedorModal"; // ✅ Nuevo componente
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
 import Swal from "sweetalert2";
@@ -27,6 +28,7 @@ const CrearDocumento = () => {
   const [modalBuscarProducto, setModalBuscarProducto] = useState(false);
   const [modalCrearProducto, setModalCrearProducto] = useState(false);
   const [modalCrearCliente, setModalCrearCliente] = useState(false);
+  const [modalProveedor, setModalProveedor] = useState(false); // ✅ Nuevo estado para proveedores
 
   useEffect(() => {
     const cargarClientes = async () => {
@@ -35,6 +37,7 @@ const CrearDocumento = () => {
     };
     cargarClientes();
   }, []);
+
   const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
   const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
   const saldo = Math.max(0, total - sumaAbonos);
@@ -61,6 +64,19 @@ const CrearDocumento = () => {
     setModalBuscarProducto(false);
   };
 
+  const agregarProductoProveedor = (producto) => {
+    const nuevo = {
+      nombre: producto.nombre,
+      cantidad: 1,
+      precio: parseFloat(producto.precio_venta),
+      subtotal: parseFloat(producto.precio_venta),
+      es_grupo: false,
+      es_proveedor: true // ✅ para diferenciar los productos de proveedores
+    };
+    setProductosAgregados([...productosAgregados, nuevo]);
+    setModalProveedor(false);
+  };
+
   const actualizarCantidad = (index, cantidad) => {
     const nuevos = [...productosAgregados];
     nuevos[index].cantidad = parseInt(cantidad || 0);
@@ -83,6 +99,7 @@ const CrearDocumento = () => {
     nuevos[index] = valor;
     setAbonos(nuevos);
   };
+
   const guardarDocumento = async () => {
     if (!clienteSeleccionado || productosAgregados.length === 0) {
       return Swal.fire("Faltan datos", "Debes seleccionar un cliente y agregar al menos un producto.", "warning");
@@ -206,62 +223,85 @@ const CrearDocumento = () => {
       <h3>Productos o Grupos Agregados</h3>
 
       <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={{ borderBottom: "1px solid #ccc" }}>Cantidad</th>
-            <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
-            <th style={{ borderBottom: "1px solid #ccc" }}>Valor Unitario</th>
-            <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {productosAgregados.map((item, index) => (
-            <tr key={index}>
-              <td>
-                <input
-                  type="number"
-                  value={item.cantidad}
-                  min="1"
-                  onChange={(e) => actualizarCantidad(index, e.target.value)}
-                  style={{ width: "60px" }}
-                  disabled={item.es_grupo}
-                />
-              </td>
-              <td>{item.nombre}</td>
-              <td>${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
-              <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
-              <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-        <button onClick={() => setModalBuscarProducto(true)} style={{ padding: "8px 12px" }}>
-          🔍 Agregar Producto desde Inventario
-        </button>
-
-        <button onClick={() => setModalCrearProducto(true)} style={{ padding: "8px 12px" }}>
-          ➕ Crear Nuevo Producto
-        </button>
-
-        <button onClick={() => setModalGrupo(true)} style={{ padding: "8px 12px" }}>
-          📦 Crear Grupo de Artículos
-        </button>
-      </div>
-
-      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
-        <div style={{ flex: "1" }}>
-          <label>Garantía ($):</label>
+  <thead>
+    <tr>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Cantidad</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Valor Unitario</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {productosAgregados.map((item, index) => (
+      <tr key={index}>
+        <td>
           <input
             type="number"
-            min="0"
-            value={garantia}
-            onChange={(e) => setGarantia(e.target.value)}
-            style={{ width: "100%" }}
+            value={item.cantidad}
+            min="1"
+            onChange={(e) => actualizarCantidad(index, e.target.value)}
+            style={{ width: "60px" }}
+            disabled={item.es_grupo}
           />
-        </div>
+        </td>
+        <td>{item.nombre}</td>
+        <td>
+          {item.es_grupo ? (
+            `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
+          ) : (
+            <input
+              type="number"
+              value={item.precio}
+              min="0"
+              onChange={(e) => {
+                const nuevos = [...productosAgregados];
+                nuevos[index].precio = parseFloat(e.target.value || 0);
+                nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
+                setProductosAgregados(nuevos);
+              }}
+              style={{ width: "100px" }}
+            />
+          )}
+        </td>
+        <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
+        <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+
+<div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+  <button onClick={() => setModalBuscarProducto(true)} style={{ padding: "8px 12px" }}>
+    🔍 Agregar Producto desde Inventario
+  </button>
+
+  <button onClick={() => setModalCrearProducto(true)} style={{ padding: "8px 12px" }}>
+    ➕ Crear Nuevo Producto
+  </button>
+
+  <button onClick={() => setModalGrupo(true)} style={{ padding: "8px 12px" }}>
+    📦 Crear Grupo de Artículos
+  </button>
+
+  <button onClick={() => setModalProveedor(true)} style={{ padding: "8px 12px" }}>
+    📥 Agregar desde Proveedor
+  </button>
+</div>
+
+<div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
+  <div style={{ flex: "1" }}>
+    <label>Garantía ($):</label>
+    <input
+      type="number"
+      min="0"
+      value={garantia}
+      onChange={(e) => setGarantia(e.target.value)}
+      style={{ width: "100%" }}
+    />
+  </div>
+
 
         <div style={{ flex: "2" }}>
           <label>Abonos ($):</label>
@@ -325,25 +365,35 @@ const CrearDocumento = () => {
         </button>
       </div>
 
-      {/* Modales */}
-      {modalBuscarProducto && (
+           {/* Modales */}
+           {modalBuscarProducto && (
         <BuscarProductoModal
           onSelect={agregarProducto}
           onClose={() => setModalBuscarProducto(false)}
         />
       )}
+
       {modalCrearProducto && (
         <BuscarProductoModal
           onSelect={agregarProducto}
           onClose={() => setModalCrearProducto(false)}
         />
       )}
+
       {modalGrupo && (
         <AgregarGrupoModal
           onAgregarGrupo={agregarGrupo}
           onClose={() => setModalGrupo(false)}
         />
       )}
+
+      {modalProveedor && (
+        <BuscarProductoProveedorModal
+          onSelect={agregarProductoProveedor}
+          onClose={() => setModalProveedor(false)}
+        />
+      )}
+
       {modalCrearCliente && (
         <CrearClienteModal
           onClienteCreado={(cliente) => {
