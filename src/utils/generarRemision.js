@@ -25,20 +25,25 @@ export async function generarRemision(documento) {
   doc.text("Cel: 3166534685 - 3118222934", 105, 36, { align: "center" });
   doc.line(10, 42, 200, 42);
 
-  // DATOS DEL DOCUMENTO
-  const numeroOrden = documento.numero || documento.id?.toString().slice(-5) || "SIN-ID";
+  // 🔢 Número de remisión y datos del cliente (modo mixto)
+  const numeroOrden = documento.numero || documento.numero_orden || documento.id?.toString().slice(-5) || "SIN-ID";
   const remisionId = `REM-OP${numeroOrden}`;
+
+  const cliente = documento.cliente || {
+    nombre: documento.cliente_nombre || "No especificado",
+    identificacion: documento.cliente_identificacion || "-",
+    telefono: documento.cliente_telefono || "-",
+    direccion: documento.cliente_direccion || "-",
+    email: documento.cliente_email || "-"
+  };
 
   doc.setFontSize(12);
   doc.text(`No. de Remisión: ${remisionId}`, 10, 50);
-
-  // Datos completos del cliente
-  doc.text(`Cliente: ${documento.cliente?.nombre || documento.cliente_nombre || "No especificado"}`, 10, 56);
-  doc.text(`Identificación: ${documento.cliente?.identificacion || documento.cliente_identificacion || "-"}`, 10, 62);
-  doc.text(`Teléfono: ${documento.cliente?.telefono || documento.cliente_telefono || "-"}`, 10, 68);
-  doc.text(`Dirección: ${documento.cliente?.direccion || documento.cliente_direccion || "-"}`, 10, 74);
-  doc.text(`Correo: ${documento.cliente?.email || documento.cliente_email || "-"}`, 10, 80);
-
+  doc.text(`Cliente: ${cliente.nombre}`, 10, 56);
+  doc.text(`Identificación: ${cliente.identificacion}`, 10, 62);
+  doc.text(`Teléfono: ${cliente.telefono}`, 10, 68);
+  doc.text(`Dirección: ${cliente.direccion}`, 10, 74);
+  doc.text(`Correo: ${cliente.email}`, 10, 80);
   doc.text(`Fecha de creación: ${documento.fecha?.split("T")[0] || "-"}`, 10, 86);
   doc.text(`Fecha del evento: ${documento.fecha_evento || "-"}`, 10, 92);
 
@@ -50,16 +55,10 @@ export async function generarRemision(documento) {
   (documento.productos || []).forEach((p) => {
     if (p.es_grupo && Array.isArray(p.productos)) {
       p.productos.forEach((sub) => {
-        filas.push([
-          sub.cantidad,
-          sub.nombre
-        ]);
+        filas.push([sub.cantidad, sub.nombre]);
       });
     } else {
-      filas.push([
-        p.cantidad,
-        p.nombre
-      ]);
+      filas.push([p.cantidad, p.nombre]);
     }
   });
 
