@@ -26,15 +26,19 @@ export async function generarRemision(documento) {
   doc.line(10, 42, 200, 42);
 
   // DATOS DEL DOCUMENTO
-  const remisionId = `REM-OP${documento.id || "SIN-ID"}`;
+  const numeroOrden = documento.numero || documento.id?.toString().slice(-5) || "SIN-ID";
+  const remisionId = `REM-OP${numeroOrden}`;
+
   doc.setFontSize(12);
   doc.text(`No. de Remisión: ${remisionId}`, 10, 50);
 
-  doc.text(`Cliente: ${documento.cliente_nombre || documento.cliente_id}`, 10, 56);
-  if (documento.identificacion) doc.text(`Identificación: ${documento.identificacion}`, 10, 62);
-  if (documento.telefono) doc.text(`Teléfono: ${documento.telefono}`, 10, 68);
-  if (documento.direccion) doc.text(`Dirección: ${documento.direccion}`, 10, 74);
-  if (documento.email) doc.text(`Correo: ${documento.email}`, 10, 80);
+  // Datos completos del cliente
+  doc.text(`Cliente: ${documento.cliente?.nombre || documento.cliente_nombre || "No especificado"}`, 10, 56);
+  doc.text(`Identificación: ${documento.cliente?.identificacion || documento.cliente_identificacion || "-"}`, 10, 62);
+  doc.text(`Teléfono: ${documento.cliente?.telefono || documento.cliente_telefono || "-"}`, 10, 68);
+  doc.text(`Dirección: ${documento.cliente?.direccion || documento.cliente_direccion || "-"}`, 10, 74);
+  doc.text(`Correo: ${documento.cliente?.email || documento.cliente_email || "-"}`, 10, 80);
+
   doc.text(`Fecha de creación: ${documento.fecha?.split("T")[0] || "-"}`, 10, 86);
   doc.text(`Fecha del evento: ${documento.fecha_evento || "-"}`, 10, 92);
 
