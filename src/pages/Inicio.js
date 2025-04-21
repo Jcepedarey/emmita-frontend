@@ -1,189 +1,197 @@
+// src/pages/Inicio.js
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../supabaseClient";
+import supabase from "../supabase";
 import Swal from "sweetalert2";
-import {
-  FaFileAlt, FaUserFriends, FaBoxes, FaSearch, FaFingerprint,
-  FaCalendarAlt, FaTruck, FaChartBar, FaUsers
-} from "react-icons/fa";
+import { FaFilePdf, FaEdit, FaTruck } from "react-icons/fa";
 
-export default function Inicio() {
+const Inicio = () => {
   const navigate = useNavigate();
-  const [pedidosActivos, setPedidosActivos] = useState(0);
-  const [cotizacionesSemana, setCotizacionesSemana] = useState(0);
-  const [fechaHora, setFechaHora] = useState(new Date());
   const [usuario, setUsuario] = useState(null);
+  const [ordenesProximas, setOrdenesProximas] = useState([]);
+  const [ordenesPendientes, setOrdenesPendientes] = useState([]);
 
   useEffect(() => {
-    const u = JSON.parse(localStorage.getItem("usuario"));
-    if (!u) {
-      navigate("/");
+    const usuarioStorage = localStorage.getItem("usuario");
+    if (!usuarioStorage) {
+      navigate("/login");
       return;
     }
-    setUsuario(u);
-  }, [navigate]);
+    setUsuario(JSON.parse(usuarioStorage));
+    obtenerOrdenes();
+  }, []);
 
-  useEffect(() => {
-    if (!usuario) return;
-    const interval = setInterval(() => setFechaHora(new Date()), 1000);
-    obtenerPedidosActivos();
-    obtenerCotizacionesSemana();
-    verificarAlertasHoy();
-    return () => clearInterval(interval);
-  }, [usuario]);
+  const obtenerOrdenes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("documentos")
+        .select("*")
+        .eq("tipo", "orden")
+        .order("fecha_evento", { ascending: true });
 
-  const esAdmin = usuario?.rol === "admin";
+      if (error) throw error;
 
-  const iconos = [
-    { nombre: "Crear documento", ruta: "/crear-documento", icono: <FaFileAlt /> },
-    { nombre: "Clientes", ruta: "/clientes", icono: <FaUserFriends /> },
-    ...(esAdmin ? [{ nombre: "Inventario", ruta: "/inventario", icono: <FaBoxes /> }] : []),
-    ...(esAdmin ? [{ nombre: "Usuarios", ruta: "/usuarios", icono: <FaUsers /> }] : []),
-    ...(esAdmin ? [{ nombre: "Reportes", ruta: "/reportes", icono: <FaChartBar /> }] : []),
-    { nombre: "Buscar documento", ruta: "/buscar", icono: <FaSearch /> },
-    { nombre: "Trazabilidad", ruta: "/trazabilidad", icono: <FaFingerprint /> },
-    { nombre: "Calendario y agenda", ruta: "/agenda", icono: <FaCalendarAlt /> },
-    { nombre: "Proveedores", ruta: "/proveedores", icono: <FaTruck /> },
-  ];
+      const hoy = new Date();
 
-  const obtenerPedidosActivos = async () => {
-    const { data } = await supabase
-      .from("ordenes_pedido")
-      .select("*")
-      .eq("estado", "confirmada");
-    if (data) setPedidosActivos(data.length);
-  };
+      const proximas = data
+        .filter((doc) => new Date(doc.fecha_evento) >= hoy)
+        .slice(0, 5);
 
-  const obtenerCotizacionesSemana = async () => {
-    const fechaInicio = new Date();
-    fechaInicio.setDate(fechaInicio.getDate() - 7);
-    const isoInicio = fechaInicio.toISOString();
-    const { data } = await supabase
-      .from("cotizaciones")
-      .select("*")
-      .gte("fecha", isoInicio);
-    if (data) setCotizacionesSemana(data.length);
-  };
+      const pendientes = data.filter((doc) => !doc.recibido);
 
-  const verificarAlertasHoy = async () => {
-    const hoy = new Date().toISOString().split("T")[0];
-
-    const { data: pedidos } = await supabase
-      .from("ordenes_pedido")
-      .select("*")
-      .eq("fecha_evento", hoy)
-      .eq("estado", "confirmada");
-
-    const { data: notas } = await supabase
-      .from("agenda")
-      .select("*")
-      .eq("fecha", hoy);
-
-    const alertas = [];
-
-    if (pedidos?.length) {
-      alertas.push(`📦 Hay ${pedidos.length} pedido(s) programado(s) para hoy.`);
-    }
-
-    if (notas?.length) {
-      alertas.push(`📌 Hay ${notas.length} nota(s) agendada(s) para hoy.`);
-    }
-
-    const conteoPorProducto = {};
-    pedidos?.forEach((p) => {
-      p.productos?.forEach((prod) => {
-        conteoPorProducto[prod.nombre] = (conteoPorProducto[prod.nombre] || 0) + prod.cantidad;
-      });
-    });
-
-    const { data: productos } = await supabase.from("productos").select("*");
-
-    if (alertas.length > 0) {
-      Swal.fire({
-        title: "🔔 Recordatorios para hoy",
-        text: alertas.join("\n\n"),
-        icon: "info",
-        confirmButtonText: "Ok",
-      });
+      setOrdenesProximas(proximas);
+      setOrdenesPendientes(pendientes);
+    } catch (err) {
+      console.error("Error al obtener órdenes:", err);
+      Swal.fire("Error", "No se pudieron cargar las órdenes.", "error");
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("usuario");
-    navigate("/");
+  const descargarPDF = (documento) => {
+    // Asumiendo que tienes la función ya implementada
+    window.open(`${process.env.REACT_APP_API_URL}/api/pdf/${documento.id}`, "_blank");
   };
 
-  if (!usuario) return null;
+  const descargarRemision = (documento) => {
+    // Asumiendo que tienes la función ya implementada
+    window.open(`${process.env.REACT_APP_API_URL}/api/remision/${documento.id}`, "_blank");
+  };
 
+  const editarDocumento = (documento) => {
+    navigate("/crear-documento", { state: { documento, tipo: "orden" } });
+  };
   return (
-    <div style={{ padding: "1rem", maxWidth: "1000px", margin: "auto" }}>
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 20
-      }}>
-        <img src="/logo192.png" alt="logo" style={{ height: "50px" }} />
-        <div style={{ textAlign: "right" }}>
-          <div>{fechaHora.toLocaleString()}</div>
-          <div style={{ fontWeight: "bold" }}>{usuario?.nombre}</div>
-          <button onClick={handleLogout}>Cerrar sesión</button>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6 text-center">
+        Bienvenido, {usuario?.nombre}
+      </h1>
+
+      {/* CUADRO 1: Órdenes próximas */}
+      <div className="mb-10">
+        <h2 className="text-xl font-semibold mb-4 text-gray-700">
+          📅 Pedidos activos más próximos
+        </h2>
+        <div className="overflow-x-auto shadow border rounded-lg">
+          <table className="min-w-full bg-white">
+            <thead className="bg-gray-100 text-gray-700">
+              <tr>
+                <th className="px-4 py-2"># OP</th>
+                <th className="px-4 py-2">Cliente</th>
+                <th className="px-4 py-2">Fecha del evento</th>
+                <th className="px-4 py-2">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ordenesProximas.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="text-center py-4 text-gray-500">
+                    No hay pedidos próximos.
+                  </td>
+                </tr>
+              ) : (
+                ordenesProximas.map((orden, index) => (
+                  <tr key={orden.id} className="border-t">
+                    <td className="px-4 py-2 font-semibold">
+                      OP-{orden.numero}
+                    </td>
+                    <td className="px-4 py-2">{orden.cliente_nombre}</td>
+                    <td className="px-4 py-2">
+                      {new Date(orden.fecha_evento).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-2 space-x-2">
+                      <button
+                        onClick={() => descargarPDF(orden)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Descargar PDF"
+                      >
+                        <FaFilePdf size={18} />
+                      </button>
+                      <button
+                        onClick={() => descargarRemision(orden)}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Generar Remisión"
+                      >
+                        <FaTruck size={18} />
+                      </button>
+                      <button
+                        onClick={() => editarDocumento(orden)}
+                        className="text-green-600 hover:text-green-800"
+                        title="Editar"
+                      >
+                        <FaEdit size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <h1 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2.5rem)" }}>Menú Principal</h1>
-
-      <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "20px" }}>
-        <div style={{
-          flex: "1 1 250px",
-          border: "1px solid #ccc",
-          borderRadius: "10px",
-          padding: "15px",
-          background: "#f0f8ff"
-        }}>
-          <h3>📦 Pedidos activos</h3>
-          <p style={{ fontSize: "1.5rem", fontWeight: "bold" }}>{pedidosActivos}</p>
+      {/* CUADRO 2: Órdenes pendientes por recibir */}
+      <div className="mb-10">
+        <h2 className="text-xl font-semibold mb-4 text-yellow-700">
+          🚚 Pedidos pendientes por recibir
+        </h2>
+        <div className="overflow-x-auto shadow border rounded-lg">
+          <table className="min-w-full bg-white">
+            <thead className="bg-yellow-100 text-gray-700">
+              <tr>
+                <th className="px-4 py-2"># OP</th>
+                <th className="px-4 py-2">Cliente</th>
+                <th className="px-4 py-2">Fecha del evento</th>
+                <th className="px-4 py-2">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ordenesPendientes.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="text-center py-4 text-gray-500">
+                    No hay pedidos pendientes por recibir.
+                  </td>
+                </tr>
+              ) : (
+                ordenesPendientes.map((orden, index) => (
+                  <tr key={orden.id} className="border-t bg-yellow-50">
+                    <td className="px-4 py-2 font-semibold">
+                      OP-{orden.numero}
+                    </td>
+                    <td className="px-4 py-2">{orden.cliente_nombre}</td>
+                    <td className="px-4 py-2">
+                      {new Date(orden.fecha_evento).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-2 space-x-2">
+                      <button
+                        onClick={() => descargarPDF(orden)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Descargar PDF"
+                      >
+                        <FaFilePdf size={18} />
+                      </button>
+                      <button
+                        onClick={() => descargarRemision(orden)}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Generar Remisión"
+                      >
+                        <FaTruck size={18} />
+                      </button>
+                      <button
+                        onClick={() => editarDocumento(orden)}
+                        className="text-green-600 hover:text-green-800"
+                        title="Editar"
+                      >
+                        <FaEdit size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-
-        <div style={{
-          flex: "1 1 250px",
-          border: "1px solid #ccc",
-          borderRadius: "10px",
-          padding: "15px",
-          background: "#fff0f5"
-        }}>
-          <h3>🧾 Cotizaciones esta semana</h3>
-          <p style={{ fontSize: "1.5rem", fontWeight: "bold" }}>{cotizacionesSemana}</p>
-        </div>
-      </div>
-
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-        gap: "15px",
-      }}>
-        {iconos.map((item) => (
-          <button
-            key={item.nombre}
-            onClick={() => navigate(item.ruta)}
-            style={{
-              padding: "15px",
-              fontSize: "clamp(0.9rem, 2.5vw, 1.1rem)",
-              cursor: "pointer",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-              background: "#f9f9f9",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "10px"
-            }}
-          >
-            <div style={{ fontSize: "1.5rem" }}>{item.icono}</div>
-            {item.nombre}
-          </button>
-        ))}
       </div>
     </div>
   );
-}
+};
+
+export default Inicio;
