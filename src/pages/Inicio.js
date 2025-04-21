@@ -98,17 +98,6 @@ export default function Inicio() {
 
     const { data: productos } = await supabase.from("productos").select("*");
 
-    const productosEnAlerta = productos.filter((prod) => {
-      const alquilado = conteoPorProducto[prod.nombre] || 0;
-      const disponible = prod.stock - alquilado;
-      return disponible < 5;
-    });
-
-    if (productosEnAlerta.length > 0) {
-      alertas.push("⚠️ Productos con baja disponibilidad hoy:\n" +
-        productosEnAlerta.map(p => `• ${p.nombre}`).join("\n"));
-    }
-
     if (alertas.length > 0) {
       Swal.fire({
         title: "🔔 Recordatorios para hoy",
