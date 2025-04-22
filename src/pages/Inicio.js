@@ -204,7 +204,7 @@ const BotonModulo = ({ titulo, imagen, onClick }) => (
       src={imagen}
       alt={titulo}
       className="w-10 h-10 mb-2 object-contain"
-      style={{ maxWidth: "40px", maxHeight: "40px" }}
+      style={{ maxWidth: "48px", maxHeight: "48px" }}
     />
     <p className="text-sm text-center text-gray-800">{titulo}</p>
   </div>
