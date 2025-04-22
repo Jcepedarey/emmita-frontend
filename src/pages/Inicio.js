@@ -200,7 +200,12 @@ const BotonModulo = ({ titulo, imagen, onClick }) => (
     className="flex flex-col items-center justify-center p-4 rounded-lg shadow hover:shadow-md hover:bg-gray-50 transition cursor-pointer"
     onClick={onClick}
   >
-    <img src={imagen} alt={titulo} className="w-5 h-5 mb-2 object-contain" />
+    <img
+      src={imagen}
+      alt={titulo}
+      className="w-8 h-8 mb-2 object-contain"
+      style={{ maxWidth: "32px", maxHeight: "32px" }}
+    />
     <p className="text-sm text-center text-gray-800">{titulo}</p>
   </div>
 );
