@@ -1,12 +1,9 @@
-// src/pages/Inicio.js
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabase";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
 import Swal from "sweetalert2";
-
-// Íconos importados (usarás los personalizados como imágenes)
 import { FaEdit } from "react-icons/fa";
 
 const Inicio = () => {
@@ -79,6 +76,7 @@ const Inicio = () => {
   const manejarRemision = async (orden) => {
     await generarRemision(orden);
   };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">
@@ -106,25 +104,13 @@ const Inicio = () => {
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => editarOrden(orden)}
-                      className="text-green-600 hover:text-green-800"
-                      title="Editar orden"
-                    >
+                    <button onClick={() => editarOrden(orden)} className="text-green-600 hover:text-green-800" title="Editar orden">
                       <FaEdit size={18} />
                     </button>
-                    <button
-                      onClick={() => manejarPDF(orden)}
-                      className="text-red-600 hover:text-red-800"
-                      title="Descargar PDF"
-                    >
+                    <button onClick={() => manejarPDF(orden)} className="text-red-600 hover:text-red-800" title="Descargar PDF">
                       🧾
                     </button>
-                    <button
-                      onClick={() => manejarRemision(orden)}
-                      className="text-blue-600 hover:text-blue-800"
-                      title="Generar remisión"
-                    >
+                    <button onClick={() => manejarRemision(orden)} className="text-blue-600 hover:text-blue-800" title="Generar remisión">
                       🚚
                     </button>
                   </div>
@@ -153,7 +139,7 @@ const Inicio = () => {
                         {new Date(orden.fecha_evento).toLocaleDateString()}
                       </p>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div>
                       <button
                         onClick={() => navigate("/recepcion", { state: { ordenId: orden.id } })}
                         className="text-green-600 hover:text-green-800"
@@ -169,69 +155,32 @@ const Inicio = () => {
           )}
         </div>
       </div>
-      {/* MENÚ PRINCIPAL */}
-      <div className="mt-12">
-        <h2 className="text-xl font-semibold text-center mb-6">Menú Principal</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 justify-center">
 
-          <BotonModulo
-            titulo="Crear documento"
-            imagen="/icons/contrato.png"
-            onClick={() => navigate("/crear-documento")}
-          />
-          <BotonModulo
-            titulo="Clientes"
-            imagen="/icons/buscar_cliente.png"
-            onClick={() => navigate("/clientes")}
-          />
-          <BotonModulo
-            titulo="Inventario"
-            imagen="/icons/inventario.png"
-            onClick={() => navigate("/inventario")}
-          />
-          <BotonModulo
-            titulo="Agenda"
-            imagen="/icons/agenda.png"
-            onClick={() => navigate("/agenda")}
-          />
-          <BotonModulo
-            titulo="Proveedores"
-            imagen="/icons/proveedores.png"
-            onClick={() => navigate("/proveedores")}
-          />
-          <BotonModulo
-            titulo="Usuarios"
-            imagen="/icons/usuario.png"
-            onClick={() => navigate("/usuarios")}
-          />
-          <BotonModulo
-            titulo="Reportes"
-            imagen="/icons/reportes.png"
-            onClick={() => navigate("/reportes")}
-          />
-          <BotonModulo
-            titulo="Trazabilidad"
-            imagen="/icons/trazabilidad.png"
-            onClick={() => navigate("/trazabilidad")}
-          />
-          <BotonModulo
-            titulo="Buscar documento"
-            imagen="/icons/buscar_doc.png"
-            onClick={() => navigate("/buscar-documento")}
-          />
-        </div>
+      {/* MENÚ PRINCIPAL */}
+      <h2 className="text-xl font-semibold text-center mb-6">Menú Principal</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <BotonModulo titulo="Crear documento" imagen="/icons/contrato.png" onClick={() => navigate("/crear-documento")} />
+        <BotonModulo titulo="Clientes" imagen="/icons/buscar_cliente.png" onClick={() => navigate("/clientes")} />
+        <BotonModulo titulo="Inventario" imagen="/icons/inventario.png" onClick={() => navigate("/inventario")} />
+        <BotonModulo titulo="Agenda" imagen="/icons/adenda.png" onClick={() => navigate("/agenda")} />
+        <BotonModulo titulo="Proveedores" imagen="/icons/proveedores.png" onClick={() => navigate("/proveedores")} />
+        <BotonModulo titulo="Usuarios" imagen="/icons/usuario.png" onClick={() => navigate("/usuarios")} />
+        <BotonModulo titulo="Reportes" imagen="/icons/reportes.png" onClick={() => navigate("/reportes")} />
+        <BotonModulo titulo="Trazabilidad" imagen="/icons/trazabilidad.png" onClick={() => navigate("/trazabilidad")} />
+        <BotonModulo titulo="Buscar documento" imagen="/icons/buscar_doc.png" onClick={() => navigate("/buscar-documento")} />
+        <BotonModulo titulo="Recepción" imagen="/icons/recepcion.png" onClick={() => navigate("/recepcion")} />
       </div>
     </div>
   );
 };
 
-// COMPONENTE BOTÓN MODULAR
+// COMPONENTE PARA CADA BOTÓN DEL MENÚ
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div
     className="flex flex-col items-center justify-center p-4 rounded-lg shadow hover:shadow-md hover:bg-gray-50 transition cursor-pointer"
     onClick={onClick}
   >
-    <img src={imagen} alt={titulo} className="w-12 h-12 mb-2" />
+    <img src={imagen} alt={titulo} className="w-12 h-12 mb-2 object-contain" />
     <p className="text-sm text-center text-gray-800">{titulo}</p>
   </div>
 );
