@@ -2,8 +2,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabase";
+import { generarPDF } from "../utils/generarPDF";
+import { generarRemision } from "../utils/generarRemision";
 import Swal from "sweetalert2";
-import { FaFilePdf, FaEdit, FaTruck } from "react-icons/fa";
+
+// Íconos importados (usarás los personalizados como imágenes)
+import { FaEdit } from "react-icons/fa";
 
 const Inicio = () => {
   const navigate = useNavigate();
@@ -31,7 +35,8 @@ const Inicio = () => {
 
       if (error) throw error;
 
-      // Buscar nombre del cliente para cada orden
+      const hoy = new Date();
+
       const ordenesConCliente = await Promise.all(
         ordenes.map(async (orden) => {
           const { data: cliente } = await supabase
@@ -46,8 +51,6 @@ const Inicio = () => {
           };
         })
       );
-
-      const hoy = new Date();
 
       const proximas = ordenesConCliente
         .filter((op) => new Date(op.fecha_evento) >= hoy)
@@ -65,16 +68,16 @@ const Inicio = () => {
     }
   };
 
-  const descargarPDF = (orden) => {
-    window.open(`${process.env.REACT_APP_API_URL}/api/pdf/${orden.id}`, "_blank");
-  };
-
-  const descargarRemision = (orden) => {
-    window.open(`${process.env.REACT_APP_API_URL}/api/remision/${orden.id}`, "_blank");
-  };
-
-  const editarDocumento = (orden) => {
+  const editarOrden = (orden) => {
     navigate("/crear-documento", { state: { documento: orden, tipo: "orden" } });
+  };
+
+  const manejarPDF = async (orden) => {
+    await generarPDF(orden, "orden");
+  };
+
+  const manejarRemision = async (orden) => {
+    await generarRemision(orden);
   };
   return (
     <div className="p-6">
@@ -82,120 +85,155 @@ const Inicio = () => {
         Bienvenido, {usuario?.nombre}
       </h1>
 
-      {/* Cuadro: Pedidos próximos */}
-      <section className="mb-12">
-        <h2 className="text-xl font-semibold mb-4 text-gray-700">
-          📆 Pedidos activos más próximos
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* CUADROS DE INFORMACIÓN */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        {/* Pedidos activos más próximos */}
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg shadow">
+          <h2 className="text-lg font-semibold mb-3 text-blue-800 flex items-center gap-2">
+            📦 Pedidos activos más próximos
+          </h2>
           {ordenesProximas.length === 0 ? (
-            <p className="text-gray-500 col-span-full">
-              No hay pedidos próximos.
-            </p>
+            <p className="text-gray-500">No hay pedidos próximos.</p>
           ) : (
-            ordenesProximas.map((orden) => (
-              <div
-                key={orden.id}
-                className="bg-white border rounded-xl shadow-md p-4 flex flex-col justify-between"
-              >
-                <div className="mb-2">
-                  <p className="text-sm text-gray-500">Orden:</p>
-                  <p className="text-lg font-semibold text-blue-700">
-                    OP-{orden.numero || "???"}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-2">Cliente:</p>
-                  <p className="text-base text-gray-800">{orden.cliente_nombre}</p>
-                  <p className="text-sm text-gray-500 mt-2">Fecha del evento:</p>
-                  <p className="text-base">
-                    {new Date(orden.fecha_evento).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex justify-around mt-4">
-                  <button
-                    onClick={() => descargarPDF(orden)}
-                    title="Descargar PDF"
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <FaFilePdf size={20} />
-                  </button>
-                  <button
-                    onClick={() => descargarRemision(orden)}
-                    title="Generar Remisión"
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    <FaTruck size={20} />
-                  </button>
-                  <button
-                    onClick={() => editarDocumento(orden)}
-                    title="Editar Orden"
-                    className="text-green-600 hover:text-green-800"
-                  >
-                    <FaEdit size={20} />
-                  </button>
-                </div>
-              </div>
-            ))
+            <ul className="space-y-3">
+              {ordenesProximas.map((orden) => (
+                <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-blue-100 transition">
+                  <div className="text-sm">
+                    <p className="font-semibold text-blue-700">OP-{orden.numero || "???"}</p>
+                    <p className="text-gray-700">{orden.cliente_nombre}</p>
+                    <p className="text-gray-500">
+                      {new Date(orden.fecha_evento).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => editarOrden(orden)}
+                      className="text-green-600 hover:text-green-800"
+                      title="Editar orden"
+                    >
+                      <FaEdit size={18} />
+                    </button>
+                    <button
+                      onClick={() => manejarPDF(orden)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Descargar PDF"
+                    >
+                      🧾
+                    </button>
+                    <button
+                      onClick={() => manejarRemision(orden)}
+                      className="text-blue-600 hover:text-blue-800"
+                      title="Generar remisión"
+                    >
+                      🚚
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-      </section>
-      {/* Cuadro: Pedidos pendientes por recibir */}
-      <section className="mb-12">
-        <h2 className="text-xl font-semibold mb-4 text-yellow-700">
-          🚚 Pedidos pendientes por recibir
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        {/* Pedidos pendientes por recibir */}
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg shadow">
+          <h2 className="text-lg font-semibold mb-3 text-red-700 flex items-center gap-2">
+            🧾 Pedidos pendientes por revisar (retornados a bodega)
+          </h2>
           {ordenesPendientes.length === 0 ? (
-            <p className="text-gray-500 col-span-full">
-              No hay pedidos pendientes por recibir.
-            </p>
+            <p className="text-gray-500">No hay pedidos pendientes por revisar.</p>
           ) : (
-            ordenesPendientes.map((orden) => (
-              <div
-                key={orden.id}
-                className="bg-yellow-50 border border-yellow-300 rounded-xl shadow-md p-4 flex flex-col justify-between"
-              >
-                <div className="mb-2">
-                  <p className="text-sm text-gray-600">Orden:</p>
-                  <p className="text-lg font-semibold text-yellow-800">
-                    OP-{orden.numero || "???"}
-                  </p>
-                  <p className="text-sm text-gray-600 mt-2">Cliente:</p>
-                  <p className="text-base text-gray-800">{orden.cliente_nombre}</p>
-                  <p className="text-sm text-gray-600 mt-2">Fecha del evento:</p>
-                  <p className="text-base">
-                    {new Date(orden.fecha_evento).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex justify-around mt-4">
-                  <button
-                    onClick={() => descargarPDF(orden)}
-                    title="Descargar PDF"
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <FaFilePdf size={20} />
-                  </button>
-                  <button
-                    onClick={() => descargarRemision(orden)}
-                    title="Generar Remisión"
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    <FaTruck size={20} />
-                  </button>
-                  <button
-                    onClick={() => editarDocumento(orden)}
-                    title="Editar Orden"
-                    className="text-green-600 hover:text-green-800"
-                  >
-                    <FaEdit size={20} />
-                  </button>
-                </div>
-              </div>
-            ))
+            <div className="h-64 overflow-y-auto pr-2">
+              <ul className="space-y-3">
+                {ordenesPendientes.map((orden) => (
+                  <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-red-100 transition">
+                    <div className="text-sm">
+                      <p className="font-semibold text-red-700">OP-{orden.numero || "???"}</p>
+                      <p className="text-gray-700">{orden.cliente_nombre}</p>
+                      <p className="text-gray-500">
+                        {new Date(orden.fecha_evento).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => navigate("/recepcion", { state: { ordenId: orden.id } })}
+                        className="text-green-600 hover:text-green-800"
+                        title="Revisar recepción"
+                      >
+                        📝
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
-      </section>
+      </div>
+      {/* MENÚ PRINCIPAL */}
+      <div className="mt-12">
+        <h2 className="text-xl font-semibold text-center mb-6">Menú Principal</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 justify-center">
+
+          <BotonModulo
+            titulo="Crear documento"
+            imagen="/icons/contrato.png"
+            onClick={() => navigate("/crear-documento")}
+          />
+          <BotonModulo
+            titulo="Clientes"
+            imagen="/icons/buscar_cliente.png"
+            onClick={() => navigate("/clientes")}
+          />
+          <BotonModulo
+            titulo="Inventario"
+            imagen="/icons/inventario.png"
+            onClick={() => navigate("/inventario")}
+          />
+          <BotonModulo
+            titulo="Agenda"
+            imagen="/icons/agenda.png"
+            onClick={() => navigate("/agenda")}
+          />
+          <BotonModulo
+            titulo="Proveedores"
+            imagen="/icons/proveedores.png"
+            onClick={() => navigate("/proveedores")}
+          />
+          <BotonModulo
+            titulo="Usuarios"
+            imagen="/icons/usuario.png"
+            onClick={() => navigate("/usuarios")}
+          />
+          <BotonModulo
+            titulo="Reportes"
+            imagen="/icons/reportes.png"
+            onClick={() => navigate("/reportes")}
+          />
+          <BotonModulo
+            titulo="Trazabilidad"
+            imagen="/icons/trazabilidad.png"
+            onClick={() => navigate("/trazabilidad")}
+          />
+          <BotonModulo
+            titulo="Buscar documento"
+            imagen="/icons/buscar_doc.png"
+            onClick={() => navigate("/buscar-documento")}
+          />
+        </div>
+      </div>
     </div>
   );
 };
+
+// COMPONENTE BOTÓN MODULAR
+const BotonModulo = ({ titulo, imagen, onClick }) => (
+  <div
+    className="flex flex-col items-center justify-center p-4 rounded-lg shadow hover:shadow-md hover:bg-gray-50 transition cursor-pointer"
+    onClick={onClick}
+  >
+    <img src={imagen} alt={titulo} className="w-12 h-12 mb-2" />
+    <p className="text-sm text-center text-gray-800">{titulo}</p>
+  </div>
+);
 
 export default Inicio;
