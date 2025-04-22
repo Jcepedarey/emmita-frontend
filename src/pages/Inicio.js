@@ -84,41 +84,61 @@ const Inicio = () => {
       </h1>
 
       {/* CUADROS DE INFORMACIÓN */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-        {/* Pedidos activos más próximos */}
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-3 text-blue-800 flex items-center gap-2">
-            📦 Pedidos activos más próximos
-          </h2>
-          {ordenesProximas.length === 0 ? (
-            <p className="text-gray-500">No hay pedidos próximos.</p>
-          ) : (
-            <ul className="space-y-3">
-              {ordenesProximas.map((orden) => (
-                <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-blue-100 transition">
-                  <div className="text-sm">
-                    <p className="font-semibold text-blue-700">OP-{orden.numero || "???"}</p>
-                    <p className="text-gray-700">{orden.cliente_nombre}</p>
-                    <p className="text-gray-500">
-                      {new Date(orden.fecha_evento).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button onClick={() => editarOrden(orden)} className="text-green-600 hover:text-green-800" title="Editar orden">
-                      <FaEdit size={18} />
-                    </button>
-                    <button onClick={() => manejarPDF(orden)} className="text-red-600 hover:text-red-800" title="Descargar PDF">
-                      🧾
-                    </button>
-                    <button onClick={() => manejarRemision(orden)} className="text-blue-600 hover:text-blue-800" title="Generar remisión">
-                      🚚
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+  {/* Pedidos activos más próximos */}
+  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg shadow">
+    <h2 className="text-lg font-semibold mb-3 text-blue-800 flex items-center gap-2">
+      📦 Pedidos activos más próximos
+    </h2>
+    {ordenesProximas.length === 0 ? (
+      <p className="text-gray-500">No hay pedidos próximos.</p>
+    ) : (
+      <ul className="space-y-3">
+        {ordenesProximas.map((orden) => (
+          <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-blue-100 transition">
+            <div className="text-sm">
+              <p className="font-semibold text-blue-700">OP-{orden.numero || "???"}</p>
+              <p className="text-gray-700">{orden.cliente_nombre}</p>
+              <p className="text-gray-500">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button onClick={() => editarOrden(orden)} title="Editar">✏️</button>
+              <button onClick={() => manejarPDF(orden)} title="PDF">🧾</button>
+              <button onClick={() => manejarRemision(orden)} title="Remisión">🚚</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+
+  {/* Pedidos pendientes por revisar */}
+  <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg shadow">
+    <h2 className="text-lg font-semibold mb-3 text-red-700 flex items-center gap-2">
+      🧾 Pedidos pendientes por revisar
+    </h2>
+    {ordenesPendientes.length === 0 ? (
+      <p className="text-gray-500">No hay pendientes.</p>
+    ) : (
+      <div className="h-64 overflow-y-auto pr-2">
+        <ul className="space-y-3">
+          {ordenesPendientes.map((orden) => (
+            <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-red-100 transition">
+              <div className="text-sm">
+                <p className="font-semibold text-red-700">OP-{orden.numero || "???"}</p>
+                <p className="text-gray-700">{orden.cliente_nombre}</p>
+                <p className="text-gray-500">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <button onClick={() => navigate("/recepcion", { state: { ordenId: orden.id } })} title="Recepción">📝</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </div>
+
 
         {/* Pedidos pendientes por recibir */}
         <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg shadow">
@@ -180,7 +200,7 @@ const BotonModulo = ({ titulo, imagen, onClick }) => (
     className="flex flex-col items-center justify-center p-4 rounded-lg shadow hover:shadow-md hover:bg-gray-50 transition cursor-pointer"
     onClick={onClick}
   >
-    <img src={imagen} alt={titulo} className="w-12 h-12 mb-2 object-contain" />
+    <img src={imagen} alt={titulo} className="w-5 h-5 mb-2 object-contain" />
     <p className="text-sm text-center text-gray-800">{titulo}</p>
   </div>
 );
