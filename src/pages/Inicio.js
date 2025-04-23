@@ -177,20 +177,20 @@ const Inicio = () => {
       </div>
 
       {/* MENÚ PRINCIPAL */}
-      <h2 className="text-xl font-semibold text-center mb-6">Menú Principal</h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <BotonModulo titulo="Crear documento" imagen="/icons/contrato.png" onClick={() => navigate("/crear-documento")} />
-        <BotonModulo titulo="Clientes" imagen="/icons/buscar_cliente.png" onClick={() => navigate("/clientes")} />
-        <BotonModulo titulo="Inventario" imagen="/icons/inventario.png" onClick={() => navigate("/inventario")} />
-        <BotonModulo titulo="Agenda" imagen="/icons/adenda.png" onClick={() => navigate("/agenda")} />
-        <BotonModulo titulo="Proveedores" imagen="/icons/proveedores.png" onClick={() => navigate("/proveedores")} />
-        <BotonModulo titulo="Usuarios" imagen="/icons/usuario.png" onClick={() => navigate("/usuarios")} />
-        <BotonModulo titulo="Reportes" imagen="/icons/reportes.png" onClick={() => navigate("/reportes")} />
-        <BotonModulo titulo="Trazabilidad" imagen="/icons/trazabilidad.png" onClick={() => navigate("/trazabilidad")} />
-        <BotonModulo titulo="Buscar documento" imagen="/icons/buscar_doc.png" onClick={() => navigate("/buscar-documento")} />
-        <BotonModulo titulo="Recepción" imagen="/icons/recepcion.png" onClick={() => navigate("/recepcion")} />
-      </div>
-    </div>
+<h2 className="text-xl font-semibold text-center mb-6">Menú Principal</h2>
+<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+  <BotonModulo titulo="Crear documento" imagen="/icons/contrato.png" onClick={() => navigate("/crear-documento")} />
+  <BotonModulo titulo="Clientes" imagen="/icons/buscar_cliente.png" onClick={() => navigate("/clientes")} />
+  <BotonModulo titulo="Inventario" imagen="/icons/inventario.png" onClick={() => navigate("/inventario")} />
+  <BotonModulo titulo="Agenda" imagen="/icons/adenda.png" onClick={() => navigate("/agenda")} />
+  <BotonModulo titulo="Proveedores" imagen="/icons/proveedores.png" onClick={() => navigate("/proveedores")} />
+  <BotonModulo titulo="Usuarios" imagen="/icons/usuario.png" onClick={() => navigate("/usuarios")} />
+  <BotonModulo titulo="Reportes" imagen="/icons/reportes.png" onClick={() => navigate("/reportes")} />
+  <BotonModulo titulo="Trazabilidad" imagen="/icons/trazabilidad.png" onClick={() => navigate("/trazabilidad")} />
+  <BotonModulo titulo="Buscar documento" imagen="/icons/buscar_doc.png" onClick={() => navigate("/buscar-documento")} />
+  <BotonModulo titulo="Recepción" imagen="/icons/recepcion.png" onClick={() => navigate("/recepcion")} />
+</div>
+</div>
   );
 };
 
