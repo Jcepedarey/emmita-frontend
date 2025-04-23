@@ -1,4 +1,4 @@
-// Inicio.js (corregido visual y funcionalmente)
+// Inicio.js (actualizado con tabla visual y diseño horizontal de iconos)
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
@@ -7,16 +7,16 @@ import { generarRemision } from "../utils/generarRemision";
 
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div
-    className="flex flex-col items-center justify-center p-3 bg-white rounded-xl shadow hover:shadow-md hover:bg-gray-100 transition cursor-pointer"
+    className="flex flex-col items-center justify-center p-2 rounded-lg shadow hover:shadow-md hover:bg-gray-100 transition cursor-pointer"
     onClick={onClick}
   >
     <img
       src={imagen}
       alt={titulo}
-      className="w-12 h-12 object-contain mb-2"
+      className="w-12 h-12 mb-1 object-contain"
       style={{ maxWidth: "48px", maxHeight: "48px" }}
     />
-    <p className="text-sm text-center font-medium text-gray-800">{titulo}</p>
+    <p className="text-xs text-center text-gray-800 font-medium">{titulo}</p>
   </div>
 );
 
@@ -64,61 +64,64 @@ const Inicio = () => {
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-6">Bienvenido, {usuario?.nombre || "Usuario"}</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-3 text-blue-800 flex items-center gap-2">
-            📦 Pedidos activos más próximos
-          </h2>
-          {ordenesProximas.length === 0 ? (
-            <p className="text-gray-500">No hay pedidos próximos.</p>
-          ) : (
-            <ul className="space-y-3">
-              {ordenesProximas.map((orden) => (
-                <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-blue-100 transition">
-                  <div className="text-sm">
-                    <p className="font-semibold text-blue-700">OP-{orden.numero || orden.id?.slice(-4) || "???"}</p>
-                    <p className="text-gray-700">{orden.clientes?.nombre || "Cliente"}</p>
-                    <p className="text-gray-500">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button onClick={() => editarOrden(orden)} title="Editar">✏️</button>
-                    <button onClick={() => manejarPDF(orden)} title="PDF">🧾</button>
-                    <button onClick={() => manejarRemision(orden)} title="Remisión">🚚</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-3 text-red-700 flex items-center gap-2">
-            🧾 Pedidos pendientes por revisar
-          </h2>
-          {ordenesPendientes.length === 0 ? (
-            <p className="text-gray-500">No hay pendientes.</p>
-          ) : (
-            <div className="h-64 overflow-y-auto pr-2">
-              <ul className="space-y-3">
-                {ordenesPendientes.map((orden) => (
-                  <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-red-100 transition">
-                    <div className="text-sm">
-                      <p className="font-semibold text-red-700">OP-{orden.numero || orden.id?.slice(-4) || "???"}</p>
-                      <p className="text-gray-700">{orden.clientes?.nombre}</p>
-                      <p className="text-gray-500">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <button onClick={() => navigate("/recepcion", { state: { ordenId: orden.id } })} title="Revisar">📝</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full table-auto border border-gray-300">
+          <thead>
+            <tr>
+              <th className="bg-blue-100 p-3 text-left text-blue-800 text-lg">📦 Pedidos próximos</th>
+              <th className="bg-red-100 p-3 text-left text-red-700 text-lg">🧾 Pedidos sin revisar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="align-top p-3">
+                {ordenesProximas.length === 0 ? (
+                  <p className="text-gray-500">No hay pedidos próximos.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {ordenesProximas.map((orden) => (
+                      <li key={orden.id} className="bg-white p-3 rounded-lg shadow hover:bg-blue-100 transition">
+                        <div className="text-sm">
+                          <p className="font-semibold text-blue-700">OP-{orden.numero || "???"}</p>
+                          <p className="text-gray-700">{orden.clientes?.nombre || "Cliente"}</p>
+                          <p className="text-gray-500">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <button onClick={() => editarOrden(orden)} title="Editar">✏️</button>
+                          <button onClick={() => manejarPDF(orden)} title="PDF">🧾</button>
+                          <button onClick={() => manejarRemision(orden)} title="Remisión">🚚</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </td>
+              <td className="align-top p-3">
+                {ordenesPendientes.length === 0 ? (
+                  <p className="text-gray-500">No hay pendientes.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {ordenesPendientes.map((orden) => (
+                      <li key={orden.id} className="bg-white p-3 rounded-lg shadow hover:bg-red-100 transition">
+                        <div className="text-sm">
+                          <p className="font-semibold text-red-700">OP-{orden.numero || "???"}</p>
+                          <p className="text-gray-700">{orden.clientes?.nombre}</p>
+                          <p className="text-gray-500">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
+                        </div>
+                        <div className="mt-2">
+                          <button onClick={() => navigate("/recepcion", { state: { ordenId: orden.id } })} title="Revisar">📝</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <h2 className="text-xl font-semibold mb-4">Menú Principal</h2>
+      <h2 className="text-xl font-semibold my-6">Menú Principal</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <BotonModulo titulo="Crear documento" imagen="/icons/contrato.png" onClick={() => navigate("/crear-documento")} />
         <BotonModulo titulo="Clientes" imagen="/icons/buscar_cliente.png" onClick={() => navigate("/clientes")} />
