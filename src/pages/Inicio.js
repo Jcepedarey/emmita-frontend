@@ -4,26 +4,21 @@ import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
 
+// Componente reutilizable para los botones del menú
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div
     className="flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer hover:shadow-md"
     onClick={onClick}
-    style={{ width: "80px", height: "80px" }} // Íconos más pequeños
+    style={{ width: "80px", height: "80px" }} // Tamaño reducido
   >
     <img
       src={imagen}
       alt={titulo}
-      className="w-12 h-12 object-contain" // Ajuste de tamaño
+      className="w-12 h-12 object-contain" // Íconos más pequeños
     />
     <p className="text-xs text-center mt-1">{titulo}</p>
   </div>
 );
-
-const Inicio = () => {
-  // Código para la funcionalidad principal
-};
-
-export default Inicio; // Aseguramos que sea una exportación predeterminada
 const Inicio = () => {
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem("usuario"));
@@ -132,9 +127,8 @@ const Inicio = () => {
           </table>
         </div>
       </div>
-
-      {/* Menú principal mejorado */}
-      <h2 className="text-xl font-semibold mt-6 mb-4">Menú Principal</h2>
+{/* Menú principal mejorado */}
+<h2 className="text-xl font-semibold mt-6 mb-4">Menú Principal</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <BotonModulo titulo="Crear documento" imagen="/icons/contrato.png" onClick={() => navigate("/crear-documento")} />
         <BotonModulo titulo="Clientes" imagen="/icons/buscar_cliente.png" onClick={() => navigate("/clientes")} />
@@ -150,3 +144,5 @@ const Inicio = () => {
     </div>
   );
 };
+
+export default Inicio; // Exportación corregida para evitar errores
