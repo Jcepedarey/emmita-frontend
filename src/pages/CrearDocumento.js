@@ -1,5 +1,6 @@
 // C:\Users\pc\frontend-emmita\src\pages\CrearDocumento.js
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
 import AgregarGrupoModal from "../components/AgregarGrupoModal";
@@ -10,6 +11,8 @@ import { generarRemision } from "../utils/generarRemision";
 import Swal from "sweetalert2";
 
 const CrearDocumento = () => {
+  const location = useLocation();
+  const documento = location.state?.documento;
   const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
   const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
   const [fechaEvento, setFechaEvento] = useState("");
@@ -37,6 +40,17 @@ const CrearDocumento = () => {
     };
     cargarClientes();
   }, []);
+  useEffect(() => {
+    if (documento) {
+      setTipoDocumento(documento.tipo || "cotizacion");
+      setFechaEvento(documento.fecha_evento || "");
+      setClienteSeleccionado(documento.cliente || null);
+      setProductosAgregados(documento.productos || []);
+      setGarantia(documento.garantia || "");
+      setAbonos(documento.abonos || [""]);
+      setPagado(documento.pagado || false);
+    }
+  }, [documento]);
 
   const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
   const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
