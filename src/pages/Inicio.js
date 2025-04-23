@@ -1,4 +1,4 @@
-// Inicio.js (completo y corregido)
+// Inicio.js (completo y actualizado con layout corregido)
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
@@ -7,16 +7,16 @@ import { generarRemision } from "../utils/generarRemision";
 
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div
-    className="flex flex-col items-center justify-center p-4 rounded-lg shadow hover:shadow-md hover:bg-gray-50 transition cursor-pointer"
+    className="flex flex-col items-center justify-center p-2 rounded-lg shadow hover:shadow-md hover:bg-gray-100 transition cursor-pointer"
     onClick={onClick}
   >
     <img
       src={imagen}
       alt={titulo}
-      className="w-8 h-8 mb-2 object-contain"
-      style={{ maxWidth: "32px", maxHeight: "32px" }}
+      className="w-12 h-12 mb-1 object-contain"
+      style={{ maxWidth: "48px", maxHeight: "48px" }}
     />
-    <p className="text-sm text-center text-gray-800">{titulo}</p>
+    <p className="text-xs text-center text-gray-800 font-medium">{titulo}</p>
   </div>
 );
 
@@ -32,7 +32,7 @@ const Inicio = () => {
     const cargarOrdenes = async () => {
       const { data, error } = await supabase
         .from("ordenes_pedido")
-        .select("*, clientes(nombre, identificacion, telefono, direccion, email)")
+        .select("*, clientes(*)")
         .order("fecha_evento", { ascending: true });
 
       if (error) return console.error("Error cargando órdenes:", error);
