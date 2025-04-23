@@ -48,7 +48,16 @@ const Inicio = () => {
   };
 
   const manejarPDF = async (orden) => {
-    await generarPDF(orden, "orden");
+    const doc = {
+      ...orden,
+      nombre_cliente: orden.clientes?.nombre || "No disponible",
+      identificacion: orden.clientes?.identificacion || "-",
+      telefono: orden.clientes?.telefono || "-",
+      direccion: orden.clientes?.direccion || "-",
+      email: orden.clientes?.email || "-",
+    };
+  
+    await generarPDF(doc, "orden");
   };
 
   const manejarRemision = async (orden) => {
