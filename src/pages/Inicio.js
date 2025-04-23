@@ -162,6 +162,11 @@ const Inicio = () => {
           imagen="/icons/reportes.png"
           onClick={() => navigate("/reportes")}
         />
+        <BotonModulo
+    titulo="Trazabilidad"
+    imagen="/icons/trazabilidad.png"
+    onClick={() => navigate("/trazabilidad")}
+  />
         {usuario?.rol === "admin" && (
           <BotonModulo
             titulo="Usuarios"
