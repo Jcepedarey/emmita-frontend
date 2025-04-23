@@ -1,15 +1,17 @@
 import React from "react";
 import { AppBar, Toolbar, Typography, Button } from "@mui/material";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import supabase from "../supabaseClient";
 
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem("usuario"));
 
-  const handleLogout = () => {
-    localStorage.removeItem("usuario");
-    navigate("/");
+  const handleLogout = async () => {
+    await supabase.auth.signOut(); // ✅ cierra sesión en Supabase
+    localStorage.removeItem("usuario"); // ✅ borra info local
+    navigate("/"); // ✅ redirige al login
   };
 
   const navLinks = [
@@ -42,7 +44,7 @@ const Navbar = () => {
 
         {usuario && (
           <>
-            <Typography sx={{ mx: 2 }}>{usuario.nombre}</Typography>
+            <Typography sx={{ mx: 2 }}>{usuario.email}</Typography>
             <Button color="inherit" onClick={handleLogout}>
               Cerrar sesión
             </Button>

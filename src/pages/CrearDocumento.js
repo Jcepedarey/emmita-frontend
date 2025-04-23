@@ -44,7 +44,7 @@ const CrearDocumento = () => {
     if (documento) {
       setTipoDocumento(documento.tipo || "cotizacion");
       setFechaEvento(documento.fecha_evento || "");
-      setClienteSeleccionado(documento.cliente || null);
+      setClienteSeleccionado(documento.cliente || documento.clientes || null);
       setProductosAgregados(documento.productos || []);
       setGarantia(documento.garantia || "");
       setAbonos(documento.abonos || [""]);

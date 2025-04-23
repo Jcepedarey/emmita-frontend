@@ -1,6 +1,8 @@
+// C:\Users\pc\frontend-emmita\src\pages\Login.js
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+import supabase from "../supabaseClient";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -15,24 +17,24 @@ export default function Login() {
 
     try {
       setCargando(true);
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/usuarios/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
 
-      const data = await res.json();
       setCargando(false);
 
-      if (res.ok) {
-        localStorage.setItem("usuario", JSON.stringify(data));
-        navigate("/inicio");
-      } else {
-        Swal.fire("Acceso denegado", data.error || "Email o contraseña incorrectos", "error");
+      if (error || !data.session) {
+        return Swal.fire("Acceso denegado", error?.message || "Email o contraseña incorrectos", "error");
       }
+
+      // Guardar datos de sesión
+      localStorage.setItem("usuario", JSON.stringify(data.user));
+      navigate("/inicio");
     } catch (err) {
       setCargando(false);
-      Swal.fire("Error de conexión", "No se pudo conectar al servidor", "error");
+      Swal.fire("Error de conexión", "No se pudo conectar a Supabase", "error");
     }
   };
 
