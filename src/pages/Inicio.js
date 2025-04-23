@@ -4,21 +4,26 @@ import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
 
-// Componente reutilizable para los botones del menú
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div
     className="flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer hover:shadow-md"
     onClick={onClick}
-    style={{ width: "80px", height: "80px" }} // Tamaño reducido
+    style={{ width: "80px", height: "80px" }} // Íconos más pequeños
   >
     <img
       src={imagen}
       alt={titulo}
-      className="w-12 h-12 object-contain" // Íconos más pequeños
+      className="w-12 h-12 object-contain" // Ajuste de tamaño
     />
     <p className="text-xs text-center mt-1">{titulo}</p>
   </div>
 );
+
+const Inicio = () => {
+  // Código para la funcionalidad principal
+};
+
+export default Inicio; // Aseguramos que sea una exportación predeterminada
 const Inicio = () => {
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem("usuario"));
@@ -44,6 +49,17 @@ const Inicio = () => {
     cargarOrdenes();
   }, [navigate, usuario]);
 
+  const editarOrden = (orden) => {
+    navigate("/crear-documento", { state: { documento: orden } });
+  };
+
+  const manejarPDF = async (orden) => {
+    await generarPDF(orden, "orden");
+  };
+
+  const manejarRemision = async (orden) => {
+    await generarRemision(orden);
+  };
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-6">Bienvenido, {usuario?.nombre || "Usuario"}</h1>
@@ -116,18 +132,21 @@ const Inicio = () => {
           </table>
         </div>
       </div>
+
+      {/* Menú principal mejorado */}
+      <h2 className="text-xl font-semibold mt-6 mb-4">Menú Principal</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <BotonModulo titulo="Crear documento" imagen="/icons/contrato.png" onClick={() => navigate("/crear-documento")} />
+        <BotonModulo titulo="Clientes" imagen="/icons/buscar_cliente.png" onClick={() => navigate("/clientes")} />
+        <BotonModulo titulo="Inventario" imagen="/icons/inventario.png" onClick={() => navigate("/inventario")} />
+        <BotonModulo titulo="Agenda" imagen="/icons/agenda.png" onClick={() => navigate("/agenda")} />
+        <BotonModulo titulo="Proveedores" imagen="/icons/proveedores.png" onClick={() => navigate("/proveedores")} />
+        <BotonModulo titulo="Buscar documento" imagen="/icons/buscar_doc.png" onClick={() => navigate("/buscar-documento")} />
+        <BotonModulo titulo="Reportes" imagen="/icons/reportes.png" onClick={() => navigate("/reportes")} />
+        {usuario?.rol === "admin" && (
+          <BotonModulo titulo="Usuarios" imagen="/icons/usuario.png" onClick={() => navigate("/usuarios")} />
+        )}
+      </div>
     </div>
   );
 };
-<div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-  <BotonModulo titulo="Crear documento" imagen="/icons/contrato.png" onClick={() => navigate("/crear-documento")} />
-  <BotonModulo titulo="Clientes" imagen="/icons/buscar_cliente.png" onClick={() => navigate("/clientes")} />
-  <BotonModulo titulo="Inventario" imagen="/icons/inventario.png" onClick={() => navigate("/inventario")} />
-  <BotonModulo titulo="Agenda" imagen="/icons/agenda.png" onClick={() => navigate("/agenda")} />
-  <BotonModulo titulo="Proveedores" imagen="/icons/proveedores.png" onClick={() => navigate("/proveedores")} />
-  <BotonModulo titulo="Buscar documento" imagen="/icons/buscar_doc.png" onClick={() => navigate("/buscar-documento")} />
-  <BotonModulo titulo="Reportes" imagen="/icons/reportes.png" onClick={() => navigate("/reportes")} />
-  {usuario?.rol === "admin" && (
-    <BotonModulo titulo="Usuarios" imagen="/icons/usuario.png" onClick={() => navigate("/usuarios")} />
-  )}
-</div>
