@@ -50,12 +50,12 @@ export async function generarRemision(documento) {
   (documento.productos || []).forEach((p) => {
     if (p.es_grupo && Array.isArray(p.productos)) {
       p.productos.forEach((sub) => {
-        filas.push([`(${p.nombre}) ${sub.nombre}`, sub.cantidad]);
+        filas.push([sub.cantidad, `(${p.nombre}) ${sub.nombre}`]);
       });
     } else {
-      filas.push([p.nombre, p.cantidad]);
+      filas.push([p.cantidad, p.nombre]);
     }
-  });
+  });  
 
   autoTable(doc, {
     head: [["Cantidad", "Artículo"]],
