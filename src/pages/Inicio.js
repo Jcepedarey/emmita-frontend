@@ -1,4 +1,4 @@
-// Inicio.js (completo y actualizado con layout corregido)
+// Inicio.js (corregido visual y funcionalmente)
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
@@ -7,16 +7,16 @@ import { generarRemision } from "../utils/generarRemision";
 
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div
-    className="flex flex-col items-center justify-center p-2 rounded-lg shadow hover:shadow-md hover:bg-gray-100 transition cursor-pointer"
+    className="flex flex-col items-center justify-center p-3 bg-white rounded-xl shadow hover:shadow-md hover:bg-gray-100 transition cursor-pointer"
     onClick={onClick}
   >
     <img
       src={imagen}
       alt={titulo}
-      className="w-12 h-12 mb-1 object-contain"
+      className="w-12 h-12 object-contain mb-2"
       style={{ maxWidth: "48px", maxHeight: "48px" }}
     />
-    <p className="text-xs text-center text-gray-800 font-medium">{titulo}</p>
+    <p className="text-sm text-center font-medium text-gray-800">{titulo}</p>
   </div>
 );
 
@@ -76,7 +76,7 @@ const Inicio = () => {
               {ordenesProximas.map((orden) => (
                 <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-blue-100 transition">
                   <div className="text-sm">
-                    <p className="font-semibold text-blue-700">OP-{orden.numero || "???"}</p>
+                    <p className="font-semibold text-blue-700">OP-{orden.numero || orden.id?.slice(-4) || "???"}</p>
                     <p className="text-gray-700">{orden.clientes?.nombre || "Cliente"}</p>
                     <p className="text-gray-500">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
                   </div>
@@ -103,7 +103,7 @@ const Inicio = () => {
                 {ordenesPendientes.map((orden) => (
                   <li key={orden.id} className="bg-white p-3 rounded-lg shadow flex items-center justify-between hover:bg-red-100 transition">
                     <div className="text-sm">
-                      <p className="font-semibold text-red-700">OP-{orden.numero || "???"}</p>
+                      <p className="font-semibold text-red-700">OP-{orden.numero || orden.id?.slice(-4) || "???"}</p>
                       <p className="text-gray-700">{orden.clientes?.nombre}</p>
                       <p className="text-gray-500">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
                     </div>
