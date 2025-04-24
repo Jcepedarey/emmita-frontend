@@ -118,20 +118,38 @@ const CrearDocumento = () => {
     if (!clienteSeleccionado || productosAgregados.length === 0) {
       return Swal.fire("Faltan datos", "Debes seleccionar un cliente y agregar al menos un producto.", "warning");
     }
-
+  
     const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const prefijo = tipoDocumento === "cotizacion" ? "COT" : "OP";
+  
+    const fecha = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const fechaNumerica = fecha.replaceAll("-", ""); // YYYYMMDD
+  
+    // 🔍 Consultar cuántos documentos existen ese día
+    const { data: existentes, error: errorConsulta } = await supabase
+      .from(tabla)
+      .select("id")
+      .like("numero", `${prefijo}-${fechaNumerica}-%`);
+  
+    const consecutivo = (existentes?.length || 0) + 1;
+    const numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
+  
+    // 📦 Datos a guardar
     const dataGuardar = {
       cliente_id: clienteSeleccionado.id,
       productos: productosAgregados,
       total,
       fecha_evento: fechaEvento,
+      fecha: fecha,
+      numero: numeroDocumento,
+      tipo: tipoDocumento,
       garantia: parseFloat(garantia || 0),
       abonos,
       estado: pagado ? "pagado" : "pendiente",
     };
-
+  
     const { error } = await supabase.from(tabla).insert([dataGuardar]);
-
+  
     if (!error) {
       Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
     } else {
