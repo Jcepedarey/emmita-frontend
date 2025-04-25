@@ -139,15 +139,15 @@ const CrearDocumento = () => {
       cliente_id: clienteSeleccionado.id,
       productos: productosAgregados,
       total,
-      fecha_evento: fechaEvento,
+      fecha_evento: fechaEvento || null, // ✅ si está vacía, se envía como null
       garantia: parseFloat(garantia || 0),
       abonos,
       estado: pagado ? "pagado" : "pendiente",
       tipo: tipoDocumento,
       numero: numeroDocumento,
       ...(tipoDocumento === "cotizacion"
-        ? { fecha: fechaCreacion }
-        : { fecha_creacion: fechaCreacion }) // 👈 campo correcto para ordenes_pedido
+        ? { fecha: fechaCreacion || null }
+        : { fecha_creacion: fechaCreacion || null }) // ✅ mismo tratamiento
     };
   
     const { error } = await supabase.from(tabla).insert([dataGuardar]);
