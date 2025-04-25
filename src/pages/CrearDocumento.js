@@ -5,7 +5,7 @@ import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
 import AgregarGrupoModal from "../components/AgregarGrupoModal";
 import CrearClienteModal from "../components/CrearClienteModal";
-import BuscarProductoProveedorModal from "../components/BuscarProductoProveedorModal"; // ✅ Nuevo componente
+import BuscarProductoProveedorModal from "../components/BuscarProductoProveedorModal";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
 import Swal from "sweetalert2";
@@ -21,7 +21,7 @@ const CrearDocumento = () => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [busquedaCliente, setBusquedaCliente] = useState("");
 
-  const [stock, setStock] = useState([]);
+  const [stock, setStock] = useState([]); // Este será el stock calculado por producto y fecha
 
   const [garantia, setGarantia] = useState("");
   const [abonos, setAbonos] = useState([""]);
@@ -42,15 +42,45 @@ const CrearDocumento = () => {
     };
     cargarClientes();
   }, []);
-  
+
   useEffect(() => {
     const cargarStock = async () => {
-      const { data } = await supabase.from("stock").select("*");
-      if (data) setStock(data);
-    };
-    cargarStock();
-  }, []);
+      if (!fechaEvento) return;
   
+      const { data: inventarioData, error } = await supabase
+        .from("inventario")
+        .select("producto_id, cantidad, tipo_movimiento, fecha");
+  
+      if (!inventarioData) return;
+  
+      // Filtrar movimientos hasta la fecha seleccionada
+      const movimientosFiltrados = inventarioData.filter(
+        (m) => m.fecha.split("T")[0] <= fechaEvento
+      );
+  
+      const stockPorProducto = {};
+  
+      movimientosFiltrados.forEach((mov) => {
+        if (!stockPorProducto[mov.producto_id]) stockPorProducto[mov.producto_id] = 0;
+  
+        if (mov.tipo_movimiento === "entrada") {
+          stockPorProducto[mov.producto_id] += mov.cantidad;
+        } else if (mov.tipo_movimiento === "salida") {
+          stockPorProducto[mov.producto_id] -= mov.cantidad;
+        }
+      });
+  
+      const resultado = Object.entries(stockPorProducto).map(([producto_id, disponible]) => ({
+        producto_id,
+        disponible
+      }));
+  
+      setStock(resultado);
+    };
+  
+    cargarStock();
+  }, [fechaEvento]);
+
   useEffect(() => {
     if (documento) {
       setTipoDocumento(documento.tipo || "cotizacion");
@@ -208,10 +238,10 @@ const CrearDocumento = () => {
   
   // ✅ Calcular stock disponible por producto para la fecha seleccionada
   const stockDisponible = {};
-  productosAgregados.forEach((item) => {
-    const registros = stock.filter((s) => s.producto_id === item.id && s.fecha === fechaEvento);
-    stockDisponible[item.id] = registros.length > 0 ? registros[0].disponible : "—";
-  });
+productosAgregados.forEach((item) => {
+  const registro = stock.find((s) => s.producto_id === item.id);
+  stockDisponible[item.id] = registro ? registro.disponible : "—";
+});
   
   return (
     <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
@@ -262,88 +292,88 @@ const CrearDocumento = () => {
         </ul>
       )}
 
-      {clienteSeleccionado && (
-        <div style={{ marginTop: "15px", padding: "10px", backgroundColor: "#f1f1f1", borderRadius: "6px" }}>
-          <strong>Cliente seleccionado:</strong><br />
-          🧑 {clienteSeleccionado.nombre}<br />
-          🆔 {clienteSeleccionado.identificacion}<br />
-          📞 {clienteSeleccionado.telefono}<br />
-          📍 {clienteSeleccionado.direccion}<br />
-          ✉️ {clienteSeleccionado.email}
-        </div>
-      )}
-      <hr style={{ margin: "30px 0" }} />
-      <h3>Productos o Grupos Agregados</h3>
+{clienteSeleccionado && (
+  <div style={{ marginTop: "15px", padding: "10px", backgroundColor: "#f1f1f1", borderRadius: "6px" }}>
+    <strong>Cliente seleccionado:</strong><br />
+    🧑 {clienteSeleccionado.nombre}<br />
+    🆔 {clienteSeleccionado.identificacion}<br />
+    📞 {clienteSeleccionado.telefono}<br />
+    📍 {clienteSeleccionado.direccion}<br />
+    ✉️ {clienteSeleccionado.email}
+  </div>
+)}
+<hr style={{ margin: "30px 0" }} />
+<h3>Productos o Grupos Agregados</h3>
 
-      <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
-      <thead>
-  <tr>
-    <th style={{ borderBottom: "1px solid #ccc", width: "60px" }}>Cant</th>
-    <th style={{ borderBottom: "1px solid #ccc", width: "80px" }}>Stock</th>
-    <th style={{ borderBottom: "1px solid #ccc", width: "40%" }}>Descripción</th>
-    <th style={{ borderBottom: "1px solid #ccc", width: "100px" }}>V. Unit</th>
-    <th style={{ borderBottom: "1px solid #ccc", width: "100px" }}>Subtotal</th>
-    <th></th>
-  </tr>
-</thead>
-<tbody>
-  {productosAgregados.map((item, index) => {
-    // Buscar el stock disponible en base a la tabla stock y fechaEvento
-    const stock = stockDisponible[item.id] ?? "—";
-    const sobrepasado = item.cantidad > stock;
+<table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
+  <thead>
+    <tr>
+      <th style={{ borderBottom: "1px solid #ccc", width: "60px" }}>Cant</th>
+      <th style={{ borderBottom: "1px solid #ccc", width: "80px" }}>Stock</th>
+      <th style={{ borderBottom: "1px solid #ccc", width: "40%" }}>Descripción</th>
+      <th style={{ borderBottom: "1px solid #ccc", width: "100px" }}>V. Unit</th>
+      <th style={{ borderBottom: "1px solid #ccc", width: "100px" }}>Subtotal</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {productosAgregados.map((item, index) => {
+      // Buscar el stock disponible en base a la tabla inventario y fechaEvento
+      const stockDisp = stockDisponible[item.id] ?? "—";
+      const sobrepasado = item.cantidad > stockDisp;
 
-    if (sobrepasado && stock !== "—") {
-      Swal.fire({
-        icon: "info",
-        title: "Stock insuficiente",
-        text: `Solo hay ${stock} unidades disponibles para la fecha seleccionada.`,
-        toast: true,
-        timer: 4000,
-        position: "top-end",
-        showConfirmButton: false,
-      });
-    }
+      if (sobrepasado && stockDisp !== "—") {
+        Swal.fire({
+          icon: "info",
+          title: "Stock insuficiente",
+          text: `Solo hay ${stockDisp} unidades disponibles para la fecha seleccionada.`,
+          toast: true,
+          timer: 4000,
+          position: "top-end",
+          showConfirmButton: false,
+        });
+      }
 
-    return (
-      <tr key={index}>
-        <td>
-          <input
-            type="number"
-            value={item.cantidad}
-            min="1"
-            onChange={(e) => actualizarCantidad(index, e.target.value)}
-            style={{ width: "60px" }}
-            disabled={item.es_grupo}
-          />
-        </td>
-        <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
-          {stock}
-        </td>
-        <td>{item.nombre}</td>
-        <td>
-          {item.es_grupo ? (
-            `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
-          ) : (
+      return (
+        <tr key={index}>
+          <td>
             <input
               type="number"
-              value={item.precio}
-              min="0"
-              onChange={(e) => {
-                const nuevos = [...productosAgregados];
-                nuevos[index].precio = parseFloat(e.target.value || 0);
-                nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
-                setProductosAgregados(nuevos);
-              }}
-              style={{ width: "100px" }}
+              value={item.cantidad}
+              min="1"
+              onChange={(e) => actualizarCantidad(index, e.target.value)}
+              style={{ width: "60px" }}
+              disabled={item.es_grupo}
             />
-          )}
-        </td>
-        <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
-        <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
-      </tr>
-    );
-  })}
-</tbody>
+          </td>
+          <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
+            {stockDisp}
+          </td>
+          <td>{item.nombre}</td>
+          <td>
+            {item.es_grupo ? (
+              `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
+            ) : (
+              <input
+                type="number"
+                value={item.precio}
+                min="0"
+                onChange={(e) => {
+                  const nuevos = [...productosAgregados];
+                  nuevos[index].precio = parseFloat(e.target.value || 0);
+                  nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
+                  setProductosAgregados(nuevos);
+                }}
+                style={{ width: "100px" }}
+              />
+            )}
+          </td>
+          <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
+          <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
+        </tr>
+      );
+    })}
+  </tbody>
 </table>
 
 
