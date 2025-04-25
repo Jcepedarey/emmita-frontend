@@ -21,6 +21,8 @@ const CrearDocumento = () => {
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [busquedaCliente, setBusquedaCliente] = useState("");
 
+  const [stock, setStock] = useState([]);
+
   const [garantia, setGarantia] = useState("");
   const [abonos, setAbonos] = useState([""]);
   const [pagado, setPagado] = useState(false);
@@ -40,6 +42,15 @@ const CrearDocumento = () => {
     };
     cargarClientes();
   }, []);
+  
+  useEffect(() => {
+    const cargarStock = async () => {
+      const { data } = await supabase.from("stock").select("*");
+      if (data) setStock(data);
+    };
+    cargarStock();
+  }, []);
+  
   useEffect(() => {
     if (documento) {
       setTipoDocumento(documento.tipo || "cotizacion");
@@ -173,7 +184,7 @@ const CrearDocumento = () => {
     fecha: fechaCreacion,
     fecha_evento: fechaEvento
   });
-
+  
   const agregarGrupo = (grupo) => {
     setProductosAgregados([
       ...productosAgregados,
@@ -188,16 +199,24 @@ const CrearDocumento = () => {
     ]);
     setModalGrupo(false);
   };
-
+  
   const crearClienteDesdeDocumento = (cliente) => {
     setClientes([...clientes, cliente]);
     setClienteSeleccionado(cliente);
     setModalCrearCliente(false);
   };
+  
+  // ✅ Calcular stock disponible por producto para la fecha seleccionada
+  const stockDisponible = {};
+  productosAgregados.forEach((item) => {
+    const registros = stock.filter((s) => s.producto_id === item.id && s.fecha === fechaEvento);
+    stockDisponible[item.id] = registros.length > 0 ? registros[0].disponible : "—";
+  });
+  
   return (
     <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
       <h2 style={{ textAlign: "center" }}>📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}</h2>
-
+  
       <div style={{ marginBottom: "15px" }}>
         <label>Tipo de documento: </label>
         <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
@@ -205,7 +224,7 @@ const CrearDocumento = () => {
           <option value="orden">Orden de Pedido</option>
         </select>
       </div>
-
+  
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
           <label>Fecha de creación:</label>
@@ -215,7 +234,7 @@ const CrearDocumento = () => {
           <label>Fecha del evento:</label>
           <input type="date" value={fechaEvento} onChange={(e) => setFechaEvento(e.target.value)} style={{ width: "100%" }} />
         </div>
-      </div>
+      </div>  
 
       <hr style={{ margin: "20px 0" }} />
 
@@ -257,17 +276,35 @@ const CrearDocumento = () => {
       <h3>Productos o Grupos Agregados</h3>
 
       <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
-  <thead>
-    <tr>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Cantidad</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Valor Unitario</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {productosAgregados.map((item, index) => (
+      <thead>
+  <tr>
+    <th style={{ borderBottom: "1px solid #ccc", width: "60px" }}>Cant</th>
+    <th style={{ borderBottom: "1px solid #ccc", width: "80px" }}>Stock</th>
+    <th style={{ borderBottom: "1px solid #ccc", width: "40%" }}>Descripción</th>
+    <th style={{ borderBottom: "1px solid #ccc", width: "100px" }}>V. Unit</th>
+    <th style={{ borderBottom: "1px solid #ccc", width: "100px" }}>Subtotal</th>
+    <th></th>
+  </tr>
+</thead>
+<tbody>
+  {productosAgregados.map((item, index) => {
+    // Buscar el stock disponible en base a la tabla stock y fechaEvento
+    const stock = stockDisponible[item.id] ?? "—";
+    const sobrepasado = item.cantidad > stock;
+
+    if (sobrepasado && stock !== "—") {
+      Swal.fire({
+        icon: "info",
+        title: "Stock insuficiente",
+        text: `Solo hay ${stock} unidades disponibles para la fecha seleccionada.`,
+        toast: true,
+        timer: 4000,
+        position: "top-end",
+        showConfirmButton: false,
+      });
+    }
+
+    return (
       <tr key={index}>
         <td>
           <input
@@ -278,6 +315,9 @@ const CrearDocumento = () => {
             style={{ width: "60px" }}
             disabled={item.es_grupo}
           />
+        </td>
+        <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
+          {stock}
         </td>
         <td>{item.nombre}</td>
         <td>
@@ -301,8 +341,9 @@ const CrearDocumento = () => {
         <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
         <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
       </tr>
-    ))}
-  </tbody>
+    );
+  })}
+</tbody>
 </table>
 
 
