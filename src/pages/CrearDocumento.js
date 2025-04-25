@@ -43,7 +43,7 @@ const CrearDocumento = () => {
   useEffect(() => {
     if (documento) {
       setTipoDocumento(documento.tipo || "cotizacion");
-      setFechaEvento(documento.fecha_evento || "");
+      setFechaEvento(documento.fecha_evento?.split("T")[0] || "");
       setClienteSeleccionado(documento.cliente || documento.clientes || null);
       setProductosAgregados(documento.productos || []);
       setGarantia(documento.garantia || "");

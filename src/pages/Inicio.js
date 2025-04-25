@@ -84,7 +84,7 @@ const Inicio = () => {
                     className="bg-white p-3 rounded-lg shadow flex justify-between items-center hover:bg-blue-100 transition"
                   >
                     <div>
-                      <p className="font-bold text-blue-700">OP-{orden.numero || "???"}</p>
+                    <p className="font-bold text-blue-700">{orden.numero || "OP-???"}</p>
                       <p className="text-gray-800">{orden.clientes?.nombre || "Cliente"}</p>
                       <p className="text-gray-500 text-sm">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
                     </div>
@@ -113,7 +113,7 @@ const Inicio = () => {
                     className="bg-white p-3 rounded-lg shadow flex justify-between items-center hover:bg-red-100 transition"
                   >
                     <div>
-                      <p className="font-bold text-red-700">OP-{orden.numero || "???"}</p>
+                    <p className="font-bold text-red-700">{orden.numero || "OP-???"}</p>
                       <p className="text-gray-800">{orden.clientes?.nombre || "Cliente"}</p>
                       <p className="text-gray-500 text-sm">{new Date(orden.fecha_evento).toLocaleDateString()}</p>
                     </div>
