@@ -49,8 +49,8 @@ const CrearDocumento = () => {
   
       // 1. Traer productos
       const { data: productosData, error: errorProductos } = await supabase
-        .from("productos")
-        .select("id, cantidad");
+  .from("productos")
+  .select("id, stock");
   
       if (!productosData) return;
   
