@@ -44,48 +44,45 @@ const CrearDocumento = () => {
   }, []);
 
   useEffect(() => {
-    const cargarStock = async () => {
+    const calcularStockDisponible = async () => {
       if (!fechaEvento) return;
   
-      const { data: inventarioData, error } = await supabase
-        .from("inventario")
-        .select("producto_id, cantidad, tipo_movimiento, fecha");
+      // 1. Traer productos
+      const { data: productosData, error: errorProductos } = await supabase
+        .from("productos")
+        .select("id, cantidad");
   
-      if (!inventarioData) return;
+      if (!productosData) return;
   
-      // ✅ Convertimos fechaEvento a formato YYYY-MM-DD para comparar
-      const fechaEventoStr = new Date(fechaEvento).toISOString().split("T")[0];
+      // 2. Traer órdenes para esa fecha
+      const { data: ordenes, error: errorOrdenes } = await supabase
+        .from("ordenes_pedido")
+        .select("productos, fecha_evento")
+        .eq("fecha_evento", fechaEvento);
   
-      // ✅ Filtramos los movimientos anteriores o iguales a la fecha
-      const movimientosFiltrados = inventarioData.filter(
-        (m) => m.fecha.split("T")[0] <= fechaEventoStr
-      );
+      // 3. Sumar reservas por producto
+      const reservas = {};
   
-      console.log("📦 Movimientos filtrados:", movimientosFiltrados);
-  
-      const stockPorProducto = {};
-  
-      movimientosFiltrados.forEach((mov) => {
-        if (!stockPorProducto[mov.producto_id]) stockPorProducto[mov.producto_id] = 0;
-  
-        if (mov.tipo_movimiento === "entrada") {
-          stockPorProducto[mov.producto_id] += mov.cantidad;
-        } else if (mov.tipo_movimiento === "salida") {
-          stockPorProducto[mov.producto_id] -= mov.cantidad;
-        }
+      ordenes?.forEach((orden) => {
+        (orden.productos || []).forEach((p) => {
+          const id = p.producto_id || p.id;
+          if (!reservas[id]) reservas[id] = 0;
+          reservas[id] += p.cantidad || 0;
+        });
       });
   
-      const resultado = Object.entries(stockPorProducto).map(([producto_id, disponible]) => ({
-        producto_id,
-        disponible
-      }));
+      // 4. Calcular disponibilidad
+      const stockFinal = {};
+      productosData.forEach((producto) => {
+        const reservado = reservas[producto.id] || 0;
+        stockFinal[producto.id] = producto.cantidad - reservado;
+      });
   
-      console.log("🧮 Stock por producto cargado:", resultado);
-  
-      setStock(resultado);
+      console.log("📦 Stock disponible calculado:", stockFinal);
+      setStock(stockFinal);
     };
   
-    cargarStock();
+    calcularStockDisponible();
   }, [fechaEvento]);
 
   useEffect(() => {
