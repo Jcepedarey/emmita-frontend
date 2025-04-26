@@ -37,7 +37,10 @@ const CrearDocumento = () => {
 
   useEffect(() => {
     const cargarClientes = async () => {
-      const { data } = await supabase.from("clientes").select("*").order("nombre", { ascending: true });
+      const { data } = await supabase
+        .from("clientes")
+        .select("*")
+        .order("nombre", { ascending: true });
       if (data) setClientes(data);
     };
     cargarClientes();
@@ -46,23 +49,31 @@ const CrearDocumento = () => {
   useEffect(() => {
     const calcularStockDisponible = async () => {
       if (!fechaEvento) return;
-  
-      // 1. Traer productos
+
+      // 1. Traer productos desde Supabase
       const { data: productosData, error: errorProductos } = await supabase
-  .from("productos")
-  .select("id, stock");
-  
-      if (!productosData) return;
-  
-      // 2. Traer órdenes para esa fecha
+        .from("productos")
+        .select("id, stock");
+
+      if (errorProductos) {
+        console.error("❌ Error obteniendo productos:", errorProductos);
+        return;
+      }
+
+      // 2. Traer órdenes confirmadas para la misma fecha
       const { data: ordenes, error: errorOrdenes } = await supabase
         .from("ordenes_pedido")
         .select("productos, fecha_evento")
         .eq("fecha_evento", fechaEvento);
-  
+
+      if (errorOrdenes) {
+        console.error("❌ Error obteniendo órdenes:", errorOrdenes);
+        return;
+      }
+
       // 3. Sumar reservas por producto
       const reservas = {};
-  
+
       ordenes?.forEach((orden) => {
         (orden.productos || []).forEach((p) => {
           const id = p.producto_id || p.id;
@@ -70,18 +81,19 @@ const CrearDocumento = () => {
           reservas[id] += p.cantidad || 0;
         });
       });
-  
+
       // 4. Calcular disponibilidad
       const stockFinal = {};
       productosData.forEach((producto) => {
+        const stockReal = parseInt(producto.stock ?? 0); // ✅ conversión segura
         const reservado = reservas[producto.id] || 0;
-        stockFinal[producto.id] = producto.cantidad - reservado;
+        stockFinal[producto.id] = stockReal - reservado;
       });
-  
+
       console.log("📦 Stock disponible calculado:", stockFinal);
       setStock(stockFinal);
     };
-  
+
     calcularStockDisponible();
   }, [fechaEvento]);
 
