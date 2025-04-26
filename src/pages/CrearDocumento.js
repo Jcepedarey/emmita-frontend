@@ -346,62 +346,63 @@ return (
     </tr>
   </thead>
   <tbody>
-    {productosAgregados.map((item, index) => {
-      const stockDisp = stock?.[item.producto_id] ?? "—";
-      const sobrepasado = item.cantidad > stockDisp;
+  {productosAgregados.map((item, index) => {
+    // Buscar stock disponible usando item.id (no producto_id)
+    const stockDisp = stock?.[item.id] ?? "—";
+    const sobrepasado = stockDisp !== "—" && item.cantidad > stockDisp;
 
-      if (sobrepasado && stockDisp !== "—") {
-        Swal.fire({
-          icon: "info",
-          title: "Stock insuficiente",
-          text: `Solo hay ${stockDisp} unidades disponibles para la fecha seleccionada.`,
-          toast: true,
-          timer: 4000,
-          position: "top-end",
-          showConfirmButton: false,
-        });
-      }
+    if (sobrepasado) {
+      Swal.fire({
+        icon: "info",
+        title: "Stock insuficiente",
+        text: `Solo hay ${stockDisp} unidades disponibles para la fecha seleccionada.`,
+        toast: true,
+        timer: 4000,
+        position: "top-end",
+        showConfirmButton: false,
+      });
+    }
 
-      return (
-        <tr key={index}>
-          <td>
+    return (
+      <tr key={index}>
+        <td>
+          <input
+            type="number"
+            value={item.cantidad}
+            min="1"
+            onChange={(e) => actualizarCantidad(index, e.target.value)}
+            style={{ width: "60px" }}
+            disabled={item.es_grupo}
+          />
+        </td>
+        <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
+          {stockDisp}
+        </td>
+        <td>{item.nombre}</td>
+        <td>
+          {item.es_grupo ? (
+            `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
+          ) : (
             <input
               type="number"
-              value={item.cantidad}
-              min="1"
-              onChange={(e) => actualizarCantidad(index, e.target.value)}
-              style={{ width: "60px" }}
-              disabled={item.es_grupo}
+              value={item.precio}
+              min="0"
+              onChange={(e) => {
+                const nuevos = [...productosAgregados];
+                nuevos[index].precio = parseFloat(e.target.value || 0);
+                nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
+                setProductosAgregados(nuevos);
+              }}
+              style={{ width: "100px" }}
             />
-          </td>
-          <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
-            {stockDisp}
-          </td>
-          <td>{item.nombre}</td>
-          <td>
-            {item.es_grupo ? (
-              `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
-            ) : (
-              <input
-                type="number"
-                value={item.precio}
-                min="0"
-                onChange={(e) => {
-                  const nuevos = [...productosAgregados];
-                  nuevos[index].precio = parseFloat(e.target.value || 0);
-                  nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
-                  setProductosAgregados(nuevos);
-                }}
-                style={{ width: "100px" }}
-              />
-            )}
-          </td>
-          <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
-          <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
-        </tr>
-      );
-    })}
-  </tbody>
+          )}
+        </td>
+        <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
+        <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
+      </tr>
+    );
+  })}
+</tbody>
 </table>
 
 
