@@ -334,8 +334,7 @@ productosAgregados.forEach((item) => {
   </thead>
   <tbody>
     {productosAgregados.map((item, index) => {
-      // Buscar el stock disponible usando producto_id en lugar de id
-      const stockDisp = stockDisponible[item.producto_id] ?? "—";
+      const stockDisp = stock[item.producto_id] ?? "—";
       const sobrepasado = item.cantidad > stockDisp;
 
       if (sobrepasado && stockDisp !== "—") {
