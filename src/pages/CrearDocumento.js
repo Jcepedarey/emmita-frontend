@@ -255,60 +255,71 @@ const CrearDocumento = () => {
   };
   
   // ✅ Calcular stock disponible por producto para la fecha seleccionada
-  const stockDisponible = {};
+const stockDisponible = {};
 productosAgregados.forEach((item) => {
-  const registro = stock.find((s) => s.producto_id === item.id);
-  stockDisponible[item.id] = registro ? registro.disponible : "—";
+  const disponible = stock[item.producto_id || item.id] ?? "—";
+  stockDisponible[item.id] = disponible;
 });
-  
-  return (
-    <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center" }}>📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}</h2>
-  
-      <div style={{ marginBottom: "15px" }}>
-        <label>Tipo de documento: </label>
-        <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
-          <option value="cotizacion">Cotización</option>
-          <option value="orden">Orden de Pedido</option>
-        </select>
+
+return (
+  <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
+    <h2 style={{ textAlign: "center" }}>
+      📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
+    </h2>
+
+    <div style={{ marginBottom: "15px" }}>
+      <label>Tipo de documento: </label>
+      <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+        <option value="cotizacion">Cotización</option>
+        <option value="orden">Orden de Pedido</option>
+      </select>
+    </div>
+
+    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+      <div style={{ flex: 1 }}>
+        <label>Fecha de creación:</label>
+        <input type="date" value={fechaCreacion} disabled style={{ width: "100%" }} />
       </div>
-  
-      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-        <div style={{ flex: 1 }}>
-          <label>Fecha de creación:</label>
-          <input type="date" value={fechaCreacion} disabled style={{ width: "100%" }} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label>Fecha del evento:</label>
-          <input type="date" value={fechaEvento} onChange={(e) => setFechaEvento(e.target.value)} style={{ width: "100%" }} />
-        </div>
-      </div>  
-
-      <hr style={{ margin: "20px 0" }} />
-
-      <label>Buscar cliente:</label>
-      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+      <div style={{ flex: 1 }}>
+        <label>Fecha del evento:</label>
         <input
-          type="text"
-          placeholder="Nombre, identificación o teléfono"
-          value={busquedaCliente}
-          onChange={(e) => setBusquedaCliente(e.target.value)}
-          style={{ flex: 1 }}
+          type="date"
+          value={fechaEvento}
+          onChange={(e) => setFechaEvento(e.target.value)}
+          style={{ width: "100%" }}
         />
-        <button onClick={() => setModalCrearCliente(true)}>➕ Crear cliente</button>
       </div>
+    </div>
 
-      {busquedaCliente && clientesFiltrados.length > 0 && (
-        <ul style={{ marginTop: "10px", listStyle: "none", padding: 0 }}>
-          {clientesFiltrados.map((cliente) => (
-            <li key={cliente.id}>
-              <button onClick={() => seleccionarCliente(cliente)} style={{ width: "100%", textAlign: "left" }}>
-                {cliente.nombre} - {cliente.identificacion} - {cliente.telefono}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+    <hr style={{ margin: "20px 0" }} />
+
+    <label>Buscar cliente:</label>
+    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+      <input
+        type="text"
+        placeholder="Nombre, identificación o teléfono"
+        value={busquedaCliente}
+        onChange={(e) => setBusquedaCliente(e.target.value)}
+        style={{ flex: 1 }}
+      />
+      <button onClick={() => setModalCrearCliente(true)}>➕ Crear cliente</button>
+    </div>
+
+    {busquedaCliente && clientesFiltrados.length > 0 && (
+      <ul style={{ marginTop: "10px", listStyle: "none", padding: 0 }}>
+        {clientesFiltrados.map((cliente) => (
+          <li key={cliente.id}>
+            <button
+              onClick={() => seleccionarCliente(cliente)}
+              style={{ width: "100%", textAlign: "left" }}
+            >
+              {cliente.nombre} - {cliente.identificacion} - {cliente.telefono}
+            </button>
+          </li>
+        ))}
+      </ul>
+    )}
+
 
 {clienteSeleccionado && (
   <div style={{ marginTop: "15px", padding: "10px", backgroundColor: "#f1f1f1", borderRadius: "6px" }}>
@@ -336,7 +347,7 @@ productosAgregados.forEach((item) => {
   </thead>
   <tbody>
     {productosAgregados.map((item, index) => {
-      const stockDisp = stock[item.producto_id] ?? "—";
+      const stockDisp = stock?.[item.producto_id] ?? "—";
       const sobrepasado = item.cantidad > stockDisp;
 
       if (sobrepasado && stockDisp !== "—") {
