@@ -58,6 +58,8 @@ const CrearDocumento = () => {
         (m) => m.fecha.split("T")[0] <= fechaEvento
       );
   
+      console.log("📦 Movimientos filtrados:", movimientosFiltrados); // ✅ Depuración
+  
       const stockPorProducto = {};
   
       movimientosFiltrados.forEach((mov) => {
@@ -74,6 +76,8 @@ const CrearDocumento = () => {
         producto_id,
         disponible
       }));
+  
+      console.log("🧮 Stock por producto cargado:", resultado); // ✅ Depuración
   
       setStock(resultado);
     };
