@@ -75,11 +75,13 @@ const CrearDocumento = () => {
       const reservas = {};
 
       ordenes?.forEach((orden) => {
-        (orden.productos || []).forEach((p) => {
-          const id = p.producto_id || p.id;
-          if (!reservas[id]) reservas[id] = 0;
-          reservas[id] += p.cantidad || 0;
-        });
+        if (Array.isArray(orden.productos)) {
+          orden.productos.forEach((p) => {
+            const id = p.producto_id || p.id;
+            if (!reservas[id]) reservas[id] = 0;
+            reservas[id] += p.cantidad || 0;
+          });
+        }
       });
 
       // 4. Calcular disponibilidad
