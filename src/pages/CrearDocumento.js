@@ -53,12 +53,15 @@ const CrearDocumento = () => {
   
       if (!inventarioData) return;
   
-      // Filtrar movimientos hasta la fecha seleccionada
+      // ✅ Convertimos fechaEvento a formato YYYY-MM-DD para comparar
+      const fechaEventoStr = new Date(fechaEvento).toISOString().split("T")[0];
+  
+      // ✅ Filtramos los movimientos anteriores o iguales a la fecha
       const movimientosFiltrados = inventarioData.filter(
-        (m) => m.fecha.split("T")[0] <= fechaEvento
+        (m) => m.fecha.split("T")[0] <= fechaEventoStr
       );
   
-      console.log("📦 Movimientos filtrados:", movimientosFiltrados); // ✅ Depuración
+      console.log("📦 Movimientos filtrados:", movimientosFiltrados);
   
       const stockPorProducto = {};
   
@@ -77,7 +80,7 @@ const CrearDocumento = () => {
         disponible
       }));
   
-      console.log("🧮 Stock por producto cargado:", resultado); // ✅ Depuración
+      console.log("🧮 Stock por producto cargado:", resultado);
   
       setStock(resultado);
     };
@@ -322,8 +325,8 @@ productosAgregados.forEach((item) => {
   </thead>
   <tbody>
     {productosAgregados.map((item, index) => {
-      // Buscar el stock disponible en base a la tabla inventario y fechaEvento
-      const stockDisp = stockDisponible[item.id] ?? "—";
+      // Buscar el stock disponible usando producto_id en lugar de id
+      const stockDisp = stockDisponible[item.producto_id] ?? "—";
       const sobrepasado = item.cantidad > stockDisp;
 
       if (sobrepasado && stockDisp !== "—") {
