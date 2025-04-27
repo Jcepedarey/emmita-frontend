@@ -12,7 +12,8 @@ import Swal from "sweetalert2";
 
 const CrearDocumento = () => {
   const location = useLocation();
-  const documento = location.state?.documento;
+  const { documento, tipo, cliente: clientePrecargado } = location.state || {};
+
   const [tipoDocumento, setTipoDocumento] = useState("cotizacion");
   const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
   const [fechaEvento, setFechaEvento] = useState("");
@@ -35,12 +36,26 @@ const CrearDocumento = () => {
   const [modalCrearCliente, setModalCrearCliente] = useState(false);
   const [modalProveedor, setModalProveedor] = useState(false); // ✅ Nuevo estado para proveedores
 
+  // 🛠️ Precargar datos si vienen desde Agenda o Inicio
+  useEffect(() => {
+    if (documento) {
+      setTipoDocumento(documento.tipo || tipo || "cotizacion");
+      setFechaEvento(documento.fecha_evento || "");
+      setClienteSeleccionado(clientePrecargado || documento.cliente || documento.clientes || null);
+      setProductosAgregados(documento.productos || []);
+      setGarantia(documento.garantia || "");
+      setAbonos(documento.abonos || [""]);
+      setPagado(documento.estado === "pagado");
+    }
+  }, [documento, tipo, clientePrecargado]);
+
   useEffect(() => {
     const cargarClientes = async () => {
       const { data } = await supabase
         .from("clientes")
         .select("*")
         .order("nombre", { ascending: true });
+
       if (data) setClientes(data);
     };
     cargarClientes();
