@@ -49,53 +49,50 @@ const CrearDocumento = () => {
   useEffect(() => {
     const calcularStockDisponible = async () => {
       if (!fechaEvento) return;
-
+  
       // 1. Traer productos desde Supabase
       const { data: productosData, error: errorProductos } = await supabase
         .from("productos")
         .select("id, stock");
-
+  
       if (errorProductos) {
         console.error("❌ Error obteniendo productos:", errorProductos);
         return;
       }
-
+  
       // 2. Traer órdenes confirmadas para la misma fecha
-      const { data: ordenes, error: errorOrdenes } = await supabase
+      const { data: ordenesData, error: errorOrdenes } = await supabase
         .from("ordenes_pedido")
         .select("productos, fecha_evento")
         .eq("fecha_evento", fechaEvento);
-
+  
       if (errorOrdenes) {
         console.error("❌ Error obteniendo órdenes:", errorOrdenes);
         return;
       }
-
+  
       // 3. Sumar reservas por producto
       const reservas = {};
-
-      ordenes?.forEach((orden) => {
-        if (Array.isArray(orden.productos)) {
-          orden.productos.forEach((p) => {
-            const id = p.producto_id || p.id;
-            if (!reservas[id]) reservas[id] = 0;
-            reservas[id] += p.cantidad || 0;
-          });
-        }
+      ordenesData?.forEach((orden) => {
+        orden.productos?.forEach((p) => {
+          const id = p.producto_id || p.id;
+          if (!reservas[id]) reservas[id] = 0;
+          reservas[id] += p.cantidad || 0;
+        });
       });
-
+  
       // 4. Calcular disponibilidad
-      const stockFinal = {};
+      const stockCalculado = {};
       productosData.forEach((producto) => {
-        const stockReal = parseInt(producto.stock ?? 0); // ✅ conversión segura
+        const stockReal = parseInt(producto.stock ?? 0);
         const reservado = reservas[producto.id] || 0;
-        stockFinal[producto.id] = stockReal - reservado;
+        stockCalculado[producto.id] = stockReal - reservado;
       });
-
-      console.log("📦 Stock disponible calculado:", stockFinal);
-      setStock(stockFinal);
+  
+      console.log("📦 Stock disponible calculado:", stockCalculado);
+      setStock(stockCalculado);
     };
-
+  
     calcularStockDisponible();
   }, [fechaEvento]);
 
@@ -347,61 +344,64 @@ return (
   </thead>
   <tbody>
   {productosAgregados.map((item, index) => {
-    // Buscar stock disponible usando item.id (no producto_id)
-    const stockDisp = stock?.[item.id] ?? "—";
-    const sobrepasado = stockDisp !== "—" && item.cantidad > stockDisp;
+  // Buscar el stock disponible usando producto_id o id
+  const idProducto = item.producto_id || item.id;
+  const stockDisp = stock?.[idProducto] ?? "—";
+  const sobrepasado = stockDisp !== "—" && item.cantidad > stockDisp;
 
-    if (sobrepasado) {
-      Swal.fire({
-        icon: "info",
-        title: "Stock insuficiente",
-        text: `Solo hay ${stockDisp} unidades disponibles para la fecha seleccionada.`,
-        toast: true,
-        timer: 4000,
-        position: "top-end",
-        showConfirmButton: false,
-      });
-    }
+  if (sobrepasado) {
+    Swal.fire({
+      icon: "info",
+      title: "Stock insuficiente",
+      text: `Solo hay ${stockDisp} unidades disponibles para la fecha seleccionada.`,
+      toast: true,
+      timer: 4000,
+      position: "top-end",
+      showConfirmButton: false,
+    });
+  }
 
-    return (
-      <tr key={index}>
-        <td>
+  return (
+    <tr key={index}>
+      <td>
+        <input
+          type="number"
+          value={item.cantidad}
+          min="1"
+          onChange={(e) => actualizarCantidad(index, e.target.value)}
+          style={{ width: "60px" }}
+          disabled={item.es_grupo}
+        />
+      </td>
+      <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
+        {stockDisp}
+      </td>
+      <td>{item.nombre}</td>
+      <td>
+        {item.es_grupo ? (
+          `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
+        ) : (
           <input
             type="number"
-            value={item.cantidad}
-            min="1"
-            onChange={(e) => actualizarCantidad(index, e.target.value)}
-            style={{ width: "60px" }}
-            disabled={item.es_grupo}
+            value={item.precio}
+            min="0"
+            onChange={(e) => {
+              const nuevos = [...productosAgregados];
+              nuevos[index].precio = parseFloat(e.target.value || 0);
+              nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
+              setProductosAgregados(nuevos);
+            }}
+            style={{ width: "100px" }}
           />
-        </td>
-        <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
-          {stockDisp}
-        </td>
-        <td>{item.nombre}</td>
-        <td>
-          {item.es_grupo ? (
-            `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
-          ) : (
-            <input
-              type="number"
-              value={item.precio}
-              min="0"
-              onChange={(e) => {
-                const nuevos = [...productosAgregados];
-                nuevos[index].precio = parseFloat(e.target.value || 0);
-                nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
-                setProductosAgregados(nuevos);
-              }}
-              style={{ width: "100px" }}
-            />
-          )}
-        </td>
-        <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
-        <td><button onClick={() => eliminarProducto(index)}>🗑️</button></td>
-      </tr>
-    );
-  })}
+        )}
+      </td>
+      <td>${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</td>
+      <td>
+        <button onClick={() => eliminarProducto(index)}>🗑️</button>
+      </td>
+    </tr>
+  );
+})}
 </tbody>
 </table>
 
