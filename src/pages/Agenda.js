@@ -2,120 +2,107 @@
 import React, { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import supabase from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
+import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 
 export default function Agenda() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
+  const [nuevaNota, setNuevaNota] = useState("");
   const [notas, setNotas] = useState([]);
   const [ordenes, setOrdenes] = useState([]);
   const [cotizaciones, setCotizaciones] = useState([]);
-  const [notaEditando, setNotaEditando] = useState(null);
-  const [textoNota, setTextoNota] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    cargarNotas();
-    cargarDocumentos();
+    cargarDatos();
   }, [fechaSeleccionada]);
 
-  const cargarNotas = async () => {
+  const cargarDatos = async () => {
     const fecha = fechaSeleccionada.toISOString().split("T")[0];
-    const { data, error } = await supabase
+
+    const { data: notasData } = await supabase
       .from("agenda")
       .select("*")
       .eq("fecha", fecha)
       .order("created_at", { ascending: true });
 
-    if (!error) setNotas(data);
-  };
-
-  const cargarDocumentos = async () => {
-    const fecha = fechaSeleccionada.toISOString().split("T")[0];
-
-    const { data: pedidos } = await supabase
+    const { data: ordenesData } = await supabase
       .from("ordenes_pedido")
-      .select("id, cliente_id, total, fecha_evento, numero")
+      .select("*")
       .eq("fecha_evento", fecha);
 
-    const { data: cotis } = await supabase
+    const { data: cotizacionesData } = await supabase
       .from("cotizaciones")
-      .select("id, cliente_id, total, fecha_evento, numero")
+      .select("*")
       .eq("fecha_evento", fecha);
 
-    setOrdenes(pedidos || []);
-    setCotizaciones(cotis || []);
+    setNotas(notasData || []);
+    setOrdenes(ordenesData || []);
+    setCotizaciones(cotizacionesData || []);
   };
 
   const guardarNota = async () => {
-    if (!textoNota.trim()) return;
+    if (!nuevaNota.trim()) return;
 
     const fecha = fechaSeleccionada.toISOString().split("T")[0];
 
-    if (notaEditando) {
-      const { error } = await supabase
-        .from("agenda")
-        .update({ descripcion: textoNota })
-        .eq("id", notaEditando);
+    const { error } = await supabase.from("agenda").insert([
+      {
+        titulo: "Nota",
+        descripcion: nuevaNota,
+        fecha,
+        documento: null,
+        tipo: null,
+      },
+    ]);
 
-      if (!error) {
-        setNotaEditando(null);
-        setTextoNota("");
-        cargarNotas();
-      }
+    if (!error) {
+      setNuevaNota("");
+      cargarDatos();
+      Swal.fire("Nota guardada", "", "success");
     } else {
-      const { error } = await supabase.from("agenda").insert([
-        {
-          titulo: "Nota",
-          descripcion: textoNota,
-          fecha,
-          documento_id: null,
-          tipo: null,
-        },
-      ]);
-
-      if (!error) {
-        setTextoNota("");
-        cargarNotas();
-      }
+      console.error("Error al guardar nota:", error);
+      Swal.fire("Error", "No se pudo guardar la nota", "error");
     }
   };
 
-  const editarNota = (nota) => {
-    setNotaEditando(nota.id);
-    setTextoNota(nota.descripcion);
-  };
+  const borrarNota = async (id) => {
+    const { error } = await supabase.from("agenda").delete().eq("id", id);
 
-  const eliminarNota = async (id) => {
-    const confirmacion = await Swal.fire({
-      title: "¿Eliminar nota?",
-      text: "Esta acción no se puede deshacer.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Sí, eliminar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (confirmacion.isConfirmed) {
-      await supabase.from("agenda").delete().eq("id", id);
-      cargarNotas();
+    if (!error) {
+      cargarDatos();
+      Swal.fire("Nota eliminada", "", "success");
+    } else {
+      console.error("Error al borrar nota:", error);
+      Swal.fire("Error", "No se pudo eliminar la nota", "error");
     }
   };
 
-  const irADocumento = (id, tipo) => {
-    navigate("/crear-documento", { state: { documentoId: id, tipo } });
+  const irADocumento = async (tipo, id) => {
+    const tabla = tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+
+    const { data, error } = await supabase
+      .from(tabla)
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (!error && data) {
+      navigate("/crear-documento", { state: { documento: data, tipo } });
+    } else {
+      console.error("Error al cargar documento:", error);
+      Swal.fire("Error", "No se pudo cargar el documento", "error");
+    }
   };
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "1200px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
-        📅 Calendario y Agenda
-      </h2>
+    <div style={{ padding: "1rem", maxWidth: "1000px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>📅 Calendario y Agenda</h2>
 
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
         {/* Calendario */}
-        <div style={{ flex: "1 1 300px" }}>
+        <div style={{ flex: "1" }}>
           <Calendar
             onChange={setFechaSeleccionada}
             value={fechaSeleccionada}
@@ -124,42 +111,31 @@ export default function Agenda() {
         </div>
 
         {/* Notas */}
-        <div style={{ flex: "2 1 500px" }}>
+        <div style={{ flex: "2" }}>
           <textarea
+            value={nuevaNota}
+            onChange={(e) => setNuevaNota(e.target.value)}
             placeholder="Escribe una nota o recordatorio..."
-            value={textoNota}
-            onChange={(e) => setTextoNota(e.target.value)}
             rows={3}
-            style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
+            style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
           />
           <button
             onClick={guardarNota}
-            style={{
-              width: "100%",
-              padding: "10px",
-              backgroundColor: "#2e7d32",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
+            style={{ width: "100%", backgroundColor: "#388e3c", color: "white", padding: "10px", borderRadius: "6px" }}
           >
-            {notaEditando ? "Actualizar Nota" : "Guardar Nota"}
+            Guardar Nota
           </button>
 
-          {/* Listado de notas */}
-          <div style={{ marginTop: "15px", background: "#f3f3f3", padding: "10px", borderRadius: "8px", maxHeight: "200px", overflowY: "auto" }}>
+          <div style={{ backgroundColor: "#f1f1f1", padding: "10px", marginTop: "20px", borderRadius: "6px" }}>
             <h4>📝 Notas</h4>
-            {notas.length === 0 && <p style={{ color: "#999" }}>No hay notas para este día.</p>}
+            {notas.length === 0 && <p>No hay notas para este día.</p>}
             {notas.map((nota) => (
-              <div key={nota.id} style={{ marginBottom: "8px", borderBottom: "1px solid #ccc", paddingBottom: "5px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>{nota.descripcion}</span>
-                  <span>
-                    <button onClick={() => editarNota(nota)} style={{ marginRight: "5px" }}>✏️</button>
-                    <button onClick={() => eliminarNota(nota.id)}>❌</button>
-                  </span>
+              <div key={nota.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", padding: "8px", marginTop: "5px", borderRadius: "4px" }}>
+                <span>{nota.descripcion}</span>
+                <div>
+                  <button onClick={() => borrarNota(nota.id)} style={{ marginLeft: "10px", color: "red", border: "none", background: "none", cursor: "pointer" }}>
+                    ❌
+                  </button>
                 </div>
               </div>
             ))}
@@ -168,25 +144,33 @@ export default function Agenda() {
       </div>
 
       {/* Pedidos y Cotizaciones */}
-      <div style={{ display: "flex", gap: "20px", marginTop: "30px", flexWrap: "wrap" }}>
-        {/* Órdenes de Pedido */}
-        <div style={{ flex: "1 1 400px", background: "#e3f2fd", padding: "15px", borderRadius: "8px", minHeight: "250px", overflowY: "auto" }}>
+      <div style={{ display: "flex", marginTop: "30px", gap: "20px", flexWrap: "wrap" }}>
+        {/* Pedidos */}
+        <div style={{ flex: "1", backgroundColor: "#e3f2fd", padding: "10px", borderRadius: "8px", minHeight: "200px", overflowY: "auto" }}>
           <h4>📦 Órdenes de Pedido</h4>
           {ordenes.length === 0 && <p>No hay pedidos para este día.</p>}
           {ordenes.map((orden) => (
-            <div key={orden.id} style={{ marginBottom: "10px", padding: "8px", background: "#bbdefb", borderRadius: "6px", cursor: "pointer" }} onClick={() => irADocumento(orden.id, "orden")}>
+            <div
+              key={orden.id}
+              onClick={() => irADocumento("orden", orden.id)}
+              style={{ backgroundColor: "#bbdefb", padding: "8px", margin: "5px 0", borderRadius: "6px", cursor: "pointer" }}
+            >
               {orden.numero}
             </div>
           ))}
         </div>
 
         {/* Cotizaciones */}
-        <div style={{ flex: "1 1 400px", background: "#ffebee", padding: "15px", borderRadius: "8px", minHeight: "250px", overflowY: "auto" }}>
-          <h4>🧾 Cotizaciones</h4>
+        <div style={{ flex: "1", backgroundColor: "#ffebee", padding: "10px", borderRadius: "8px", minHeight: "200px", overflowY: "auto" }}>
+          <h4>📄 Cotizaciones</h4>
           {cotizaciones.length === 0 && <p>No hay cotizaciones para este día.</p>}
-          {cotizaciones.map((coti) => (
-            <div key={coti.id} style={{ marginBottom: "10px", padding: "8px", background: "#ffcdd2", borderRadius: "6px", cursor: "pointer" }} onClick={() => irADocumento(coti.id, "cotizacion")}>
-              {coti.numero}
+          {cotizaciones.map((cotizacion) => (
+            <div
+              key={cotizacion.id}
+              onClick={() => irADocumento("cotizacion", cotizacion.id)}
+              style={{ backgroundColor: "#ffcdd2", padding: "8px", margin: "5px 0", borderRadius: "6px", cursor: "pointer" }}
+            >
+              {cotizacion.numero}
             </div>
           ))}
         </div>
