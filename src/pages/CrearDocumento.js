@@ -124,6 +124,7 @@ const CrearDocumento = () => {
 
   const agregarProducto = (producto) => {
     const nuevo = {
+      id: producto.id, // ✅ GUARDAR EL ID AQUÍ
       nombre: producto.nombre,
       cantidad: 1,
       precio: parseFloat(producto.precio),
