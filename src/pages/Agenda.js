@@ -81,19 +81,30 @@ export default function Agenda() {
 
   const irADocumento = async (tipo, id) => {
     const tabla = tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
-
-    const { data, error } = await supabase
+  
+    const { data: documento, error: errorDocumento } = await supabase
       .from(tabla)
       .select("*")
       .eq("id", id)
       .single();
-
-    if (!error && data) {
-      navigate("/crear-documento", { state: { documento: data, tipo } });
-    } else {
-      console.error("Error al cargar documento:", error);
-      Swal.fire("Error", "No se pudo cargar el documento", "error");
+  
+    if (errorDocumento || !documento) {
+      console.error("Error al cargar documento:", errorDocumento);
+      return Swal.fire("Error", "No se pudo cargar el documento", "error");
     }
+  
+    const { data: cliente, error: errorCliente } = await supabase
+      .from("clientes")
+      .select("*")
+      .eq("id", documento.cliente_id)
+      .single();
+  
+    if (errorCliente || !cliente) {
+      console.error("Error al cargar cliente:", errorCliente);
+      return Swal.fire("Error", "No se pudo cargar el cliente", "error");
+    }
+  
+    navigate("/crear-documento", { state: { documento, tipo, cliente } });
   };
 
   return (
