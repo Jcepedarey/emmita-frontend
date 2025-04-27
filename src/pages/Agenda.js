@@ -1,5 +1,5 @@
 // C:\Users\pc\frontend-emmita\src\pages\Agenda.js
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import supabase from "../supabaseClient";
@@ -9,83 +9,113 @@ import Swal from "sweetalert2";
 export default function Agenda() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
   const [notas, setNotas] = useState([]);
-  const [pedidos, setPedidos] = useState([]);
+  const [ordenes, setOrdenes] = useState([]);
   const [cotizaciones, setCotizaciones] = useState([]);
-  const [nuevaNota, setNuevaNota] = useState("");
+  const [notaEditando, setNotaEditando] = useState(null);
+  const [textoNota, setTextoNota] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    cargarNotasYDocumentos();
+    cargarNotas();
+    cargarDocumentos();
   }, [fechaSeleccionada]);
 
-  const cargarNotasYDocumentos = async () => {
+  const cargarNotas = async () => {
     const fecha = fechaSeleccionada.toISOString().split("T")[0];
-
     const { data, error } = await supabase
       .from("agenda")
       .select("*")
       .eq("fecha", fecha)
       .order("created_at", { ascending: true });
 
-    if (error) {
-      console.error("Error al cargar notas:", error);
-      Swal.fire("Error", "No se pudieron cargar las notas", "error");
-    } else {
-      const notasSimples = data.filter((item) => !item.documento);
-      const pedidos = data.filter((item) => item.tipo === "orden");
-      const cotizaciones = data.filter((item) => item.tipo === "cotizacion");
+    if (!error) setNotas(data);
+  };
 
-      setNotas(notasSimples);
-      setPedidos(pedidos);
-      setCotizaciones(cotizaciones);
-    }
+  const cargarDocumentos = async () => {
+    const fecha = fechaSeleccionada.toISOString().split("T")[0];
+
+    const { data: pedidos } = await supabase
+      .from("ordenes_pedido")
+      .select("id, cliente_id, total, fecha_evento, numero")
+      .eq("fecha_evento", fecha);
+
+    const { data: cotis } = await supabase
+      .from("cotizaciones")
+      .select("id, cliente_id, total, fecha_evento, numero")
+      .eq("fecha_evento", fecha);
+
+    setOrdenes(pedidos || []);
+    setCotizaciones(cotis || []);
   };
 
   const guardarNota = async () => {
-    if (!nuevaNota.trim()) return;
+    if (!textoNota.trim()) return;
 
     const fecha = fechaSeleccionada.toISOString().split("T")[0];
 
-    const { error } = await supabase.from("agenda").insert([
-      {
-        titulo: "Nota",
-        descripcion: nuevaNota.trim(),
-        fecha,
-        documento: null,
-        tipo: null,
-      },
-    ]);
+    if (notaEditando) {
+      const { error } = await supabase
+        .from("agenda")
+        .update({ descripcion: textoNota })
+        .eq("id", notaEditando);
 
-    if (error) {
-      console.error("Error al guardar nota:", error);
-      Swal.fire("Error", "No se pudo guardar la nota", "error");
+      if (!error) {
+        setNotaEditando(null);
+        setTextoNota("");
+        cargarNotas();
+      }
     } else {
-      setNuevaNota("");
-      cargarNotasYDocumentos();
-      Swal.fire("Guardado", "Nota guardada exitosamente", "success");
+      const { error } = await supabase.from("agenda").insert([
+        {
+          titulo: "Nota",
+          descripcion: textoNota,
+          fecha,
+          documento_id: null,
+          tipo: null,
+        },
+      ]);
+
+      if (!error) {
+        setTextoNota("");
+        cargarNotas();
+      }
     }
   };
 
-  const irADocumento = async (nota) => {
-    if (!nota.documento || !nota.tipo) return;
+  const editarNota = (nota) => {
+    setNotaEditando(nota.id);
+    setTextoNota(nota.descripcion);
+  };
 
-    const tabla = nota.tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
-    const { data, error } = await supabase
-      .from(tabla)
-      .select("*")
-      .eq("id", nota.documento)
-      .single();
+  const eliminarNota = async (id) => {
+    const confirmacion = await Swal.fire({
+      title: "¿Eliminar nota?",
+      text: "Esta acción no se puede deshacer.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+    });
 
-    if (!error && data) {
-      navigate("/crear-documento", { state: { documento: data, tipo: nota.tipo } });
+    if (confirmacion.isConfirmed) {
+      await supabase.from("agenda").delete().eq("id", id);
+      cargarNotas();
     }
+  };
+
+  const irADocumento = (id, tipo) => {
+    navigate("/crear-documento", { state: { documentoId: id, tipo } });
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "1000px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>📅 Calendario y Agenda</h2>
+    <div style={{ padding: "1rem", maxWidth: "1200px", margin: "auto" }}>
+      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
+        📅 Calendario y Agenda
+      </h2>
+
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-        <div>
+        {/* Calendario */}
+        <div style={{ flex: "1 1 300px" }}>
           <Calendar
             onChange={setFechaSeleccionada}
             value={fechaSeleccionada}
@@ -93,63 +123,72 @@ export default function Agenda() {
           />
         </div>
 
-        <div style={{ flex: 1, minWidth: "300px" }}>
+        {/* Notas */}
+        <div style={{ flex: "2 1 500px" }}>
           <textarea
             placeholder="Escribe una nota o recordatorio..."
-            value={nuevaNota}
-            onChange={(e) => setNuevaNota(e.target.value)}
+            value={textoNota}
+            onChange={(e) => setTextoNota(e.target.value)}
             rows={3}
-            style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
+            style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
           />
           <button
             onClick={guardarNota}
-            style={{ width: "100%", padding: "10px", backgroundColor: "green", color: "white", border: "none", borderRadius: "5px", marginBottom: "20px" }}
+            style={{
+              width: "100%",
+              padding: "10px",
+              backgroundColor: "#2e7d32",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
           >
-            Guardar Nota
+            {notaEditando ? "Actualizar Nota" : "Guardar Nota"}
           </button>
 
-          {notas.length > 0 && (
-            <div style={{ background: "#f9f9f9", padding: "10px", borderRadius: "8px", marginBottom: "20px", maxHeight: "200px", overflowY: "auto" }}>
-              <h4>📝 Notas</h4>
-              {notas.map((nota) => (
-                <div key={nota.id} style={{ borderBottom: "1px solid #ddd", paddingBottom: "5px", marginBottom: "5px" }}>
-                  {nota.descripcion}
+          {/* Listado de notas */}
+          <div style={{ marginTop: "15px", background: "#f3f3f3", padding: "10px", borderRadius: "8px", maxHeight: "200px", overflowY: "auto" }}>
+            <h4>📝 Notas</h4>
+            {notas.length === 0 && <p style={{ color: "#999" }}>No hay notas para este día.</p>}
+            {notas.map((nota) => (
+              <div key={nota.id} style={{ marginBottom: "8px", borderBottom: "1px solid #ccc", paddingBottom: "5px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>{nota.descripcion}</span>
+                  <span>
+                    <button onClick={() => editarNota(nota)} style={{ marginRight: "5px" }}>✏️</button>
+                    <button onClick={() => eliminarNota(nota.id)}>❌</button>
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "20px", marginTop: "20px", flexWrap: "wrap" }}>
-        <div style={{ flex: 1, background: "#e0f7fa", padding: "10px", borderRadius: "10px", minHeight: "150px", overflowY: "auto" }}>
+      {/* Pedidos y Cotizaciones */}
+      <div style={{ display: "flex", gap: "20px", marginTop: "30px", flexWrap: "wrap" }}>
+        {/* Órdenes de Pedido */}
+        <div style={{ flex: "1 1 400px", background: "#e3f2fd", padding: "15px", borderRadius: "8px", minHeight: "250px", overflowY: "auto" }}>
           <h4>📦 Órdenes de Pedido</h4>
-          {pedidos.length > 0 ? (
-            pedidos.map((pedido) => (
-              <div key={pedido.id} style={{ marginBottom: "10px" }}>
-                <strong>{pedido.titulo}</strong><br />
-                {pedido.descripcion}<br />
-                <button onClick={() => irADocumento(pedido)} style={{ marginTop: "5px" }}>Ver pedido</button>
-              </div>
-            ))
-          ) : (
-            <p>No hay pedidos para este día.</p>
-          )}
+          {ordenes.length === 0 && <p>No hay pedidos para este día.</p>}
+          {ordenes.map((orden) => (
+            <div key={orden.id} style={{ marginBottom: "10px", padding: "8px", background: "#bbdefb", borderRadius: "6px", cursor: "pointer" }} onClick={() => irADocumento(orden.id, "orden")}>
+              {orden.numero}
+            </div>
+          ))}
         </div>
 
-        <div style={{ flex: 1, background: "#ffebee", padding: "10px", borderRadius: "10px", minHeight: "150px", overflowY: "auto" }}>
-          <h4>📝 Cotizaciones</h4>
-          {cotizaciones.length > 0 ? (
-            cotizaciones.map((coti) => (
-              <div key={coti.id} style={{ marginBottom: "10px" }}>
-                <strong>{coti.titulo}</strong><br />
-                {coti.descripcion}<br />
-                <button onClick={() => irADocumento(coti)} style={{ marginTop: "5px" }}>Ver cotización</button>
-              </div>
-            ))
-          ) : (
-            <p>No hay cotizaciones para este día.</p>
-          )}
+        {/* Cotizaciones */}
+        <div style={{ flex: "1 1 400px", background: "#ffebee", padding: "15px", borderRadius: "8px", minHeight: "250px", overflowY: "auto" }}>
+          <h4>🧾 Cotizaciones</h4>
+          {cotizaciones.length === 0 && <p>No hay cotizaciones para este día.</p>}
+          {cotizaciones.map((coti) => (
+            <div key={coti.id} style={{ marginBottom: "10px", padding: "8px", background: "#ffcdd2", borderRadius: "6px", cursor: "pointer" }} onClick={() => irADocumento(coti.id, "cotizacion")}>
+              {coti.numero}
+            </div>
+          ))}
         </div>
       </div>
     </div>
