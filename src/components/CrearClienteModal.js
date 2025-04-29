@@ -12,11 +12,23 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
   });
 
   const guardarCliente = async () => {
-    const { nombre, identificacion, telefono } = form;
+    const { nombre, identificacion, telefono, direccion, email } = form;
+
     if (!nombre || !identificacion || !telefono) {
       return Swal.fire("Campos requeridos", "Nombre, identificación y teléfono son obligatorios.", "warning");
     }
 
+    // ✅ Verificar si ya existe un cliente con esa identificación
+    const { data: existentes } = await supabase
+      .from("clientes")
+      .select("id")
+      .eq("identificacion", identificacion);
+
+    if (existentes.length > 0) {
+      return Swal.fire("Ya existe", "Ya hay un cliente con esa identificación.", "warning");
+    }
+
+    // ✅ Obtener códigos actuales para generar uno nuevo
     const { data: clientesExistentes } = await supabase.from("clientes").select("codigo");
     const codigos = clientesExistentes
       .map(c => c.codigo)
@@ -25,16 +37,25 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
       .map(c => parseInt(c.slice(1)));
 
     const siguiente = Math.max(...codigos, 1000) + 1;
+    if (siguiente > 9999) {
+      Swal.fire("Límite alcanzado", "No se pueden generar más códigos de cliente", "error");
+      return;
+    }
+
     const nuevoCodigo = `C${siguiente}`;
 
-    const { data, error } = await supabase.from("clientes").insert([{ ...form, codigo: nuevoCodigo }]).select();
+    // ✅ Insertar nuevo cliente
+    const { data, error } = await supabase
+      .from("clientes")
+      .insert([{ codigo: nuevoCodigo, nombre, identificacion, telefono, direccion, email }])
+      .select();
 
     if (!error && data?.length) {
       Swal.fire("Cliente creado", "El cliente fue guardado correctamente", "success");
-      onClienteCreado(data[0]); // pasa el cliente nuevo al módulo padre
+      onClienteCreado(data[0]); // pasa el cliente nuevo al componente padre
       onClose();
     } else {
-      console.error(error);
+      console.error("Error al guardar:", error);
       Swal.fire("Error", "No se pudo guardar el cliente", "error");
     }
   };
@@ -74,7 +95,9 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
           onChange={(e) => setForm({ ...form, email: e.target.value })}
         />
         <button onClick={guardarCliente}>Guardar</button>
-        <button onClick={onClose} style={{ background: "#f44336", color: "white", marginTop: "10px" }}>Cancelar</button>
+        <button onClick={onClose} style={{ background: "#f44336", color: "white", marginTop: "10px" }}>
+          Cancelar
+        </button>
       </div>
     </div>
   );
