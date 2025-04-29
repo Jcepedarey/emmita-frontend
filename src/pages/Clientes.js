@@ -41,17 +41,29 @@ export default function Clientes() {
 
   const guardarCliente = async () => {
     const { nombre, identificacion, telefono, direccion, email } = form;
-  
     if (!nombre || !identificacion || !telefono) {
       return Swal.fire("Campos requeridos", "Nombre, identificación y teléfono son obligatorios.", "warning");
     }
   
+    // ✅ Verificar si ya existe cliente con esa identificación
+    const { data: existentes, error: errorExistentes } = await supabase
+      .from("clientes")
+      .select("id")
+      .eq("identificacion", identificacion);
+  
+    if (errorExistentes) {
+      console.error("Error buscando duplicados:", errorExistentes);
+      return Swal.fire("Error", "Problema verificando cliente existente.", "error");
+    }
+  
+    if (existentes && existentes.length > 0 && !editando) {
+      return Swal.fire("Ya existe", "Ya hay un cliente con esa identificación.", "warning");
+    }
+  
     if (editando) {
-      const { error } = await supabase
-        .from("clientes")
+      const { error } = await supabase.from("clientes")
         .update({ nombre, identificacion, telefono, direccion, email })
         .eq("id", editando);
-  
       if (!error) {
         Swal.fire("Actualizado", "Cliente actualizado correctamente.", "success");
         setEditando(null);
@@ -59,24 +71,11 @@ export default function Clientes() {
         cargarClientes();
       }
     } else {
-      // ✅ Verificar si ya existe una identificación
-      const { data: existentes } = await supabase
-        .from("clientes")
-        .select("id")
-        .eq("identificacion", identificacion);
-  
-      if (existentes.length > 0) {
-        Swal.fire("Ya existe", "Ya hay un cliente con esa identificación.", "warning");
-        return;
-      }
-  
-      // ✅ Generar nuevo código
       const nuevoCodigo = generarCodigoCliente();
       if (!nuevoCodigo) return;
   
-      const { error } = await supabase.from("clientes").insert([
-        { codigo: nuevoCodigo, nombre, identificacion, telefono, direccion, email }
-      ]);
+      const { error } = await supabase.from("clientes")
+        .insert([{ codigo: nuevoCodigo, nombre, identificacion, telefono, direccion, email }]);
   
       if (!error) {
         Swal.fire("Guardado", "Cliente guardado correctamente.", "success");

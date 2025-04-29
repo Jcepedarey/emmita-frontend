@@ -13,23 +13,30 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
 
   const guardarCliente = async () => {
     const { nombre, identificacion, telefono, direccion, email } = form;
-
     if (!nombre || !identificacion || !telefono) {
       return Swal.fire("Campos requeridos", "Nombre, identificación y teléfono son obligatorios.", "warning");
     }
 
-    // ✅ Verificar si ya existe un cliente con esa identificación
-    const { data: existentes } = await supabase
+    // ✅ Verificar si ya existe cliente con esa identificación
+    const { data: existentes, error: errorExistentes } = await supabase
       .from("clientes")
       .select("id")
       .eq("identificacion", identificacion);
 
-    if (existentes.length > 0) {
+    if (errorExistentes) {
+      console.error("Error buscando duplicados:", errorExistentes);
+      return Swal.fire("Error", "Problema verificando cliente existente.", "error");
+    }
+
+    if (existentes && existentes.length > 0) {
       return Swal.fire("Ya existe", "Ya hay un cliente con esa identificación.", "warning");
     }
 
-    // ✅ Obtener códigos actuales para generar uno nuevo
-    const { data: clientesExistentes } = await supabase.from("clientes").select("codigo");
+    // ✅ Consultar códigos existentes para generar uno nuevo
+    const { data: clientesExistentes } = await supabase
+      .from("clientes")
+      .select("codigo");
+
     const codigos = clientesExistentes
       .map(c => c.codigo)
       .filter(Boolean)
@@ -37,11 +44,6 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
       .map(c => parseInt(c.slice(1)));
 
     const siguiente = Math.max(...codigos, 1000) + 1;
-    if (siguiente > 9999) {
-      Swal.fire("Límite alcanzado", "No se pueden generar más códigos de cliente", "error");
-      return;
-    }
-
     const nuevoCodigo = `C${siguiente}`;
 
     // ✅ Insertar nuevo cliente
@@ -52,7 +54,7 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
 
     if (!error && data?.length) {
       Swal.fire("Cliente creado", "El cliente fue guardado correctamente", "success");
-      onClienteCreado(data[0]); // pasa el cliente nuevo al componente padre
+      onClienteCreado(data[0]);
       onClose();
     } else {
       console.error("Error al guardar:", error);
