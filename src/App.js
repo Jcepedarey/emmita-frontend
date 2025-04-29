@@ -16,10 +16,13 @@ import CotizacionesGuardadas from "./pages/CotizacionesGuardadas";
 import OrdenesGuardadas from "./pages/OrdenesGuardadas";
 import Exportar from "./pages/Exportar";
 
+// Cargados dinámicamente
 const Inventario = React.lazy(() => import("./pages/Inventario"));
 const Reportes = React.lazy(() => import("./pages/Reportes"));
 const Agenda = React.lazy(() => import("./pages/Agenda"));
 const Usuarios = React.lazy(() => import("./pages/Usuarios"));
+const Recepcion = React.lazy(() => import("./pages/Recepcion"));
+const Contabilidad = React.lazy(() => import("./pages/Contabilidad"));
 
 function App() {
   return (
@@ -35,11 +38,12 @@ function App() {
               <Route path="/inicio" element={<Inicio />} />
               <Route path="/crear-documento" element={<CrearDocumento />} />
               <Route path="/clientes" element={<Clientes />} />
-              <Route path="/buscar" element={<BuscarDocumento />} />
+              <Route path="/buscar-documento" element={<BuscarDocumento />} />
               <Route path="/cotizacionesguardadas" element={<CotizacionesGuardadas />} />
               <Route path="/ordenesguardadas" element={<OrdenesGuardadas />} />
               <Route path="/trazabilidad" element={<Trazabilidad />} />
               <Route path="/proveedores" element={<Proveedores />} />
+              <Route path="/agenda" element={<Agenda />} />
               <Route
                 path="/inventario"
                 element={
@@ -65,6 +69,22 @@ function App() {
                 }
               />
               <Route
+                path="/recepcion"
+                element={
+                  <ProtegidoPorRol rolRequerido="admin">
+                    <Recepcion />
+                  </ProtegidoPorRol>
+                }
+              />
+              <Route
+                path="/contabilidad"
+                element={
+                  <ProtegidoPorRol rolRequerido="admin">
+                    <Contabilidad />
+                  </ProtegidoPorRol>
+                }
+              />
+              <Route
                 path="/exportar"
                 element={
                   <ProtegidoPorRol rolRequerido="admin">
@@ -72,7 +92,6 @@ function App() {
                   </ProtegidoPorRol>
                 }
               />
-              <Route path="/agenda" element={<Agenda />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </Suspense>
