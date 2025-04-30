@@ -1,4 +1,4 @@
-// src/pages/Recepcion.js
+/ src/pages/Recepcion.js
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
@@ -12,15 +12,21 @@ const Recepcion = () => {
   const [orden, setOrden] = useState(null);
   const [productosRevisados, setProductosRevisados] = useState([]);
   const [comentarioGeneral, setComentarioGeneral] = useState("");
-  const [usuario, setUsuario] = useState(null);
+  const [usuario, setUsuario] = useState({ nombre: "Administrador" });
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("usuario"));
-    setUsuario(user || { nombre: "Administrador" });
+    if (user) setUsuario(user);
   }, []);
+
   useEffect(() => {
+    console.log("📦 ordenId recibido:", ordenId);
+
     const cargarOrden = async () => {
-      if (!ordenId) return;
+      if (!ordenId) {
+        console.warn("⚠️ No se recibió ordenId.");
+        return;
+      }
 
       const { data, error } = await supabase
         .from("ordenes_pedido")
@@ -28,17 +34,21 @@ const Recepcion = () => {
         .eq("id", ordenId)
         .single();
 
-      if (error) {
-        console.error("❌ Error al cargar orden:", error);
-        return Swal.fire("Error", "No se pudo cargar la orden", "error");
+      if (error || !data) {
+        console.error("❌ Error cargando orden:", error);
+        Swal.fire("Error", "No se pudo cargar la orden", "error");
+        return navigate("/inicio");
       }
 
+      console.log("✅ Orden cargada:", data);
+
       const productosDesglosados = [];
+
       data.productos.forEach((p) => {
-        if (p.es_grupo && p.productos?.length > 0) {
+        if (p.es_grupo && Array.isArray(p.productos)) {
           p.productos.forEach((sub) => {
             productosDesglosados.push({
-              descripcion: sub.nombre,
+              nombre: sub.nombre,
               esperado: sub.cantidad,
               recibido: sub.cantidad,
               observacion: ""
@@ -46,7 +56,7 @@ const Recepcion = () => {
           });
         } else {
           productosDesglosados.push({
-            descripcion: p.nombre,
+            nombre: p.nombre,
             esperado: p.cantidad,
             recibido: p.cantidad,
             observacion: ""
@@ -59,7 +69,8 @@ const Recepcion = () => {
     };
 
     cargarOrden();
-  }, [ordenId]);
+  }, [ordenId, navigate]);
+
   const actualizarCampo = (index, campo, valor) => {
     const copia = [...productosRevisados];
     copia[index][campo] = campo === "recibido" ? parseInt(valor) : valor;
@@ -70,28 +81,32 @@ const Recepcion = () => {
     if (!orden) return;
 
     try {
-      // 1. Descontar productos que no llegaron
       for (const item of productosRevisados) {
         const diferencia = item.esperado - item.recibido;
         if (diferencia > 0) {
-          // Buscar el ID real del producto en la orden original
-          const original = orden.productos.find(p => p.nombre === item.descripcion);
-          if (original?.id) {
+          const original = orden.productos.find(p => {
+            if (p.es_grupo && Array.isArray(p.productos)) {
+              return p.productos.some(sub => sub.nombre === item.nombre);
+            }
+            return p.nombre === item.nombre;
+          });
+
+          const productoId = original?.id || (original?.productos?.find(sub => sub.nombre === item.nombre)?.id);
+
+          if (productoId) {
             await supabase.rpc("descontar_stock", {
-              producto_id: original.id,
+              producto_id: productoId,
               cantidad: diferencia
             });
           }
         }
       }
 
-      // 2. Marcar orden como revisada
       await supabase
         .from("ordenes_pedido")
         .update({ revisada: true })
         .eq("id", orden.id);
 
-      // 3. Confirmación
       Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
       navigate("/inicio");
     } catch (error) {
@@ -99,6 +114,7 @@ const Recepcion = () => {
       Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
     }
   };
+
   return (
     <div style={{ padding: "2rem", maxWidth: "900px", margin: "auto" }}>
       <h2>📦 Revisión de Orden</h2>
@@ -115,13 +131,13 @@ const Recepcion = () => {
                 <th style={{ borderBottom: "1px solid #ccc" }}>Artículo</th>
                 <th style={{ borderBottom: "1px solid #ccc" }}>Esperado</th>
                 <th style={{ borderBottom: "1px solid #ccc" }}>Recibido</th>
-                <th style={{ borderBottom: "1px solid #ccc" }}>Comentarios</th>
+                <th style={{ borderBottom: "1px solid #ccc" }}>Observación</th>
               </tr>
             </thead>
             <tbody>
               {productosRevisados.map((item, index) => (
                 <tr key={index}>
-                  <td>{item.descripcion}</td>
+                  <td>{item.nombre}</td>
                   <td>{item.esperado}</td>
                   <td>
                     <input
@@ -135,8 +151,8 @@ const Recepcion = () => {
                   <td>
                     <input
                       type="text"
-                      value={item.comentarios}
-                      onChange={(e) => actualizarCampo(index, "comentarios", e.target.value)}
+                      value={item.observacion}
+                      onChange={(e) => actualizarCampo(index, "observacion", e.target.value)}
                       placeholder="Opcional"
                       style={{ width: "100%" }}
                     />
@@ -146,26 +162,38 @@ const Recepcion = () => {
             </tbody>
           </table>
 
-          <button
-            onClick={guardarRevision}
-            style={{
-              marginTop: "20px",
-              padding: "10px 20px",
-              backgroundColor: "#2c7a7b",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer"
-            }}
-          >
-            💾 Guardar revisión
-          </button>
+          <div style={{ marginTop: "20px" }}>
+            <label>Comentario general (opcional):</label>
+            <textarea
+              value={comentarioGeneral}
+              onChange={(e) => setComentarioGeneral(e.target.value)}
+              style={{ width: "100%", height: "80px", marginTop: "5px" }}
+            />
+          </div>
+
+          <div style={{ marginTop: "20px", display: "flex", gap: "1rem" }}>
+            <button
+              onClick={guardarRevision}
+              style={{ padding: "10px 20px", backgroundColor: "#38a169", color: "white", border: "none", borderRadius: "5px" }}
+            >
+              💾 Guardar revisión
+            </button>
+
+            <button
+              onClick={() =>
+                generarPDFRecepcion(orden, productosRevisados, usuario.nombre, comentarioGeneral)
+              }
+              style={{ padding: "10px 20px", backgroundColor: "#4a5568", color: "white", border: "none", borderRadius: "5px" }}
+            >
+              🧾 Descargar PDF
+            </button>
+          </div>
         </>
       ) : (
         <p style={{ marginTop: "1rem" }}>🔄 Cargando orden...</p>
       )}
     </div>
   );
-}
+};
 
 export default Recepcion;
