@@ -176,10 +176,7 @@ const Inicio = () => {
     imagen={`${process.env.PUBLIC_URL}/icons/trazabilidad.png`}
     onClick={() => navigate("/trazabilidad")}
   />
-
-  {usuario?.rol === "admin" && (
-    <>
-      <BotonModulo
+  <BotonModulo
         titulo="Usuarios"
         imagen={`${process.env.PUBLIC_URL}/icons/usuario.png`}
         onClick={() => navigate("/usuarios")}
@@ -194,6 +191,8 @@ const Inicio = () => {
         imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
         onClick={() => navigate("/contabilidad")}
       />
+  {usuario?.rol === "admin" && (
+    <>   
     </>
   )}
 </div>
