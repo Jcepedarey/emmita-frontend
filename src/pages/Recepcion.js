@@ -1,4 +1,4 @@
-/ src/pages/Recepcion.js
+// src/pages/Recepcion.js
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
