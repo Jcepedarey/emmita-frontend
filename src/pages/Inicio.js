@@ -141,7 +141,7 @@ const Inicio = () => {
     imagen={`${process.env.PUBLIC_URL}/icons/contrato.png`}
     onClick={() => navigate("/crear-documento")}
   />
-  <BotonModulox
+  <BotonModulo
     titulo="Clientes"
     imagen={`${process.env.PUBLIC_URL}/icons/buscar_cliente.png`}
     onClick={() => navigate("/clientes")}
