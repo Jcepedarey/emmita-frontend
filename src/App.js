@@ -1,4 +1,4 @@
-// src/App.js
+// src/App.js 
 import React, { Suspense } from "react";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import { CssBaseline, CircularProgress, Container } from "@mui/material";
@@ -6,6 +6,7 @@ import Navbar from "./components/Navbar";
 import ProtegidoPorRol from "./components/ProtegidoPorRol";
 import Navegacion from "./components/Navegacion";
 
+// 📦 Páginas principales
 import Login from "./pages/Login";
 import Inicio from "./pages/Inicio";
 import CrearDocumento from "./pages/CrearDocumento";
@@ -16,13 +17,14 @@ import Proveedores from "./pages/Proveedores";
 import CotizacionesGuardadas from "./pages/CotizacionesGuardadas";
 import OrdenesGuardadas from "./pages/OrdenesGuardadas";
 import Exportar from "./pages/Exportar";
-import Recepcion from "./pages/Recepcion";       // ✅ AÑADIDO
-import Contabilidad from "./pages/Contabilidad"; // ✅ AÑADIDO
+import Recepcion from "./pages/Recepcion";
+import Contabilidad from "./pages/Contabilidad";
 
-const Inventario = React.lazy(() => import("./pages/Inventario"));
-const Reportes = React.lazy(() => import("./pages/Reportes"));
-const Agenda = React.lazy(() => import("./pages/Agenda"));
-const Usuarios = React.lazy(() => import("./pages/Usuarios"));
+// 📦 Rutas con carga diferida
+import Inventario from "./pages/Inventario";
+import Reportes from "./pages/Reportes";
+import Agenda from "./pages/Agenda";
+import Usuarios from "./pages/Usuarios";
 
 function App() {
   return (
@@ -44,40 +46,12 @@ function App() {
               <Route path="/trazabilidad" element={<Trazabilidad />} />
               <Route path="/proveedores" element={<Proveedores />} />
               <Route path="/agenda" element={<Agenda />} />
-              <Route path="/recepcion" element={<Recepcion />} />             {/* ✅ NUEVA RUTA */}
-              <Route path="/contabilidad" element={<Contabilidad />} />       {/* ✅ NUEVA RUTA */}
-              <Route
-                path="/inventario"
-                element={
-                  <ProtegidoPorRol rolRequerido="admin">
-                    <Inventario />
-                  </ProtegidoPorRol>
-                }
-              />
-              <Route
-                path="/reportes"
-                element={
-                  <ProtegidoPorRol rolRequerido="admin">
-                    <Reportes />
-                  </ProtegidoPorRol>
-                }
-              />
-              <Route
-                path="/usuarios"
-                element={
-                  <ProtegidoPorRol rolRequerido="admin">
-                    <Usuarios />
-                  </ProtegidoPorRol>
-                }
-              />
-              <Route
-                path="/exportar"
-                element={
-                  <ProtegidoPorRol rolRequerido="admin">
-                    <Exportar />
-                  </ProtegidoPorRol>
-                }
-              />
+              <Route path="/recepcion" element={<Recepcion />} />
+              <Route path="/contabilidad" element={<Contabilidad />} />
+              <Route path="/inventario" element={<ProtegidoPorRol rolRequerido="admin"><Inventario /></ProtegidoPorRol>} />
+              <Route path="/reportes" element={<ProtegidoPorRol rolRequerido="admin"><Reportes /></ProtegidoPorRol>} />
+              <Route path="/usuarios" element={<ProtegidoPorRol rolRequerido="admin"><Usuarios /></ProtegidoPorRol>} />
+              <Route path="/exportar" element={<ProtegidoPorRol rolRequerido="admin"><Exportar /></ProtegidoPorRol>} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </Suspense>
