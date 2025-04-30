@@ -1,15 +1,12 @@
 // src/pages/Recepcion.js
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { generarPDFRecepcion } from "../utils/generarPDFRecepcion";
 
 const Recepcion = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const ordenId = location.state?.ordenId;
-  const [orden, setOrden] = useState(null);
+  const [ordenes, setOrdenes] = useState([]);
+  const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
   const [productosRevisados, setProductosRevisados] = useState([]);
   const [comentarioGeneral, setComentarioGeneral] = useState("");
   const [usuario, setUsuario] = useState({ nombre: "Administrador" });
@@ -20,56 +17,54 @@ const Recepcion = () => {
   }, []);
 
   useEffect(() => {
-    console.log("📦 ordenId recibido:", ordenId);
-
-    const cargarOrden = async () => {
-      if (!ordenId) {
-        console.warn("⚠️ No se recibió ordenId.");
-        return;
-      }
-
+    const cargarOrdenes = async () => {
+      const hoy = new Date().toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("ordenes_pedido")
         .select("*, clientes(*)")
-        .eq("id", ordenId)
-        .single();
+        .eq("revisada", false)
+        .lt("fecha_evento", hoy)
+        .order("fecha_evento", { ascending: true });
 
-      if (error || !data) {
-        console.error("❌ Error cargando orden:", error);
-        Swal.fire("Error", "No se pudo cargar la orden", "error");
-        return navigate("/inicio");
+      if (error) {
+        console.error("❌ Error cargando órdenes:", error);
+        return;
       }
 
-      console.log("✅ Orden cargada:", data);
-
-      const productosDesglosados = [];
-
-      data.productos.forEach((p) => {
-        if (p.es_grupo && Array.isArray(p.productos)) {
-          p.productos.forEach((sub) => {
-            productosDesglosados.push({
-              nombre: sub.nombre,
-              esperado: sub.cantidad,
-              recibido: sub.cantidad,
-              observacion: ""
-            });
-          });
-        } else {
-          productosDesglosados.push({
-            nombre: p.nombre,
-            esperado: p.cantidad,
-            recibido: p.cantidad,
-            observacion: ""
-          });
-        }
-      });
-
-      setOrden(data);
-      setProductosRevisados(productosDesglosados);
+      setOrdenes(data);
     };
 
-    cargarOrden();
-  }, [ordenId, navigate]);
+    cargarOrdenes();
+  }, []);
+
+  const seleccionarOrden = (orden) => {
+    setOrdenSeleccionada(orden);
+    const productosConCampo = [];
+
+    orden.productos.forEach((p) => {
+      if (p.es_grupo && Array.isArray(p.productos)) {
+        p.productos.forEach((sub) => {
+          productosConCampo.push({
+            nombre: sub.nombre,
+            esperado: sub.cantidad,
+            recibido: sub.cantidad,
+            observacion: "",
+            producto_id: sub.id,
+          });
+        });
+      } else {
+        productosConCampo.push({
+          nombre: p.nombre,
+          esperado: p.cantidad,
+          recibido: p.cantidad,
+          observacion: "",
+          producto_id: p.id,
+        });
+      }
+    });
+
+    setProductosRevisados(productosConCampo);
+  };
 
   const actualizarCampo = (index, campo, valor) => {
     const copia = [...productosRevisados];
@@ -78,83 +73,97 @@ const Recepcion = () => {
   };
 
   const guardarRevision = async () => {
-    if (!orden) return;
+    if (!ordenSeleccionada) return;
 
-    try {
-      for (const item of productosRevisados) {
-        const diferencia = item.esperado - item.recibido;
-        if (diferencia > 0) {
-          const original = orden.productos.find(p => {
-            if (p.es_grupo && Array.isArray(p.productos)) {
-              return p.productos.some(sub => sub.nombre === item.nombre);
-            }
-            return p.nombre === item.nombre;
-          });
+    const fechaRevision = new Date().toISOString();
 
-          const productoId = original?.id || (original?.productos?.find(sub => sub.nombre === item.nombre)?.id);
+    for (const item of productosRevisados) {
+      const diferencia = item.esperado - item.recibido;
 
-          if (productoId) {
-            await supabase.rpc("descontar_stock", {
-              producto_id: productoId,
-              cantidad: diferencia
-            });
-          }
-        }
+      if (diferencia > 0 && item.producto_id) {
+        await supabase.from("inventario").insert([
+          {
+            producto_id: item.producto_id,
+            cantidad: diferencia,
+            tipo_movimiento: "salida",
+            observaciones: `Faltante tras recepción de orden ${ordenSeleccionada.numero}`,
+            fecha: fechaRevision,
+          },
+        ]);
       }
-
-      await supabase
-        .from("ordenes_pedido")
-        .update({ revisada: true })
-        .eq("id", orden.id);
-
-      Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
-      navigate("/inicio");
-    } catch (error) {
-      console.error("❌ Error al guardar revisión:", error);
-      Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
     }
+
+    const { error: errorActualizar } = await supabase
+      .from("ordenes_pedido")
+      .update({ revisada: true, fecha_revision: fechaRevision })
+      .eq("id", ordenSeleccionada.id);
+
+    if (errorActualizar) {
+      return Swal.fire("Error", "No se pudo guardar la revisión", "error");
+    }
+
+    Swal.fire("✅ Revisión guardada", "La orden fue registrada correctamente", "success");
+    setOrdenSeleccionada(null);
+    setProductosRevisados([]);
+    setComentarioGeneral("");
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "900px", margin: "auto" }}>
-      <h2>📦 Revisión de Orden</h2>
+    <div className="p-4">
+      <h2 className="text-xl font-semibold mb-4">📦 Recepción de pedidos</h2>
 
-      {orden ? (
-        <>
-          <p><strong>Número de orden:</strong> {orden.numero}</p>
-          <p><strong>Cliente:</strong> {orden.clientes?.nombre}</p>
-          <p><strong>Fecha del evento:</strong> {new Date(orden.fecha_evento).toLocaleDateString()}</p>
+      {!ordenSeleccionada ? (
+        <div>
+          <p>Selecciona una orden para revisar:</p>
+          <ul className="mt-2">
+            {ordenes.map((orden) => (
+              <li key={orden.id} className="mb-2">
+                <button
+                  onClick={() => seleccionarOrden(orden)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded"
+                >
+                  Revisar {orden.numero}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="bg-white p-4 rounded shadow mt-4">
+          <h3 className="text-lg font-semibold mb-3">
+            Revisando: {ordenSeleccionada.numero}
+          </h3>
 
-          <table style={{ width: "100%", marginTop: "20px", borderCollapse: "collapse" }}>
+          <table className="w-full mb-4 border">
             <thead>
               <tr>
-                <th style={{ borderBottom: "1px solid #ccc" }}>Artículo</th>
-                <th style={{ borderBottom: "1px solid #ccc" }}>Esperado</th>
-                <th style={{ borderBottom: "1px solid #ccc" }}>Recibido</th>
-                <th style={{ borderBottom: "1px solid #ccc" }}>Observación</th>
+                <th className="border px-2 py-1">Descripción</th>
+                <th className="border px-2 py-1">Esperado</th>
+                <th className="border px-2 py-1">Recibido</th>
+                <th className="border px-2 py-1">Observación</th>
               </tr>
             </thead>
             <tbody>
               {productosRevisados.map((item, index) => (
                 <tr key={index}>
-                  <td>{item.nombre}</td>
-                  <td>{item.esperado}</td>
-                  <td>
+                  <td className="border px-2 py-1">{item.nombre}</td>
+                  <td className="border px-2 py-1 text-center">{item.esperado}</td>
+                  <td className="border px-2 py-1 text-center">
                     <input
                       type="number"
-                      min="0"
                       value={item.recibido}
+                      min="0"
                       onChange={(e) => actualizarCampo(index, "recibido", e.target.value)}
-                      style={{ width: "60px" }}
+                      className="w-16 text-center"
                     />
                   </td>
-                  <td>
+                  <td className="border px-2 py-1">
                     <input
                       type="text"
+                      placeholder="Opcional"
                       value={item.observacion}
                       onChange={(e) => actualizarCampo(index, "observacion", e.target.value)}
-                      placeholder="Opcional"
-                      style={{ width: "100%" }}
+                      className="w-full"
                     />
                   </td>
                 </tr>
@@ -162,35 +171,30 @@ const Recepcion = () => {
             </tbody>
           </table>
 
-          <div style={{ marginTop: "20px" }}>
-            <label>Comentario general (opcional):</label>
-            <textarea
-              value={comentarioGeneral}
-              onChange={(e) => setComentarioGeneral(e.target.value)}
-              style={{ width: "100%", height: "80px", marginTop: "5px" }}
-            />
-          </div>
+          <label>Comentario general (opcional):</label>
+          <textarea
+            className="w-full mb-2 p-2 border rounded"
+            rows={3}
+            value={comentarioGeneral}
+            onChange={(e) => setComentarioGeneral(e.target.value)}
+          />
 
-          <div style={{ marginTop: "20px", display: "flex", gap: "1rem" }}>
+          <div className="flex gap-3">
             <button
               onClick={guardarRevision}
-              style={{ padding: "10px 20px", backgroundColor: "#38a169", color: "white", border: "none", borderRadius: "5px" }}
+              className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded"
             >
-              💾 Guardar revisión
+              💾 Guardar Revisión
             </button>
 
             <button
-              onClick={() =>
-                generarPDFRecepcion(orden, productosRevisados, usuario.nombre, comentarioGeneral)
-              }
-              style={{ padding: "10px 20px", backgroundColor: "#4a5568", color: "white", border: "none", borderRadius: "5px" }}
+              onClick={() => generarPDFRecepcion(ordenSeleccionada, productosRevisados, usuario.nombre, comentarioGeneral)}
+              className="bg-gray-700 hover:bg-gray-800 text-white py-2 px-4 rounded"
             >
               🧾 Descargar PDF
             </button>
           </div>
-        </>
-      ) : (
-        <p style={{ marginTop: "1rem" }}>🔄 Cargando orden...</p>
+        </div>
       )}
     </div>
   );
