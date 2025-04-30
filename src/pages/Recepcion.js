@@ -1,161 +1,144 @@
 // src/pages/Recepcion.js
 import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
+import { generarPDFRecepcion } from "../utils/generarPDFRecepcion";
 
-export default function Recepcion() {
-  const [ordenes, setOrdenes] = useState([]);
-  const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
+const Recepcion = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const ordenId = location.state?.ordenId;
+  const [orden, setOrden] = useState(null);
   const [productosRevisados, setProductosRevisados] = useState([]);
   const [comentarioGeneral, setComentarioGeneral] = useState("");
+  const [usuario, setUsuario] = useState(null);
 
   useEffect(() => {
-    const cargarOrdenesPendientes = async () => {
-      const hoy = new Date().toISOString().split("T")[0];
+    const user = JSON.parse(localStorage.getItem("usuario"));
+    setUsuario(user || { nombre: "Administrador" });
+  }, []);
+  useEffect(() => {
+    const cargarOrden = async () => {
+      if (!ordenId) return;
+
       const { data, error } = await supabase
         .from("ordenes_pedido")
         .select("*, clientes(*)")
-        .eq("revisada", false)
-        .lt("fecha_evento", hoy)
-        .order("fecha_evento", { ascending: true });
+        .eq("id", ordenId)
+        .single();
 
       if (error) {
-        console.error("❌ Error cargando órdenes:", error);
-      } else {
-        setOrdenes(data);
+        console.error("❌ Error al cargar orden:", error);
+        return Swal.fire("Error", "No se pudo cargar la orden", "error");
       }
+
+      const productosDesglosados = [];
+      data.productos.forEach((p) => {
+        if (p.es_grupo && p.productos?.length > 0) {
+          p.productos.forEach((sub) => {
+            productosDesglosados.push({
+              descripcion: sub.nombre,
+              esperado: sub.cantidad,
+              recibido: sub.cantidad,
+              observacion: ""
+            });
+          });
+        } else {
+          productosDesglosados.push({
+            descripcion: p.nombre,
+            esperado: p.cantidad,
+            recibido: p.cantidad,
+            observacion: ""
+          });
+        }
+      });
+
+      setOrden(data);
+      setProductosRevisados(productosDesglosados);
     };
 
-    cargarOrdenesPendientes();
-  }, []);
-  const seleccionarOrden = (orden) => {
-    setOrdenSeleccionada(orden);
-    // Copia los productos y agrega campo 'recibido'
-    const productosConCampo = orden.productos.map((prod) => ({
-      ...prod,
-      recibido: prod.cantidad, // valor inicial igual al esperado
-      observacion: "",
-    }));
-    setProductosRevisados(productosConCampo);
+    cargarOrden();
+  }, [ordenId]);
+  const actualizarCampo = (index, campo, valor) => {
+    const copia = [...productosRevisados];
+    copia[index][campo] = campo === "recibido" ? parseInt(valor) : valor;
+    setProductosRevisados(copia);
   };
 
-  const actualizarCantidad = (index, nuevaCantidad) => {
-    const nuevos = [...productosRevisados];
-    nuevos[index].recibido = parseInt(nuevaCantidad) || 0;
-    setProductosRevisados(nuevos);
-  };
-
-  const actualizarObservacion = (index, texto) => {
-    const nuevos = [...productosRevisados];
-    nuevos[index].observacion = texto;
-    setProductosRevisados(nuevos);
-  };
   const guardarRevision = async () => {
-    if (!ordenSeleccionada) return;
+    if (!orden) return;
 
-    const fechaRevision = new Date().toISOString();
-
-    // 1️⃣ Actualizar la orden como revisada
-    const { error: errorActualizar } = await supabase
-      .from("ordenes_pedido")
-      .update({
-        revisada: true,
-        fecha_revision: fechaRevision,
-        comentarios: comentarioGeneral,
-        productos: productosRevisados
-      })
-      .eq("id", ordenSeleccionada.id);
-
-    if (errorActualizar) {
-      return Swal.fire("Error", "No se pudo guardar la revisión", "error");
-    }
-
-    // 2️⃣ Ajustar inventario por productos incompletos
-    for (const prod of productosRevisados) {
-      const diferencia = prod.cantidad - prod.recibido;
-
-      if (diferencia > 0) {
-        await supabase.from("inventario").insert([
-          {
-            producto_id: prod.producto_id || prod.id,
-            cantidad: diferencia,
-            tipo_movimiento: "salida",
-            observaciones: `Faltante tras recepción de orden ${ordenSeleccionada.numero}`,
-            fecha: fechaRevision
+    try {
+      // 1. Descontar productos que no llegaron
+      for (const item of productosRevisados) {
+        const diferencia = item.esperado - item.recibido;
+        if (diferencia > 0) {
+          // Buscar el ID real del producto en la orden original
+          const original = orden.productos.find(p => p.nombre === item.descripcion);
+          if (original?.id) {
+            await supabase.rpc("descontar_stock", {
+              producto_id: original.id,
+              cantidad: diferencia
+            });
           }
-        ]);
+        }
       }
+
+      // 2. Marcar orden como revisada
+      await supabase
+        .from("ordenes_pedido")
+        .update({ revisada: true })
+        .eq("id", orden.id);
+
+      // 3. Confirmación
+      Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
+      navigate("/inicio");
+    } catch (error) {
+      console.error("❌ Error al guardar revisión:", error);
+      Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
     }
-
-    Swal.fire("✅ Revisión guardada", "La orden fue registrada correctamente", "success");
-    setOrdenSeleccionada(null);
-    setProductosRevisados([]);
-    setComentarioGeneral("");
   };
-
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-semibold mb-4">📦 Recepción de pedidos</h2>
+    <div style={{ padding: "2rem", maxWidth: "900px", margin: "auto" }}>
+      <h2>📦 Revisión de Orden</h2>
 
-      {!ordenSeleccionada ? (
-        <div>
-          <p>Selecciona una orden para revisar:</p>
-          <ul className="mt-2">
-            {ordenes.map((orden) => (
-              <li key={orden.id} className="mb-2">
-                <button
-                  onClick={() => {
-                    setOrdenSeleccionada(orden);
-                    setProductosRevisados(orden.productos.map(p => ({
-                      ...p,
-                      recibido: p.cantidad,
-                      observacion: ""
-                    })));
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded"
-                >
-                  Revisar {orden.numero}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <div className="bg-white p-4 rounded shadow mt-4">
-          <h3 className="text-lg font-semibold mb-3">
-            Revisando: {ordenSeleccionada.numero}
-          </h3>
+      {orden ? (
+        <>
+          <p><strong>Número de orden:</strong> {orden.numero}</p>
+          <p><strong>Cliente:</strong> {orden.clientes?.nombre}</p>
+          <p><strong>Fecha del evento:</strong> {new Date(orden.fecha_evento).toLocaleDateString()}</p>
 
-          <table className="w-full mb-4 border">
+          <table style={{ width: "100%", marginTop: "20px", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th className="border px-2 py-1">Descripción</th>
-                <th className="border px-2 py-1">Esperado</th>
-                <th className="border px-2 py-1">Recibido</th>
-                <th className="border px-2 py-1">Observación</th>
+                <th style={{ borderBottom: "1px solid #ccc" }}>Artículo</th>
+                <th style={{ borderBottom: "1px solid #ccc" }}>Esperado</th>
+                <th style={{ borderBottom: "1px solid #ccc" }}>Recibido</th>
+                <th style={{ borderBottom: "1px solid #ccc" }}>Comentarios</th>
               </tr>
             </thead>
             <tbody>
               {productosRevisados.map((item, index) => (
                 <tr key={index}>
-                  <td className="border px-2 py-1">{item.nombre}</td>
-                  <td className="border px-2 py-1 text-center">{item.cantidad}</td>
-                  <td className="border px-2 py-1 text-center">
+                  <td>{item.descripcion}</td>
+                  <td>{item.esperado}</td>
+                  <td>
                     <input
                       type="number"
-                      value={item.recibido}
                       min="0"
-                      onChange={(e) => actualizarCantidad(index, e.target.value)}
-                      className="w-16 text-center"
+                      value={item.recibido}
+                      onChange={(e) => actualizarCampo(index, "recibido", e.target.value)}
+                      style={{ width: "60px" }}
                     />
                   </td>
-                  <td className="border px-2 py-1">
+                  <td>
                     <input
                       type="text"
+                      value={item.comentarios}
+                      onChange={(e) => actualizarCampo(index, "comentarios", e.target.value)}
                       placeholder="Opcional"
-                      value={item.observacion}
-                      onChange={(e) => actualizarObservacion(index, e.target.value)}
-                      className="w-full"
+                      style={{ width: "100%" }}
                     />
                   </td>
                 </tr>
@@ -163,22 +146,26 @@ export default function Recepcion() {
             </tbody>
           </table>
 
-          <label>Comentario general (opcional):</label>
-          <textarea
-            className="w-full mb-2 p-2 border rounded"
-            rows={3}
-            value={comentarioGeneral}
-            onChange={(e) => setComentarioGeneral(e.target.value)}
-          />
-
           <button
             onClick={guardarRevision}
-            className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded"
+            style={{
+              marginTop: "20px",
+              padding: "10px 20px",
+              backgroundColor: "#2c7a7b",
+              color: "white",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer"
+            }}
           >
-            Guardar Revisión
+            💾 Guardar revisión
           </button>
-        </div>
+        </>
+      ) : (
+        <p style={{ marginTop: "1rem" }}>🔄 Cargando orden...</p>
       )}
     </div>
   );
 }
+
+export default Recepcion;
