@@ -99,19 +99,25 @@ const Recepcion = () => {
         }
       }
   
-      // ✅ Solo marcamos como revisada (no se actualiza el campo productos)
-      await supabase
+      const { error: updateError } = await supabase
         .from("ordenes_pedido")
         .update({ revisada: true })
         .eq("id", orden.id);
   
+      if (updateError) {
+        console.error("❌ Error actualizando orden:", updateError);
+        return Swal.fire("Error", "No se pudo actualizar la orden como revisada", "error");
+      }
+  
       Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
       navigate("/inicio");
+  
     } catch (error) {
-      console.error("❌ Error al guardar revisión:", error);
+      console.error("❌ Error general al guardar revisión:", error);
       Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
     }
   };
+  
 
   return (
     <div className="p-4">
