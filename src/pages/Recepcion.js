@@ -73,39 +73,44 @@ const Recepcion = () => {
   };
 
   const guardarRevision = async () => {
-    if (!ordenSeleccionada) return;
-
-    const fechaRevision = new Date().toISOString();
-
-    for (const item of productosRevisados) {
-      const diferencia = item.esperado - item.recibido;
-
-      if (diferencia > 0 && item.producto_id) {
-        await supabase.from("inventario").insert([
-          {
-            producto_id: item.producto_id,
-            cantidad: diferencia,
-            tipo_movimiento: "salida",
-            observaciones: `Faltante tras recepción de orden ${ordenSeleccionada.numero}`,
-            fecha: fechaRevision,
-          },
-        ]);
+    if (!orden) return;
+  
+    try {
+      for (const item of productosRevisados) {
+        const diferencia = item.esperado - item.recibido;
+        if (diferencia > 0) {
+          const original = orden.productos.find((p) => {
+            if (p.es_grupo && Array.isArray(p.productos)) {
+              return p.productos.some((sub) => sub.nombre === item.nombre);
+            }
+            return p.nombre === item.nombre;
+          });
+  
+          const productoId =
+            original?.id ||
+            original?.productos?.find((sub) => sub.nombre === item.nombre)?.id;
+  
+          if (productoId) {
+            await supabase.rpc("descontar_stock", {
+              producto_id: productoId,
+              cantidad: diferencia
+            });
+          }
+        }
       }
+  
+      // ✅ Solo marcamos como revisada (no se actualiza el campo productos)
+      await supabase
+        .from("ordenes_pedido")
+        .update({ revisada: true })
+        .eq("id", orden.id);
+  
+      Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
+      navigate("/inicio");
+    } catch (error) {
+      console.error("❌ Error al guardar revisión:", error);
+      Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
     }
-
-    const { error: errorActualizar } = await supabase
-      .from("ordenes_pedido")
-      .update({ revisada: true, fecha_revision: fechaRevision })
-      .eq("id", ordenSeleccionada.id);
-
-    if (errorActualizar) {
-      return Swal.fire("Error", "No se pudo guardar la revisión", "error");
-    }
-
-    Swal.fire("✅ Revisión guardada", "La orden fue registrada correctamente", "success");
-    setOrdenSeleccionada(null);
-    setProductosRevisados([]);
-    setComentarioGeneral("");
   };
 
   return (
