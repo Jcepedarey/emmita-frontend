@@ -102,7 +102,8 @@ const Recepcion = () => {
       const { error: updateError } = await supabase
         .from("ordenes_pedido")
         .update({ revisada: true })
-        .eq("id", orden.id);
+        .match({ id: orden.id })
+        ;
   
       if (updateError) {
         console.error("❌ Error actualizando orden:", updateError);
