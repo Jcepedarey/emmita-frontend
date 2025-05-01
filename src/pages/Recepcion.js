@@ -73,9 +73,13 @@ const Recepcion = () => {
   };
 
   const guardarRevision = async () => {
-    if (!orden) return;
-  
     try {
+      if (!orden) {
+        Swal.fire("Error", "No hay una orden cargada para revisar", "error");
+        return;
+      }
+  
+      // 1️⃣ Descontar productos faltantes del stock
       for (const item of productosRevisados) {
         const diferencia = item.esperado - item.recibido;
         if (diferencia > 0) {
@@ -93,17 +97,17 @@ const Recepcion = () => {
           if (productoId) {
             await supabase.rpc("descontar_stock", {
               producto_id: productoId,
-              cantidad: diferencia
+              cantidad: diferencia,
             });
           }
         }
       }
   
+      // 2️⃣ Marcar la orden como revisada
       const { error: updateError } = await supabase
         .from("ordenes_pedido")
         .update({ revisada: true })
-        .match({ id: orden.id })
-        ;
+        .match({ id: orden.id });
   
       if (updateError) {
         console.error("❌ Error actualizando orden:", updateError);
@@ -118,7 +122,7 @@ const Recepcion = () => {
       Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
     }
   };
-  
+
 
   return (
     <div className="p-4">
