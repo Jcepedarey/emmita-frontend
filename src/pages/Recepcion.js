@@ -1,10 +1,13 @@
 // src/pages/Recepcion.js
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { generarPDFRecepcion } from "../utils/generarPDFRecepcion";
 
+
 const Recepcion = () => {
+    const navigate = useNavigate(); // ✅ AQUÍ SE USA
   const [ordenes, setOrdenes] = useState([]);
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
   const [productosRevisados, setProductosRevisados] = useState([]);
@@ -74,16 +77,16 @@ const Recepcion = () => {
 
   const guardarRevision = async () => {
     try {
-      if (!orden) {
-        Swal.fire("Error", "No hay una orden cargada para revisar", "error");
-        return;
-      }
+        if (!ordenSeleccionada) {
+            Swal.fire("Error", "No hay una orden cargada para revisar", "error");
+            return;
+          }
   
       // 1️⃣ Descontar productos faltantes del stock
       for (const item of productosRevisados) {
         const diferencia = item.esperado - item.recibido;
         if (diferencia > 0) {
-          const original = orden.productos.find((p) => {
+            const original = ordenSeleccionada.productos.find((p) => {
             if (p.es_grupo && Array.isArray(p.productos)) {
               return p.productos.some((sub) => sub.nombre === item.nombre);
             }
@@ -107,7 +110,7 @@ const Recepcion = () => {
       const { error: updateError } = await supabase
         .from("ordenes_pedido")
         .update({ revisada: true })
-        .match({ id: orden.id });
+        .match({ id: ordenSeleccionada.id });
   
       if (updateError) {
         console.error("❌ Error actualizando orden:", updateError);
