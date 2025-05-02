@@ -1,32 +1,36 @@
 // src/utils/generarPDFContable.js
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export function generarPDFContable(movimientos) {
   const doc = new jsPDF();
-  const fechaActual = new Date().toLocaleDateString();
+  const fechaActual = new Date().toLocaleDateString("es-CO");
 
-  doc.setFontSize(16);
-  doc.text("📊 Resumen Contable", 20, 20);
+  doc.setFontSize(14);
+  doc.text("📊 Informe de movimientos contables", 20, 20);
   doc.setFontSize(10);
   doc.text(`Generado el: ${fechaActual}`, 20, 28);
 
-  const movimientosFiltrados = movimientos.filter((m) => m.estado === "activo");
+  const tabla = movimientos.map((m) => [
+    m.fecha?.split("T")[0] || "-",
+    m.tipo?.toUpperCase(),
+    `$${m.monto.toLocaleString("es-CO")}`,
+    m.descripcion || "-",
+    m.categoria || "-",
+    m.estado,
+    m.justificacion || "-",
+    m.fecha_modificacion?.split("T")[0] || "-",
+    m.usuario || "Administrador",
+  ]);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: 35,
-    head: [["Fecha", "Tipo", "Monto", "Descripción", "Categoría"]],
-    body: movimientosFiltrados.map((m) => [
-      m.fecha?.split("T")[0] || "-",
-      m.tipo?.toUpperCase(),
-      `$${parseFloat(m.monto).toFixed(2)}`,
-      m.descripcion || "-",
-      m.categoria || "-",
-    ]),
+    head: [["Fecha", "Tipo", "Monto", "Descripción", "Categoría", "Estado", "Justificación", "Modificado", "Usuario"]],
+    body: tabla,
     styles: { fontSize: 9 },
     theme: "grid",
     headStyles: { fillColor: [41, 128, 185] }
   });
 
-  doc.save(`reporte_contable_${fechaActual.replace(/\//g, "-")}.pdf`);
+  doc.save(`movimientos_contables_${fechaActual.replace(/\//g, "-")}.pdf`);
 }
