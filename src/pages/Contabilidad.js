@@ -137,12 +137,12 @@ const Contabilidad = () => {
     ? movimientos
     : movimientos.filter((m) => m.tipo === filtro);
 
-  const totalIngresos = movimientos
-    .filter(m => m.tipo === "ingreso" && m.estado === "activo")
+    const totalIngresos = movimientos
+    .filter(m => m.tipo === "ingreso" && m.estado !== "eliminado")
     .reduce((acc, m) => acc + m.monto, 0);
-
+  
   const totalGastos = movimientos
-    .filter(m => m.tipo === "gasto" && m.estado === "activo")
+    .filter(m => m.tipo === "gasto" && m.estado !== "eliminado")
     .reduce((acc, m) => acc + m.monto, 0);
 
   return (
@@ -191,10 +191,10 @@ const Contabilidad = () => {
       </div>
 
       <div style={{ marginTop: "2rem" }}>
-        <h3>Balance actual</h3>
-        <p><strong>Total ingresos:</strong> ${totalIngresos.toFixed(2)}</p>
-        <p><strong>Total gastos:</strong> ${totalGastos.toFixed(2)}</p>
-        <p><strong>Balance:</strong> ${(totalIngresos - totalGastos).toFixed(2)}</p>
+  <h3>Balance actual</h3>
+  <p><strong>Total ingresos:</strong> ${totalIngresos.toLocaleString("es-CO")}</p>
+  <p><strong>Total gastos:</strong> ${totalGastos.toLocaleString("es-CO")}</p>
+  <p><strong>Balance:</strong> ${(totalIngresos - totalGastos).toLocaleString("es-CO")}</p>
 
         <button
   onClick={() =>
