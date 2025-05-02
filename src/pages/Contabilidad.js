@@ -196,12 +196,37 @@ const Contabilidad = () => {
         <p><strong>Total gastos:</strong> ${totalGastos.toFixed(2)}</p>
         <p><strong>Balance:</strong> ${(totalIngresos - totalGastos).toFixed(2)}</p>
 
-        <button onClick={() => exportarCSV(movimientos, "movimientos_contables")} style={{ marginTop: "10px", padding: "10px", width: "48%", marginRight: "2%" }}>
-          Exportar CSV
-        </button>
-        <button onClick={() => generarPDFContable(movimientos)} style={{ padding: "10px", width: "48%" }}>
-          Exportar PDF
-        </button>
+        <button
+  onClick={() =>
+    exportarCSV(
+      movimientos.map((m) => ({
+        Fecha: m.fecha,
+        Tipo: m.tipo.toUpperCase(),
+        Monto: `$${m.monto.toLocaleString()}`,
+        Descripción: m.descripcion || "-",
+        Categoría: m.categoria || "-",
+        Estado: m.estado,
+        Justificación: m.justificacion || "-",
+        Modificado: m.fecha_modificacion?.split("T")[0] || "-",
+        Usuario: m.usuario || "Administrador"
+      })),
+      "movimientos_contables"
+    )
+  }
+  style={{ marginTop: "10px", padding: "10px", width: "48%", marginRight: "2%" }}
+>
+  Exportar CSV
+</button>
+<button
+  onClick={() =>
+    generarPDFContable(
+      movimientos.filter((m) => m.estado === "activo" || m.estado === "editado")
+    )
+  }
+  style={{ padding: "10px", width: "48%" }}
+>
+  Exportar PDF
+</button>
       </div>
 
       <div style={{ marginTop: "2rem" }}>
@@ -221,13 +246,19 @@ const Contabilidad = () => {
               }}
             >
               <span>
-                <strong>{m.tipo.toUpperCase()}</strong>: ${m.monto} – {m.descripcion || "Sin descripción"} – {m.fecha?.split("T")[0]}
-                {m.estado === "eliminado" && m.justificacion ? (
-                  <em style={{ display: "block", fontSize: "0.8rem" }}>Justificación: {m.justificacion}</em>
-                ) : null}
-              </span>
+  <strong>{m.tipo.toUpperCase()}:</strong>{" "}
+  <span style={{ color: m.tipo === "ingreso" ? "green" : "red" }}>
+    ${m.monto.toLocaleString()}
+  </span>{" "}
+  – {m.descripcion || "Sin descripción"} – {m.fecha?.split("T")[0]}
+  {m.estado === "eliminado" && m.justificacion ? (
+    <em style={{ display: "block", fontSize: "0.8rem" }}>
+      Justificación: {m.justificacion}
+    </em>
+  ) : null}
+</span>
 
-              {m.estado === "activo" && (
+{m.estado !== "eliminado" && (
   <div style={{ display: "flex", gap: "8px" }}>
     <button
       onClick={() => editarMovimiento(m)}
