@@ -7,7 +7,8 @@ export function generarPDFContable(movimientos) {
   const fechaActual = new Date().toLocaleDateString("es-CO");
 
   doc.setFontSize(14);
-  doc.text("📊 Informe de movimientos contables", 20, 20);
+  doc.setFont("helvetica", "bold");
+doc.text("📊 Informe de movimientos contables", 20, 20);
   doc.setFontSize(10);
   doc.text(`Generado el: ${fechaActual}`, 20, 28);
 
