@@ -25,10 +25,16 @@ export const exportarCSV = (datos, nombreArchivo) => {
   ]);
 
   const contenido = [encabezados, ...filas]
-    .map((fila) => fila.join(","))
+    .map((fila) => fila.join(";")) // ← usamos punto y coma
     .join("\n");
 
-  const blob = new Blob([contenido], { type: "text/csv;charset=utf-8;" });
+  // ⚠️ Agregar BOM para que Excel lo lea correctamente
+  const BOM = "\uFEFF";
+
+  const blob = new Blob([BOM + contenido], {
+    type: "text/csv;charset=utf-8;"
+  });
+
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = `${nombreArchivo}_${new Date().toLocaleDateString("es-CO").replaceAll("/", "_")}.csv`;

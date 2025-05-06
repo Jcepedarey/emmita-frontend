@@ -1,5 +1,7 @@
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable"; // 👈 CAMBIO IMPORTANTE
+
+autoTable(jsPDF); // 👈 REGISTRO MANUAL
 
 export function generarPDFContable(movimientos) {
   const doc = new jsPDF();
