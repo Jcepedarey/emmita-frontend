@@ -4,19 +4,28 @@ export const exportarCSV = (datos, nombreArchivo) => {
     return;
   }
 
+  // Filtrar movimientos válidos (no eliminados y con datos requeridos)
+  const datosFiltrados = datos.filter(
+    (d) => d.fecha && d.tipo && !isNaN(d.monto) && d.estado !== "eliminado"
+  );
+
+  if (datosFiltrados.length === 0) {
+    console.warn("No hay movimientos válidos para exportar.");
+    return;
+  }
+
+  // Funciones auxiliares
   const formatearMonto = (valor) => `$${valor.toLocaleString("es-CO")}`;
   const formatearFecha = (fecha) => fecha?.split("T")[0] || "-";
 
+  // Encabezados
   const encabezados = [
     "Fecha", "Tipo", "Monto", "Descripción",
     "Categoría", "Estado", "Justificación",
     "Modificado", "Usuario"
   ];
 
-  const datosFiltrados = datos.filter(
-    (d) => d.fecha && d.tipo && !isNaN(d.monto)
-  );
-
+  // Filas de datos
   const filas = datosFiltrados.map((m) => [
     m.fecha,
     m.tipo?.toUpperCase() ?? "-",
@@ -29,10 +38,12 @@ export const exportarCSV = (datos, nombreArchivo) => {
     m.usuario ?? "Administrador"
   ]);
 
+  // Convertir a texto CSV
   const contenido = [encabezados, ...filas]
     .map((fila) => fila.join(";"))
     .join("\n");
 
+  // Agregar BOM para compatibilidad con Excel
   const BOM = "\uFEFF";
   const blob = new Blob([BOM + contenido], {
     type: "text/csv;charset=utf-8;"
