@@ -36,7 +36,7 @@ export function generarPDFContable(movimientos) {
       ]);
 
     doc.autoTable({
-      startY: 50,
+      startY: 45,
       head: [[
         "Fecha", "Tipo", "Monto", "Descripción",
         "Categoría", "Estado", "Justificación",
