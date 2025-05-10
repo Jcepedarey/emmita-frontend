@@ -79,18 +79,26 @@ doc.addImage(logoOptimizado, "PNG", 10, 10, 40, 40); // mostrarlo un poco más g
       m.usuario || "Administrador",
     ]);
 
-  doc.autoTable({
-    startY: 45,
-    head: [[
-      "Fecha", "Tipo", "Monto", "Descripción",
-      "Categoría", "Estado", "Justificación",
-      "Modificado", "Usuario"
-    ]],
-    body: tabla,
-    styles: { font: "helvetica", fontSize: 9 },
-    headStyles: { fillColor: [41, 128, 185] },
-    didDrawPage: aplicarFondo // ✅ Fondo en cada página
-  });
+    doc.autoTable({
+      startY: 45,
+      head: [[
+        "Fecha", "Tipo", "Monto", "Descripción",
+        "Categoría", "Estado", "Justificación",
+        "Modificado", "Usuario"
+      ]],
+      body: tabla,
+      styles: { font: "helvetica", fontSize: 9 },
+      headStyles: { fillColor: [41, 128, 185] },
+      didDrawPage: (data) => {
+        const centerX = (doc.internal.pageSize.getWidth() - 80) / 2;
+        const centerY = (doc.internal.pageSize.getHeight() - 80) / 2;
+    
+        doc.saveGraphicsState();
+        doc.setGState(new doc.GState({ opacity: 0.08 }));
+        doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 80, 80);
+        doc.restoreGraphicsState();
+      }
+    });
 
   const nombreArchivo = `movimientos_contables_${new Date().toLocaleDateString("es-CO").replaceAll("/", "-")}.pdf`;
   doc.save(nombreArchivo);
