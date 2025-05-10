@@ -1,11 +1,11 @@
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-// ✅ Función para redimensionar y comprimir el logo antes de insertarlo
-const redimensionarLogo = (src, width = 150) =>
+// ✅ Función para redimensionar y comprimir imágenes
+const procesarImagen = (src, width = 150, calidad = 0.9) =>
   new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = "anonymous"; // Para evitar problemas de CORS en producción
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       const canvas = document.createElement("canvas");
       const escala = width / img.width;
@@ -15,8 +15,7 @@ const redimensionarLogo = (src, width = 150) =>
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Exportar como PNG optimizado
-      resolve(canvas.toDataURL("image/png", 0.7));
+      resolve(canvas.toDataURL("image/png", calidad));
     };
     img.src = src;
   });
@@ -24,12 +23,38 @@ const redimensionarLogo = (src, width = 150) =>
 export async function generarPDFContable(movimientos) {
   const doc = new jsPDF();
 
-  // 🖼️ Ruta del logo
+  // 🖼️ Procesar logo y fondo
   const logoUrl = "/icons/logo.png";
-  const logoOptimizado = await redimensionarLogo(logoUrl, 150); // 150px de ancho
+  const fondoUrl = "/icons/fondo_emmita.png";
 
-  // 🖼️ Insertar imagen ya redimensionada y comprimida
-  doc.addImage(logoOptimizado, "PNG", 10, 10, 30, 30); // (x, y, width, height)
+  const logoOptimizado = await procesarImagen(logoUrl, 150, 0.9);   // Más nítido
+  const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.8); // Más grande y translúcido
+
+  // ✅ Función para aplicar fondo en cada página
+  const aplicarFondo = () => {
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+
+      // Guardar estado gráfico
+      doc.saveGraphicsState();
+
+      // Aplicar transparencia (opacidad ~10%)
+      doc.setGState(new doc.GState({ opacity: 0.08 }));
+
+      // Imagen centrada
+      const centerX = (doc.internal.pageSize.getWidth() - 80) / 2;
+      const centerY = (doc.internal.pageSize.getHeight() - 80) / 2;
+
+      doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 80, 80);
+
+      // Restaurar estado gráfico
+      doc.restoreGraphicsState();
+    }
+  };
+
+  // 📌 Insertar logo
+  doc.addImage(logoOptimizado, "PNG", 10, 10, 30, 30);
 
   // 🧾 Encabezado
   doc.setFontSize(14);
@@ -64,6 +89,7 @@ export async function generarPDFContable(movimientos) {
     body: tabla,
     styles: { font: "helvetica", fontSize: 9 },
     headStyles: { fillColor: [41, 128, 185] },
+    didDrawPage: aplicarFondo // ✅ Fondo en cada página
   });
 
   const nombreArchivo = `movimientos_contables_${new Date().toLocaleDateString("es-CO").replaceAll("/", "-")}.pdf`;
