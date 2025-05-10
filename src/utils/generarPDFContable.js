@@ -1,8 +1,8 @@
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-// ✅ Función para redimensionar y comprimir imágenes
-const procesarImagen = (src, width = 150, calidad = 0.9) =>
+// ✅ Redimensionar imágenes con compresión
+const procesarImagen = (src, width = 150, calidad = 1.0) =>
   new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -14,7 +14,6 @@ const procesarImagen = (src, width = 150, calidad = 0.9) =>
 
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
       resolve(canvas.toDataURL("image/png", calidad));
     };
     img.src = src;
@@ -23,38 +22,14 @@ const procesarImagen = (src, width = 150, calidad = 0.9) =>
 export async function generarPDFContable(movimientos) {
   const doc = new jsPDF();
 
-  // 🖼️ Procesar logo y fondo
   const logoUrl = "/icons/logo.png";
   const fondoUrl = "/icons/fondo_emmita.png";
 
-  const logoOptimizado = await procesarImagen(logoUrl, 250, 1.0); // ancho mayor y máxima calidad
-doc.addImage(logoOptimizado, "PNG", 10, 10, 40, 40); // mostrarlo un poco más grande
-
-  // ✅ Función para aplicar fondo en cada página
-  const aplicarFondo = () => {
-    const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-
-      // Guardar estado gráfico
-      doc.saveGraphicsState();
-
-      // Aplicar transparencia (opacidad ~10%)
-      doc.setGState(new doc.GState({ opacity: 0.08 }));
-
-      // Imagen centrada
-      const centerX = (doc.internal.pageSize.getWidth() - 80) / 2;
-      const centerY = (doc.internal.pageSize.getHeight() - 80) / 2;
-
-      doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 80, 80);
-
-      // Restaurar estado gráfico
-      doc.restoreGraphicsState();
-    }
-  };
+  const logoOptimizado = await procesarImagen(logoUrl, 250, 1.0);    // logo nítido
+  const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.9);  // fondo más grande
 
   // 📌 Insertar logo
-  doc.addImage(logoOptimizado, "PNG", 10, 10, 30, 30);
+  doc.addImage(logoOptimizado, "PNG", 10, 10, 40, 40); // logo más grande
 
   // 🧾 Encabezado
   doc.setFontSize(14);
@@ -79,26 +54,27 @@ doc.addImage(logoOptimizado, "PNG", 10, 10, 40, 40); // mostrarlo un poco más g
       m.usuario || "Administrador",
     ]);
 
-    doc.autoTable({
-      startY: 45,
-      head: [[
-        "Fecha", "Tipo", "Monto", "Descripción",
-        "Categoría", "Estado", "Justificación",
-        "Modificado", "Usuario"
-      ]],
-      body: tabla,
-      styles: { font: "helvetica", fontSize: 9 },
-      headStyles: { fillColor: [41, 128, 185] },
-      didDrawPage: (data) => {
-        const centerX = (doc.internal.pageSize.getWidth() - 80) / 2;
-        const centerY = (doc.internal.pageSize.getHeight() - 80) / 2;
-    
-        doc.saveGraphicsState();
-        doc.setGState(new doc.GState({ opacity: 0.08 }));
-        doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 80, 80);
-        doc.restoreGraphicsState();
-      }
-    });
+  // 📄 Insertar tabla y fondo con marca de agua por página
+  doc.autoTable({
+    startY: 45,
+    head: [[
+      "Fecha", "Tipo", "Monto", "Descripción",
+      "Categoría", "Estado", "Justificación",
+      "Modificado", "Usuario"
+    ]],
+    body: tabla,
+    styles: { font: "helvetica", fontSize: 9 },
+    headStyles: { fillColor: [41, 128, 185] },
+    didDrawPage: (data) => {
+      const centerX = (doc.internal.pageSize.getWidth() - 100) / 2;
+      const centerY = (doc.internal.pageSize.getHeight() - 100) / 2;
+
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.08 }));
+      doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 100, 100);
+      doc.restoreGraphicsState();
+    }
+  });
 
   const nombreArchivo = `movimientos_contables_${new Date().toLocaleDateString("es-CO").replaceAll("/", "-")}.pdf`;
   doc.save(nombreArchivo);
