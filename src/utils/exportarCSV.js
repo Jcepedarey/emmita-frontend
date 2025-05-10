@@ -1,14 +1,16 @@
-import { saveAs } from "file-saver";
-
-export const exportarCSV = (datos, nombreArchivo = "movimientos_contables") => {
+export const exportarCSV = (datos, nombreArchivo) => {
   if (!Array.isArray(datos) || datos.length === 0) {
     console.warn("No hay datos para exportar.");
     return;
   }
 
-  // ✅ Corregido: Asegurar que monto es numérico con coerción +parseFloat()
+  // ✅ Arreglar validación de monto y filtrar correctamente
   const datosFiltrados = datos.filter(
-    (d) => d.fecha && d.tipo && !isNaN(parseFloat(d.monto)) && d.estado !== "eliminado"
+    (d) =>
+      d.fecha &&
+      d.tipo &&
+      d.estado !== "eliminado" &&
+      !isNaN(Number(String(d.monto).replace(/\D/g, ""))) // ✅ convierte a número ignorando símbolos
   );
 
   if (datosFiltrados.length === 0) {
@@ -16,7 +18,8 @@ export const exportarCSV = (datos, nombreArchivo = "movimientos_contables") => {
     return;
   }
 
-  const formatearMonto = (valor) => `$${parseInt(valor).toLocaleString("es-CO")}`;
+  const formatearMonto = (valor) =>
+    `$${Number(String(valor).replace(/\D/g, "")).toLocaleString("es-CO")}`;
   const formatearFecha = (fecha) => fecha?.split("T")[0] || "-";
 
   const encabezados = [
@@ -26,24 +29,27 @@ export const exportarCSV = (datos, nombreArchivo = "movimientos_contables") => {
   ];
 
   const filas = datosFiltrados.map((m) => [
-    m.fecha || "-",
-    m.tipo?.toUpperCase() || "-",
+    m.fecha,
+    m.tipo?.toUpperCase() ?? "-",
     formatearMonto(m.monto),
-    m.descripcion || "-",
-    m.categoria || "-",
-    m.estado || "-",
-    m.justificacion || "-",
+    m.descripcion ?? "-",
+    m.categoria ?? "-",
+    m.estado ?? "-",
+    m.justificacion ?? "-",
     formatearFecha(m.fecha_modificacion),
-    m.usuario || "Administrador"
+    m.usuario ?? "Administrador"
   ]);
 
-  const contenido = [encabezados, ...filas]
-    .map((fila) => fila.join(";"))
-    .join("\n");
+  const contenido = [encabezados, ...filas].map((fila) => fila.join(";")).join("\n");
 
   const BOM = "\uFEFF";
-  const blob = new Blob([BOM + contenido], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([BOM + contenido], {
+    type: "text/csv;charset=utf-8;"
+  });
 
+  const link = document.createElement("a");
   const fechaHoy = new Date().toLocaleDateString("es-CO").replaceAll("/", "_");
-  saveAs(blob, `${nombreArchivo}_${fechaHoy}.csv`);
+  link.href = URL.createObjectURL(blob);
+  link.download = `${nombreArchivo}_${fechaHoy}.csv`;
+  link.click();
 };
