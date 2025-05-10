@@ -4,13 +4,9 @@ export const exportarCSV = (datos, nombreArchivo) => {
     return;
   }
 
-  // ✅ Arreglar validación de monto y filtrar correctamente
+  // ✅ Simplificamos la validación
   const datosFiltrados = datos.filter(
-    (d) =>
-      d.fecha &&
-      d.tipo &&
-      d.estado !== "eliminado" &&
-      !isNaN(Number(String(d.monto).replace(/\D/g, ""))) // ✅ convierte a número ignorando símbolos
+    (d) => d.fecha && d.tipo && d.monto != null && d.estado !== "eliminado"
   );
 
   if (datosFiltrados.length === 0) {
@@ -18,8 +14,7 @@ export const exportarCSV = (datos, nombreArchivo) => {
     return;
   }
 
-  const formatearMonto = (valor) =>
-    `$${Number(String(valor).replace(/\D/g, "")).toLocaleString("es-CO")}`;
+  const formatearMonto = (valor) => `$${Number(valor).toLocaleString("es-CO")}`;
   const formatearFecha = (fecha) => fecha?.split("T")[0] || "-";
 
   const encabezados = [
@@ -40,7 +35,9 @@ export const exportarCSV = (datos, nombreArchivo) => {
     m.usuario ?? "Administrador"
   ]);
 
-  const contenido = [encabezados, ...filas].map((fila) => fila.join(";")).join("\n");
+  const contenido = [encabezados, ...filas]
+    .map((fila) => fila.join(";"))
+    .join("\n");
 
   const BOM = "\uFEFF";
   const blob = new Blob([BOM + contenido], {
