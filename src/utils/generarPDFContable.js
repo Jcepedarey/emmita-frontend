@@ -27,8 +27,8 @@ export async function generarPDFContable(movimientos) {
   const logoUrl = "/icons/logo.png";
   const fondoUrl = "/icons/fondo_emmita.png";
 
-  const logoOptimizado = await procesarImagen(logoUrl, 150, 0.9);   // Más nítido
-  const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.8); // Más grande y translúcido
+  const logoOptimizado = await procesarImagen(logoUrl, 250, 1.0); // ancho mayor y máxima calidad
+doc.addImage(logoOptimizado, "PNG", 10, 10, 40, 40); // mostrarlo un poco más grande
 
   // ✅ Función para aplicar fondo en cada página
   const aplicarFondo = () => {
