@@ -29,7 +29,7 @@ export async function generarPDFContable(movimientos) {
   const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.9);  // fondo más grande
 
   // 📌 Insertar logo
-  doc.addImage(logoOptimizado, "PNG", 10, 10, 40, 40); // logo más grande
+  doc.addImage(logoOptimizado, "PNG", 10, 10, 30, 30); // logo más grande
 
   // 🧾 Encabezado
   doc.setFontSize(14);
@@ -66,12 +66,12 @@ export async function generarPDFContable(movimientos) {
     styles: { font: "helvetica", fontSize: 9 },
     headStyles: { fillColor: [41, 128, 185] },
     didDrawPage: (data) => {
-      const centerX = (doc.internal.pageSize.getWidth() - 100) / 2;
-      const centerY = (doc.internal.pageSize.getHeight() - 100) / 2;
+      const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
+      const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
 
       doc.saveGraphicsState();
       doc.setGState(new doc.GState({ opacity: 0.08 }));
-      doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 100, 100);
+      doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 150, 150);
       doc.restoreGraphicsState();
     }
   });
