@@ -196,20 +196,11 @@ const Contabilidad = () => {
   <p><strong>Total gastos:</strong> ${totalGastos.toLocaleString("es-CO")}</p>
   <p><strong>Balance:</strong> ${(totalIngresos - totalGastos).toLocaleString("es-CO")}</p>
 
-        <button
+  <button
   onClick={() =>
     exportarCSV(
-      movimientos.map((m) => ({
-        Fecha: m.fecha,
-        Tipo: m.tipo.toUpperCase(),
-        Monto: `$${m.monto.toLocaleString()}`,
-        Descripción: m.descripcion || "-",
-        Categoría: m.categoria || "-",
-        Estado: m.estado,
-        Justificación: m.justificacion || "-",
-        Modificado: m.fecha_modificacion?.split("T")[0] || "-",
-        Usuario: m.usuario || "Administrador"
-      })),
+      movimientos
+        .filter((m) => m.estado === "activo" || m.estado === "editado"), // ✅ Solo válidos
       "movimientos_contables"
     )
   }
@@ -217,6 +208,7 @@ const Contabilidad = () => {
 >
   Exportar CSV
 </button>
+
 <button
   onClick={() =>
     generarPDFContable(

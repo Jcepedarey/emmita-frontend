@@ -1,4 +1,5 @@
 export const exportarCSV = (datos, nombreArchivo) => {
+  console.log("📦 Datos recibidos para exportarCSV:", datos);
   if (!Array.isArray(datos) || datos.length === 0) {
     console.warn("No hay datos para exportar.");
     return;
