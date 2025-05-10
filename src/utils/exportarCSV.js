@@ -4,9 +4,9 @@ export const exportarCSV = (datos, nombreArchivo) => {
     return;
   }
 
-  // ✅ Simplificamos la validación
+  // ✅ Validar solo que no estén eliminados
   const datosFiltrados = datos.filter(
-    (d) => d.fecha && d.tipo && d.monto != null && d.estado !== "eliminado"
+    (d) => d.estado !== "eliminado"
   );
 
   if (datosFiltrados.length === 0) {
@@ -14,7 +14,11 @@ export const exportarCSV = (datos, nombreArchivo) => {
     return;
   }
 
-  const formatearMonto = (valor) => `$${Number(valor).toLocaleString("es-CO")}`;
+  const formatearMonto = (valor) => {
+    const numero = Number(valor);
+    return isNaN(numero) ? "-" : `$${numero.toLocaleString("es-CO")}`;
+  };
+
   const formatearFecha = (fecha) => fecha?.split("T")[0] || "-";
 
   const encabezados = [
@@ -24,8 +28,8 @@ export const exportarCSV = (datos, nombreArchivo) => {
   ];
 
   const filas = datosFiltrados.map((m) => [
-    m.fecha,
-    m.tipo?.toUpperCase() ?? "-",
+    m.fecha || "-",
+    (m.tipo || "").toUpperCase(),
     formatearMonto(m.monto),
     m.descripcion ?? "-",
     m.categoria ?? "-",
