@@ -48,7 +48,7 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio, Meta", 50, 26);
   doc.text("Cel-Whatsapp 3166534685 - 3118222934", 50, 31);
   doc.setLineWidth(0.5);
-  doc.line(10, 38, 200, 38);
+  doc.line(10, 42, 200, 42);
 
   // Datos del documento
   doc.setFontSize(12);
