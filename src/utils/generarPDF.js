@@ -52,22 +52,22 @@ export async function generarPDF(documento, tipo = "cotizacion") {
 
   // Datos del documento
   doc.setFontSize(12);
-  doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 45);
-  doc.text(`Cliente: ${documento.nombre_cliente || "Cliente seleccionado"}`, 10, 52);
-  if (documento.identificacion) doc.text(`Identificación: ${documento.identificacion}`, 10, 58);
-  if (documento.telefono) doc.text(`Teléfono: ${documento.telefono}`, 10, 64);
-  if (documento.direccion) doc.text(`Dirección: ${documento.direccion}`, 10, 70);
-  if (documento.email) doc.text(`Correo: ${documento.email}`, 10, 76);
+  doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 48);
+  doc.text(`Cliente: ${documento.nombre_cliente || "Cliente seleccionado"}`, 10, 55);
+  if (documento.identificacion) doc.text(`Identificación: ${documento.identificacion}`, 10, 61);
+  if (documento.telefono) doc.text(`Teléfono: ${documento.telefono}`, 10, 67);
+  if (documento.direccion) doc.text(`Dirección: ${documento.direccion}`, 10, 73);
+  if (documento.email) doc.text(`Correo: ${documento.email}`, 10, 79);
 
   let startY = 82;
 
   if (documento.fecha) {
     doc.setFontSize(11);
-    doc.text(`Fecha creación: ${documento.fecha}`, 150, 45);
+    doc.text(`Fecha creación: ${documento.fecha}`, 150, 48);
   }
   if (documento.fecha_evento) {
     doc.setFontSize(11);
-    doc.text(`Fecha evento: ${documento.fecha_evento}`, 150, 52);
+    doc.text(`Fecha evento: ${documento.fecha_evento}`, 150, 55);
   }
 
   // Tabla de productos
