@@ -29,7 +29,7 @@ export async function generarPDFContable(movimientos) {
   const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.9);  // fondo más grande
 
   // 📌 Insertar logo
-  doc.addImage(logoOptimizado, "PNG", 10, 10, 30, 30); // logo más grande
+  doc.addImage(logoOptimizado, "PNG", 10, 10, 35, 35); // logo más grande
 
   // 🧾 Encabezado
   doc.setFontSize(14);

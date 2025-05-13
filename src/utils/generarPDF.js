@@ -1,24 +1,47 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+// ✅ Función reutilizable para optimizar imágenes (logo o fondo)
+const procesarImagen = (src, width = 150, calidad = 1.0) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const escala = width / img.width;
+      canvas.width = width;
+      canvas.height = img.height * escala;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png", calidad));
+    };
+    img.src = src;
+  });
+
 export async function generarPDF(documento, tipo = "cotizacion") {
   const doc = new jsPDF();
 
-  // Cargar imagen del logo
-  let logo = null;
-  try {
-    const blob = await fetch("/logo.png").then((res) => res.blob());
-    logo = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    console.warn("No se pudo cargar el logo.");
-  }
+  const logoUrl = "/icons/logo.png";
+  const fondoUrl = "/icons/fondo_emmita.png";
 
-  // ENCABEZADO
-  if (logo) doc.addImage(logo, "PNG", 10, 10, 30, 25);
+  const logoOptimizado = await procesarImagen(logoUrl, 250, 1.0);
+  const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.9);
+
+  // Fondo en cada página (marca de agua)
+  const insertarFondo = () => {
+    const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
+    const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
+
+    doc.saveGraphicsState();
+    doc.setGState(new doc.GState({ opacity: 0.08 }));
+    doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 150, 150);
+    doc.restoreGraphicsState();
+  };
+  insertarFondo();
+
+  // Encabezado con logo
+  doc.addImage(logoOptimizado, "PNG", 10, 10, 35, 30);
   doc.setFontSize(16);
   doc.text("Alquiler & Eventos Emmita", 50, 20);
   doc.setFontSize(10);
@@ -27,10 +50,9 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   doc.setLineWidth(0.5);
   doc.line(10, 38, 200, 38);
 
-  // DATOS DEL DOCUMENTO
+  // Datos del documento
   doc.setFontSize(12);
   doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 45);
-
   doc.text(`Cliente: ${documento.nombre_cliente || "Cliente seleccionado"}`, 10, 52);
   if (documento.identificacion) doc.text(`Identificación: ${documento.identificacion}`, 10, 58);
   if (documento.telefono) doc.text(`Teléfono: ${documento.telefono}`, 10, 64);
@@ -48,7 +70,7 @@ export async function generarPDF(documento, tipo = "cotizacion") {
     doc.text(`Fecha evento: ${documento.fecha_evento}`, 150, 52);
   }
 
-  // TABLA DE PRODUCTOS
+  // Tabla de productos
   const filas = (documento.productos || []).map((p) => [
     p.cantidad || "-",
     p.nombre,
@@ -60,17 +82,20 @@ export async function generarPDF(documento, tipo = "cotizacion") {
     head: [["Cantidad", "Producto", "Precio", "Subtotal"]],
     body: filas,
     startY: startY,
+    styles: { font: "helvetica", fontSize: 10 },
+    headStyles: { fillColor: [41, 128, 185] },
+    didDrawPage: insertarFondo
   });
 
   let y = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? doc.lastAutoTable.finalY + 10 : startY + 20;
 
-  // GARANTÍA
+  // Garantía
   if (documento.garantia && documento.garantia !== "0") {
     doc.text(`GARANTÍA: $${Number(documento.garantia).toLocaleString("es-CO")}`, 10, y);
     y += 8;
   }
 
-  // ABONOS
+  // Abonos
   if (documento.abonos?.length > 0) {
     doc.text("ABONOS:", 10, y);
     documento.abonos.forEach((abono, i) => {
@@ -80,7 +105,7 @@ export async function generarPDF(documento, tipo = "cotizacion") {
     y += 8;
   }
 
-  // TOTAL y SALDO FINAL
+  // Totales
   doc.setFontSize(12);
   doc.text(`TOTAL: $${Number(documento.total).toLocaleString("es-CO")}`, 150, y);
   y += 8;
@@ -90,14 +115,14 @@ export async function generarPDF(documento, tipo = "cotizacion") {
     doc.text(`SALDO FINAL: $${Number(saldo).toLocaleString("es-CO")}`, 150, y);
   }
 
-  // PIE DE PÁGINA
+  // Pie de página
   const yFinal = 270;
   doc.setFontSize(10);
   doc.text("Instagram: @alquileryeventosemmita", 10, yFinal);
   doc.text("Facebook: Facebook.com/alquileresemmita", 10, yFinal + 5);
   doc.text("Email: alquileresemmita@hotmail.com", 10, yFinal + 10);
 
-  // NOMBRE DEL ARCHIVO
+  // Guardar PDF
   const prefix = tipo === "cotizacion" ? "cot" : "ord";
   const nombreArchivo = `${prefix}_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(nombreArchivo);
