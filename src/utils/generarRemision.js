@@ -25,6 +25,7 @@ export const generarRemisionPDF = async (documento) => {
   const logo = await procesarImagen("/icons/logo.png", 250, 1.0);
   const fondo = await procesarImagen("/icons/fondo_emmita.png", 300, 0.9);
 
+  // ✅ Marca de agua
   const insertarFondo = () => {
     const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
     const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
@@ -36,11 +37,26 @@ export const generarRemisionPDF = async (documento) => {
 
   insertarFondo();
 
-  // 🔍 Buscar cliente si solo llega ID
+  // 🔍 Buscar cliente si solo llega el ID o está incompleto
   let cliente = documento.cliente;
+
   if (!cliente?.nombre && documento.cliente_id) {
-    const { data } = await supabase.from("clientes").select("*").eq("id", documento.cliente_id).single();
-    cliente = data || {};
+    try {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("*")
+        .eq("id", documento.cliente_id)
+        .single();
+      if (error) {
+        console.warn("Error obteniendo cliente:", error.message);
+        cliente = {};
+      } else {
+        cliente = data;
+      }
+    } catch (err) {
+      console.error("Fallo al cargar cliente desde Supabase:", err);
+      cliente = {};
+    }
   }
 
   const remisionId = `REM-${documento.numero || documento.numero_orden || documento.id?.toString().slice(-5) || "SN"}`;
@@ -100,8 +116,8 @@ export const generarRemisionPDF = async (documento) => {
   doc.text("Firma del cliente:", 120, h - 40);
   doc.line(120, h - 35, 190, h - 35);
 
-    doc.save(`${remisionId}.pdf`);
+  doc.save(`${remisionId}.pdf`);
 };
 
-// 👇 Esto permite usar "generarRemision" como alias de "generarRemisionPDF"
+// Alias de uso
 export { generarRemisionPDF as generarRemision };
