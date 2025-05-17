@@ -7,7 +7,7 @@ import AgregarGrupoModal from "../components/AgregarGrupoModal";
 import CrearClienteModal from "../components/CrearClienteModal";
 import BuscarProductoProveedorModal from "../components/BuscarProductoProveedorModal";
 import { generarPDF } from "../utils/generarPDF";
-import { generarRemision } from "../utils/generarRemision";
+import { generarRemisionPDF } from "../utils/generarRemision";
 import Swal from "sweetalert2";
 
 const CrearDocumento = () => {
@@ -487,7 +487,7 @@ return (
 
         {tipoDocumento === "orden" && productosAgregados.length > 0 && (
           <button
-            onClick={() => generarRemision(obtenerDatosPDF())}
+            onClick={() => generarRemisionPDF(obtenerDatosPDF())}
             style={{ padding: "10px 20px", backgroundColor: "#4CAF50", color: "white" }}
           >
             📦 Generar Remisión
