@@ -100,5 +100,8 @@ export const generarRemisionPDF = async (documento) => {
   doc.text("Firma del cliente:", 120, h - 40);
   doc.line(120, h - 35, 190, h - 35);
 
-  doc.save(`${remisionId}.pdf`);
+    doc.save(`${remisionId}.pdf`);
 };
+
+// 👇 Esto permite usar "generarRemision" como alias de "generarRemisionPDF"
+export { generarRemisionPDF as generarRemision };
