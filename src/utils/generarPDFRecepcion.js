@@ -1,6 +1,7 @@
 // ✅ PDF DE RECEPCIÓN DE PEDIDO CON ESTÉTICA UNIFICADA
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import supabase from "../supabaseClient"; // 🧠 Necesario para buscar cliente si es solo ID
 
 const procesarImagenRecepcion = (src, width = 150, calidad = 1.0) =>
   new Promise((resolve) => {
@@ -18,7 +19,7 @@ const procesarImagenRecepcion = (src, width = 150, calidad = 1.0) =>
     img.src = src;
   });
 
-export const generarPDFRecepcion = async (revision, cliente, productosRecibidos, comentario) => {
+export const generarPDFRecepcion = async (revision, clienteInput, productosRecibidos, comentario) => {
   const doc = new jsPDF();
   const logoOptimizado = await procesarImagenRecepcion("/icons/logo.png", 250, 1.0);
   const fondoOptimizado = await procesarImagenRecepcion("/icons/fondo_emmita.png", 300, 0.9);
@@ -31,8 +32,17 @@ export const generarPDFRecepcion = async (revision, cliente, productosRecibidos,
     doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 150, 150);
     doc.restoreGraphicsState();
   };
+
   insertarFondo();
 
+  // 🔍 Si solo se recibe el ID del cliente, buscar en Supabase
+  let cliente = clienteInput;
+  if (!cliente?.nombre && revision.cliente_id) {
+    const { data } = await supabase.from("clientes").select("*").eq("id", revision.cliente_id).single();
+    cliente = data || {};
+  }
+
+  // 🧾 Encabezado estándar
   doc.addImage(logoOptimizado, "PNG", 10, 10, 35, 30);
   doc.setFontSize(16);
   doc.text("ACTA DE RECEPCIÓN DE PEDIDO", 105, 20, { align: "center" });
@@ -42,6 +52,7 @@ export const generarPDFRecepcion = async (revision, cliente, productosRecibidos,
   doc.text("Cel: 3166534685 - 3118222934", 105, 36, { align: "center" });
   doc.line(10, 44, 200, 44);
 
+  // 🧾 Datos generales
   doc.setFontSize(12);
   doc.text(`Orden de pedido: ${revision.numero || "-"}`, 10, 48);
   doc.text(`Cliente: ${cliente?.nombre || "-"}`, 10, 55);
@@ -50,6 +61,7 @@ export const generarPDFRecepcion = async (revision, cliente, productosRecibidos,
   doc.text(`Teléfono: ${cliente?.telefono || "-"}`, 10, 73);
   doc.text(`Fecha revisión: ${new Date().toLocaleDateString("es-CO")}`, 10, 79);
 
+  // 📋 Tabla de productos
   autoTable(doc, {
     startY: 90,
     head: [["Descripción", "Esperado", "Recibido", "Observación"]],
@@ -61,17 +73,23 @@ export const generarPDFRecepcion = async (revision, cliente, productosRecibidos,
     ]),
     styles: { fontSize: 10 },
     headStyles: { fillColor: [41, 128, 185] },
-    didDrawPage: insertarFondo
+    didDrawPage: insertarFondo,
+    margin: { bottom: 40 },
   });
 
+  // 📝 Comentario general
   if (comentario) {
     doc.setFont("courier", "normal");
     doc.text("📝 Comentario general:", 10, doc.lastAutoTable.finalY + 10);
     doc.text(comentario, 10, doc.lastAutoTable.finalY + 18);
   }
 
-  doc.text("_________________________", 20, doc.internal.pageSize.height - 40);
-  doc.text("Firma responsable", 20, doc.internal.pageSize.height - 30);
+  // ✍️ Firma fija al final
+  const paginaAltura = doc.internal.pageSize.height;
+  doc.setFont("helvetica", "normal");
+  doc.text("_________________________", 20, paginaAltura - 40);
+  doc.text("Firma responsable", 20, paginaAltura - 30);
 
+  // 💾 Guardar PDF
   doc.save(`recepcion_${revision.numero || "pedido"}.pdf`);
 };
