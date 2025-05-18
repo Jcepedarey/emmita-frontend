@@ -2,6 +2,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import supabase from "../supabaseClient"; // 🧠 Necesario para buscar cliente si es solo ID
+import { generarNombreArchivo } from "./nombrePDF"; // ✅ NUEVO IMPORT
 
 const procesarImagenRecepcion = (src, width = 150, calidad = 1.0) =>
   new Promise((resolve) => {
@@ -90,6 +91,7 @@ export const generarPDFRecepcion = async (revision, clienteInput, productosRecib
   doc.text("_________________________", 20, paginaAltura - 40);
   doc.text("Firma responsable", 20, paginaAltura - 30);
 
-  // 💾 Guardar PDF
-  doc.save(`recepcion_${revision.numero || "pedido"}.pdf`);
+  // 💾 Guardar PDF con nombre dinámico
+  const nombreArchivo = generarNombreArchivo("recepcion", revision.fecha || new Date(), cliente?.nombre);
+  doc.save(nombreArchivo);
 };

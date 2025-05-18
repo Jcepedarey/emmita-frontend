@@ -2,6 +2,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import supabase from "../supabaseClient";
+import { generarNombreArchivo } from "./nombrePDF"; // ✅ NUEVO IMPORT
 
 // 🖼️ Optimización de imagen
 const procesarImagen = (src, width = 150, calidad = 1.0) =>
@@ -48,7 +49,7 @@ export const generarRemisionPDF = async (documento) => {
   doc.text("Cel: 3166534685 - 3118222934", 105, 36, { align: "center" });
   doc.line(10, 44, 200, 44);
 
-  // 🧾 Datos del documento y cliente usando la misma lógica de generarPDF.js
+  // 🧾 Datos del documento y cliente
   doc.setFontSize(12);
   doc.text(`No. de Remisión: ${remisionId}`, 10, 48);
   doc.text(`Cliente: ${documento.nombre_cliente || "Cliente no especificado"}`, 10, 55);
@@ -93,7 +94,9 @@ export const generarRemisionPDF = async (documento) => {
   doc.text("Firma del cliente:", 120, h - 40);
   doc.line(120, h - 35, 190, h - 35);
 
-  doc.save(`${remisionId}.pdf`);
+  // ✅ Nuevo sistema de nombre de archivo
+  const nombreArchivo = generarNombreArchivo("remision", documento.fecha, documento.nombre_cliente);
+  doc.save(nombreArchivo);
 };
 
 // Alias
