@@ -29,7 +29,8 @@
     "react-scripts": "^5.0.1",
     "sweetalert2": "^11.17.2",
     "web-vitals": "^4.2.4",
-    "webpack": "^5.98.0"
+    "webpack": "^5.98.0",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "react-scripts start",
