@@ -1,5 +1,13 @@
 export const generarNombreArchivo = (tipo, fecha, nombreCliente) => {
-  const fechaLimpia = new Date(fecha).toISOString().slice(0, 10); // YYYY-MM-DD
+  let fechaLimpia;
+  try {
+    const fechaValida = new Date(fecha);
+    if (isNaN(fechaValida)) throw new Error("Fecha inválida");
+    fechaLimpia = fechaValida.toISOString().slice(0, 10);
+  } catch {
+    fechaLimpia = new Date().toISOString().slice(0, 10);
+  }
+
   const nombreLimpio = (nombreCliente || "Cliente").replace(/\s+/g, "_");
   const prefijos = {
     cotizacion: "Cot_",

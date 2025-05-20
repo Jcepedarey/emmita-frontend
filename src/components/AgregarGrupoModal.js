@@ -14,9 +14,9 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
         .from("productos")
         .select("id, nombre, descripcion, precio");
 
-        const { data: proveedores } = await supabase
-        .from("productos_proveedores") // ✅ Nombre correcto
-        .select("*, proveedor:proveedor_id (nombre)");      
+      const { data: proveedores } = await supabase
+        .from("productos_proveedores")
+        .select("*, proveedor:proveedor_id (nombre)");
 
       const inventarioNormalizado = (inventario || []).map((p) => ({
         id: p.id,
@@ -49,15 +49,15 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
         ...producto,
         cantidad: 1,
         subtotal: producto.precio,
+        temporal: false,
       },
     ]);
   };
 
-  const actualizarCantidadPrecio = (index, campo, valor) => {
+  const actualizarCampo = (index, campo, valor) => {
     const actualizados = [...seleccionados];
-    actualizados[index][campo] = parseFloat(valor);
-    actualizados[index].subtotal =
-      actualizados[index].cantidad * actualizados[index].precio;
+    actualizados[index][campo] = campo === "temporal" ? valor : parseFloat(valor);
+    actualizados[index].subtotal = actualizados[index].cantidad * actualizados[index].precio;
     setSeleccionados(actualizados);
   };
 
@@ -73,10 +73,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
       return;
     }
 
-    const subtotalGrupo = seleccionados.reduce(
-      (acc, p) => acc + p.subtotal,
-      0
-    );
+    const subtotalGrupo = seleccionados.reduce((acc, p) => acc + p.subtotal, 0);
     const grupo = {
       nombre: nombreGrupo,
       subtotal: subtotalGrupo,
@@ -97,7 +94,7 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
   return (
     <div className="modal">
       <div className="modal-content">
-        <h2>Crear Grupo de Artículos</h2>
+        <h2>📦 Crear Grupo de Artículos</h2>
 
         <input
           type="text"
@@ -115,36 +112,30 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
           style={{ width: "100%", marginBottom: "10px" }}
         />
 
-        <ul style={{ maxHeight: "150px", overflowY: "auto", padding: 0 }}>
-          {filtrados.map((p) => (
-            <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
-              {p.nombre} - ${p.precio.toLocaleString("es-CO")}
-              <button
-                style={{ marginLeft: "10px" }}
-                onClick={() => agregarAlGrupo(p)}
-              >
-                Agregar
-              </button>
-            </li>
-          ))}
-        </ul>
+        {busqueda && (
+          <ul style={{ maxHeight: "150px", overflowY: "auto", padding: 0 }}>
+            {filtrados.map((p) => (
+              <li key={p.id} style={{ marginBottom: "6px", listStyle: "none" }}>
+                {p.nombre} - ${p.precio.toLocaleString("es-CO")}
+                <button style={{ marginLeft: "10px" }} onClick={() => agregarAlGrupo(p)}>
+                  Agregar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <h4 style={{ marginTop: "15px" }}>Artículos del grupo:</h4>
         <ul style={{ padding: 0 }}>
           {seleccionados.map((item, index) => (
-            <li
-              key={item.id}
-              style={{ listStyle: "none", marginBottom: "8px" }}
-            >
+            <li key={item.id} style={{ listStyle: "none", marginBottom: "8px" }}>
               {item.nombre} <br />
               Cantidad:
               <input
                 type="number"
                 min="1"
                 value={item.cantidad}
-                onChange={(e) =>
-                  actualizarCantidadPrecio(index, "cantidad", e.target.value)
-                }
+                onChange={(e) => actualizarCampo(index, "cantidad", e.target.value)}
                 style={{ width: "60px", margin: "0 5px" }}
               />
               Precio:
@@ -152,19 +143,21 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
                 type="number"
                 min="0"
                 value={item.precio}
-                onChange={(e) =>
-                  actualizarCantidadPrecio(index, "precio", e.target.value)
-                }
+                onChange={(e) => actualizarCampo(index, "precio", e.target.value)}
                 style={{ width: "70px", margin: "0 5px" }}
               />
-              <strong>
-                {" "}
+              <label style={{ marginLeft: "10px" }}>
+                <input
+                  type="checkbox"
+                  checked={item.temporal || false}
+                  onChange={(e) => actualizarCampo(index, "temporal", e.target.checked)}
+                />{" "}
+                Temporal
+              </label>
+              <strong style={{ marginLeft: "10px" }}>
                 Subtotal: ${item.subtotal.toLocaleString("es-CO")}
               </strong>
-              <button
-                onClick={() => eliminarDelGrupo(index)}
-                style={{ marginLeft: "10px" }}
-              >
+              <button onClick={() => eliminarDelGrupo(index)} style={{ marginLeft: "10px" }}>
                 Quitar
               </button>
             </li>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { FaEdit, FaTrash } from "react-icons/fa";
+import Papa from "papaparse";
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([]);
@@ -14,6 +15,7 @@ export default function Clientes() {
     email: ""
   });
   const [editando, setEditando] = useState(null);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
   useEffect(() => {
     cargarClientes();
@@ -44,22 +46,21 @@ export default function Clientes() {
     if (!nombre || !identificacion || !telefono) {
       return Swal.fire("Campos requeridos", "Nombre, identificación y teléfono son obligatorios.", "warning");
     }
-  
-    // ✅ Verificar si ya existe cliente con esa identificación
+
     const { data: existentes, error: errorExistentes } = await supabase
       .from("clientes")
       .select("id")
       .eq("identificacion", identificacion);
-  
+
     if (errorExistentes) {
       console.error("Error buscando duplicados:", errorExistentes);
       return Swal.fire("Error", "Problema verificando cliente existente.", "error");
     }
-  
+
     if (existentes && existentes.length > 0 && !editando) {
       return Swal.fire("Ya existe", "Ya hay un cliente con esa identificación.", "warning");
     }
-  
+
     if (editando) {
       const { error } = await supabase.from("clientes")
         .update({ nombre, identificacion, telefono, direccion, email })
@@ -68,18 +69,20 @@ export default function Clientes() {
         Swal.fire("Actualizado", "Cliente actualizado correctamente.", "success");
         setEditando(null);
         setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
+        setMostrarFormulario(false);
         cargarClientes();
       }
     } else {
       const nuevoCodigo = generarCodigoCliente();
       if (!nuevoCodigo) return;
-  
+
       const { error } = await supabase.from("clientes")
         .insert([{ codigo: nuevoCodigo, nombre, identificacion, telefono, direccion, email }]);
-  
+
       if (!error) {
         Swal.fire("Guardado", "Cliente guardado correctamente.", "success");
         setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
+        setMostrarFormulario(false);
         cargarClientes();
       } else {
         console.error("Error al guardar:", error);
@@ -97,7 +100,9 @@ export default function Clientes() {
       direccion: cliente.direccion,
       email: cliente.email || ""
     });
+    setMostrarFormulario(true);
   };
+
   const eliminarCliente = async (id) => {
     const confirmar = await Swal.fire({
       title: "¿Eliminar este cliente?",
@@ -115,6 +120,22 @@ export default function Clientes() {
     }
   };
 
+  const exportarCSV = () => {
+    if (clientes.length === 0) {
+      Swal.fire("Sin datos", "No hay clientes para exportar.", "info");
+      return;
+    }
+    const csv = Papa.unparse(clientes, { delimiter: ";" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "clientes.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filtrados = clientes.filter((c) =>
     [c.codigo, c.nombre, c.telefono, c.direccion, c.email]
       .some((campo) => campo?.toLowerCase().includes(buscar.toLowerCase()))
@@ -124,82 +145,74 @@ export default function Clientes() {
     <div style={{ padding: "1rem", maxWidth: "650px", margin: "auto" }}>
       <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Clientes</h2>
 
-      <input
-        type="text"
-        placeholder="Buscar cliente"
-        value={buscar}
-        onChange={(e) => setBuscar(e.target.value)}
-        style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}
-      />
-
-      <h3>{editando ? "Editar Cliente" : "Agregar Cliente"}</h3>
-      <input
-        type="text"
-        placeholder="Nombre"
-        value={form.nombre}
-        onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="text"
-        placeholder="Identificación"
-        value={form.identificacion}
-        onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="text"
-        placeholder="Teléfono"
-        value={form.telefono}
-        onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="text"
-        placeholder="Dirección"
-        value={form.direccion}
-        onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="email"
-        placeholder="Correo electrónico"
-        value={form.email}
-        onChange={(e) => setForm({ ...form, email: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }}
-      />
-
-      <button onClick={guardarCliente} style={{ width: "100%", padding: "10px", marginBottom: "8px" }}>
-        {editando ? "Actualizar" : "Guardar"}
+      <button
+        onClick={() => {
+          setEditando(null);
+          setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
+          setMostrarFormulario(true);
+        }}
+        style={{ margin: "10px 0", padding: "10px", background: "#ccc", borderRadius: "5px" }}
+      >
+        ➕ Agregar
       </button>
-      <button onClick={() => {
-        setEditando(null);
-        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
-      }} style={{ width: "100%", padding: "8px", marginBottom: "1rem" }}>Cancelar</button>
 
-      <h3 style={{ marginTop: "1.5rem" }}>Lista de Clientes</h3>
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {filtrados.map((c) => (
-          <li key={c.id} style={{
-            marginBottom: "1rem",
-            border: "1px solid #ccc",
-            borderRadius: "8px",
-            padding: "10px",
-            background: "#f9f9f9"
-          }}>
-            <strong>{c.codigo || "Sin código"}</strong><br />
-            {c.nombre}<br />
-            🆔 {c.identificacion}<br />
-            📞 {c.telefono}<br />
-            📍 {c.direccion}<br />
-            📧 {c.email}
-            <div style={{ marginTop: "0.5rem" }}>
-              <button onClick={() => editarCliente(c)} style={{ marginRight: "10px" }}><FaEdit /></button>
-              <button onClick={() => eliminarCliente(c.id)}><FaTrash /></button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <button
+        onClick={exportarCSV}
+        style={{ margin: "10px 0 20px 10px", padding: "10px", background: "#4caf50", color: "#fff", borderRadius: "5px" }}
+      >
+        📁 Exportar CSV
+      </button>
+
+      {mostrarFormulario && (
+        <>
+          <h3>{editando ? "Editar Cliente" : "Agregar Cliente"}</h3>
+          <input type="text" placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+          <input type="text" placeholder="Identificación" value={form.identificacion} onChange={(e) => setForm({ ...form, identificacion: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+          <input type="text" placeholder="Teléfono" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+          <input type="text" placeholder="Dirección" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+          <input type="email" placeholder="Correo electrónico" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+          <button onClick={guardarCliente} style={{ width: "100%", padding: "10px", marginBottom: "8px" }}>{editando ? "Actualizar" : "Guardar"}</button>
+          <button onClick={() => { setEditando(null); setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" }); setMostrarFormulario(false); }} style={{ width: "100%", padding: "8px", marginBottom: "1rem", background: "#eee" }}>Cancelar</button>
+        </>
+      )}
+
+      {/* 🔍 Buscador debajo del formulario */}
+      <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", gap: "10px" }}>
+        <input
+          type="text"
+          placeholder="Buscar cliente"
+          value={buscar}
+          onChange={(e) => setBuscar(e.target.value)}
+        />
+      </div>
+
+      {buscar && filtrados.length > 0 && (
+        <>
+          <h3 style={{ marginTop: "1.5rem" }}>Resultados</h3>
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {filtrados.map((c) => (
+              <li key={c.id} style={{
+                marginBottom: "1rem",
+                border: "1px solid #ccc",
+                borderRadius: "8px",
+                padding: "10px",
+                background: "#f9f9f9"
+              }}>
+                <strong>{c.codigo || "Sin código"}</strong><br />
+                {c.nombre}<br />
+                🆔 {c.identificacion}<br />
+                📞 {c.telefono}<br />
+                📍 {c.direccion}<br />
+                📧 {c.email}
+                <div style={{ marginTop: "0.5rem" }}>
+                  <button onClick={() => editarCliente(c)} style={{ marginRight: "10px" }}><FaEdit /></button>
+                  <button onClick={() => eliminarCliente(c.id)}><FaTrash /></button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

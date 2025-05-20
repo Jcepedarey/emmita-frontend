@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
-import { generarRemision } from "../utils/generarRemision";
+import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
 
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div

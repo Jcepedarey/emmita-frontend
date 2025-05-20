@@ -1,8 +1,6 @@
-// ✅ REMISIÓN PDF DESDE CREARDOCUMENTO - UNIFICADO
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import supabase from "../supabaseClient";
-import { generarNombreArchivo } from "./nombrePDF"; // ✅ NUEVO IMPORT
+import { generarNombreArchivo } from "./nombrePDF";
 
 // 🖼️ Optimización de imagen
 const procesarImagen = (src, width = 150, calidad = 1.0) =>
@@ -37,7 +35,12 @@ export const generarRemisionPDF = async (documento) => {
 
   insertarFondo();
 
-  const remisionId = `REM-${documento.numero || documento.numero_orden || documento.id?.toString().slice(-5) || "SN"}`;
+  const fechaSegura = documento.fecha_creacion || new Date();
+  const nombreArchivo = generarNombreArchivo("remision", fechaSegura, documento.nombre_cliente);
+  const remisionId = nombreArchivo.replace(".pdf", "");
+
+  const fechaCreacion = documento.fecha_creacion ? new Date(documento.fecha_creacion).toISOString().slice(0, 10) : "-";
+  const fechaEvento = documento.fecha_evento ? new Date(documento.fecha_evento).toISOString().slice(0, 10) : "-";
 
   // 🧾 Encabezado
   doc.addImage(logo, "PNG", 10, 10, 35, 30);
@@ -47,9 +50,10 @@ export const generarRemisionPDF = async (documento) => {
   doc.text("Alquiler & Eventos Emmita", 105, 26, { align: "center" });
   doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio", 105, 31, { align: "center" });
   doc.text("Cel: 3166534685 - 3118222934", 105, 36, { align: "center" });
+  doc.setLineWidth(0.5); // 💪 igualar grosor a PDF normal
   doc.line(10, 44, 200, 44);
 
-  // 🧾 Datos del documento y cliente
+  // 🧾 Datos del cliente (izquierda)
   doc.setFontSize(12);
   doc.text(`No. de Remisión: ${remisionId}`, 10, 48);
   doc.text(`Cliente: ${documento.nombre_cliente || "Cliente no especificado"}`, 10, 55);
@@ -57,8 +61,11 @@ export const generarRemisionPDF = async (documento) => {
   if (documento.telefono) doc.text(`Teléfono: ${documento.telefono}`, 10, 67);
   if (documento.direccion) doc.text(`Dirección: ${documento.direccion}`, 10, 73);
   if (documento.email) doc.text(`Correo: ${documento.email}`, 10, 79);
-  doc.text(`Fecha de creación: ${documento.fecha || "-"}`, 10, 85);
-  doc.text(`Fecha del evento: ${documento.fecha_evento || "-"}`, 10, 91);
+
+  // 📅 Fechas (derecha)
+  doc.setFontSize(11);
+  doc.text(`Fecha creación: ${fechaCreacion}`, 150, 48);
+  doc.text(`Fecha del evento: ${fechaEvento}`, 150, 55);
 
   // 📋 Tabla de artículos
   const filas = [];
@@ -79,14 +86,14 @@ export const generarRemisionPDF = async (documento) => {
     styles: { fontSize: 10 },
     headStyles: { fillColor: [41, 128, 185] },
     columnStyles: {
-      0: { cellWidth: 25 },
-      1: { cellWidth: 160 }
+      0: { cellWidth: 30 },
+      1: { cellWidth: 150 }
     },
     didDrawPage: insertarFondo,
-    margin: { bottom: 40 }
+    margin: { left: 10, right: 10 }
   });
 
-  // ✍️ Firmas al pie de página
+  // ✍️ Firmas
   const h = doc.internal.pageSize.height;
   doc.setFontSize(10);
   doc.text("Firma responsable entrega:", 20, h - 40);
@@ -94,10 +101,8 @@ export const generarRemisionPDF = async (documento) => {
   doc.text("Firma del cliente:", 120, h - 40);
   doc.line(120, h - 35, 190, h - 35);
 
-  // ✅ Nuevo sistema de nombre de archivo
-  const nombreArchivo = generarNombreArchivo("remision", documento.fecha, documento.nombre_cliente);
   doc.save(nombreArchivo);
 };
 
-// Alias
 export { generarRemisionPDF as generarRemision };
+export default generarRemisionPDF;
