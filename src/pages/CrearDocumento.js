@@ -6,7 +6,7 @@ import supabase from "../supabaseClient";
 import BuscarProductoModal from "../components/BuscarProductoModal";
 import AgregarGrupoModal from "../components/AgregarGrupoModal";
 import CrearClienteModal from "../components/CrearClienteModal";
-import BuscarProductoProveedorModal from "../components/BuscarProductoProveedorModal";
+import BuscarProveedorYProductoModal from "../components/BuscarProveedorYProductoModal";
 
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF } from "../utils/generarRemision";
@@ -244,7 +244,7 @@ const obtenerDatosPDF = () => ({
   total,
   abonos,
   garantia,
-  fecha: fechaCreacion,
+  fecha_creacion: fechaCreacion,
   fecha_evento: fechaEvento
 });
 
@@ -455,42 +455,49 @@ return (
     </div>
 
     {/* BOTONES FINALES */}
-    <div style={{ marginTop: "30px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
-      <button onClick={guardarDocumento} style={{ padding: "10px 20px" }}>
-        💾 Guardar Documento
-      </button>
+   <div style={{
+  marginTop: "30px",
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "10px",
+  justifyContent: "center"
+}}>
+  <button onClick={guardarDocumento} style={{ padding: "10px 20px" }}>
+    💾 Guardar Documento
+  </button>
 
-      <button onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)} style={{ padding: "10px 20px" }}>
-        📄 Descargar PDF
-      </button>
+  <button onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)} style={{ padding: "10px 20px" }}>
+    📄 Descargar PDF
+  </button>
 
-      {tipoDocumento === "orden" && productosAgregados.length > 0 && (
-        <button
-          onClick={() => generarRemisionPDF(obtenerDatosPDF())}
-          style={{ padding: "10px 20px", backgroundColor: "#4CAF50", color: "white" }}
-        >
-          📦 Generar Remisión
-        </button>
-      )}
+  {tipoDocumento === "orden" && productosAgregados.length > 0 && (
+    <button
+      onClick={() => generarRemisionPDF(obtenerDatosPDF())}
+      style={{ padding: "10px 20px", backgroundColor: "#4CAF50", color: "white" }}
+    >
+      📦 Generar Remisión
+    </button>
+  )}
 
-      <button
-        onClick={() => {
-          setClienteSeleccionado(null);
-          setProductosAgregados([]);
-          setGarantia("");
-          setAbonos([""]);
-          setBusquedaCliente("");
-        }}
-        style={{
-          padding: "10px 20px",
-          marginLeft: "10px",
-          backgroundColor: "#e53935",
-          color: "white"
-        }}
-      >
-        🧹 Limpiar módulo
-      </button>
-    </div>
+  <button
+    onClick={() => {
+      setClienteSeleccionado(null);
+      setProductosAgregados([]);
+      setGarantia("");
+      setAbonos([""]);
+      setBusquedaCliente("");
+      setFechaEvento(""); // <-- Asegúrate de limpiar también la fecha del evento (tema del punto 4)
+    }}
+    style={{
+      padding: "10px 20px",
+      marginLeft: "10px",
+      backgroundColor: "#e53935",
+      color: "white"
+    }}
+  >
+    🧹 Limpiar módulo
+  </button>
+</div>
 
     {/* MODALES */}
     {modalBuscarProducto && (
@@ -508,11 +515,11 @@ return (
     )}
 
     {modalProveedor && (
-      <BuscarProductoProveedorModal
-        onSelect={agregarProductoProveedor}
-        onClose={() => setModalProveedor(false)}
-      />
-    )}
+  <BuscarProveedorYProductoModal
+    onSelect={agregarProductoProveedor}
+    onClose={() => setModalProveedor(false)}
+  />
+)}
 
     {modalCrearCliente && (
       <CrearClienteModal
