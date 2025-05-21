@@ -1,119 +1,186 @@
-// src/pages/Trazabilidad.js (actualizado)
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
+import { generarPDF } from "../utils/generarPDF";
+import { generarRemision } from "../utils/generarRemision";
 
 export default function Trazabilidad() {
-  const [productos, setProductos] = useState([]);
-  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
-  const [movimientos, setMovimientos] = useState([]);
+  const [productoBuscar, setProductoBuscar] = useState("");
+  const [clienteFiltro, setClienteFiltro] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
-  const [filtroNombre, setFiltroNombre] = useState("");
-  const [categorias, setCategorias] = useState([]);
+  const [resultados, setResultados] = useState([]);
+
+  const [productosLista, setProductosLista] = useState([]);
+  const [clientesLista, setClientesLista] = useState([]);
+
+  const [sugerenciasProductos, setSugerenciasProductos] = useState([]);
+  const [sugerenciasClientes, setSugerenciasClientes] = useState([]);
 
   useEffect(() => {
-    cargarProductos();
+    const cargarDatos = async () => {
+      const { data: productos } = await supabase.from("productos").select("nombre");
+      const { data: clientes } = await supabase.from("clientes").select("*");
+
+      setProductosLista(productos || []);
+      setClientesLista(clientes || []);
+    };
+    cargarDatos();
   }, []);
 
-  const cargarProductos = async () => {
-    const { data } = await supabase.from("productos").select("id, nombre, categoria").order("nombre");
-    if (data) {
-      setProductos(data);
-      const unicas = [...new Set(data.map(p => p.categoria).filter(Boolean))];
-      setCategorias(unicas);
+  const buscarDocumentos = async () => {
+    if (!productoBuscar.trim()) {
+      alert("Escriba el nombre de un producto.");
+      return;
     }
-  };
 
-  const buscarTrazabilidad = async () => {
-    if (!productoSeleccionado) return alert("Selecciona un producto válido");
+    const [cotRes, ordRes] = await Promise.all([
+      supabase.from("cotizaciones").select("*"),
+      supabase.from("ordenes_pedido").select("*")
+    ]);
 
-    let query = supabase
-      .from("trazabilidad")
-      .select("*, producto_id, cliente_id")
-      .eq("producto_id", productoSeleccionado);
+    const todos = [...(cotRes.data || []), ...(ordRes.data || [])];
 
-    if (fechaDesde) query = query.gte("fecha", fechaDesde);
-    if (fechaHasta) query = query.lte("fecha", fechaHasta);
+    let clienteIdsFiltrados = [];
+    if (clienteFiltro.trim()) {
+      clienteIdsFiltrados = clientesLista
+        .filter((c) => c.nombre.toLowerCase().includes(clienteFiltro.toLowerCase()))
+        .map((c) => c.id);
+    }
 
-    const { data, error } = await query;
-
-    if (!error) {
-      const conClientes = await Promise.all(
-        data.map(async (mov) => {
-          const cliente = await supabase.from("clientes").select("nombre").eq("id", mov.cliente_id).single();
-          return {
-            ...mov,
-            cliente: cliente.data?.nombre || "No identificado",
-          };
-        })
+    const resultadosFiltrados = todos.filter((doc) => {
+      const productos = doc.productos || [];
+      const contieneProducto = productos.some((p) =>
+        p.nombre.toLowerCase().includes(productoBuscar.toLowerCase())
       );
-      setMovimientos(conClientes);
-    }
+      if (!contieneProducto) return false;
+
+      const fechaBase = doc.fecha || doc.fecha_creacion;
+      if (fechaDesde && fechaBase < fechaDesde) return false;
+      if (fechaHasta && fechaBase > fechaHasta) return false;
+
+      if (clienteFiltro && clienteIdsFiltrados.length > 0) {
+        return clienteIdsFiltrados.includes(doc.cliente_id);
+      }
+
+      return true;
+    });
+
+    resultadosFiltrados.forEach((doc) => {
+      const cliente = clientesLista.find((c) => c.id === doc.cliente_id);
+      if (cliente) {
+        doc.nombre_cliente = cliente.nombre;
+        doc.identificacion = cliente.identificacion;
+        doc.telefono = cliente.telefono;
+        doc.direccion = cliente.direccion;
+        doc.email = cliente.email;
+      }
+    });
+
+    resultadosFiltrados.sort((a, b) => {
+      const fechaA = new Date(a.fecha || a.fecha_creacion);
+      const fechaB = new Date(b.fecha || b.fecha_creacion);
+      return fechaB - fechaA;
+    });
+
+    setResultados(resultadosFiltrados);
   };
 
-  const productosFiltrados = productos.filter((p) => {
-    return (
-      p.nombre.toLowerCase().includes(filtroNombre.toLowerCase()) &&
-      (!categoriaSeleccionada || p.categoria === categoriaSeleccionada)
+  const limpiar = () => {
+    setProductoBuscar("");
+    setClienteFiltro("");
+    setFechaDesde("");
+    setFechaHasta("");
+    setResultados([]);
+    setSugerenciasProductos([]);
+    setSugerenciasClientes([]);
+  };
+
+  const manejarCambioProducto = (e) => {
+    const valor = e.target.value;
+    setProductoBuscar(valor);
+    setSugerenciasProductos(
+      valor.length > 0
+        ? productosLista.filter((p) =>
+            p.nombre.toLowerCase().includes(valor.toLowerCase())
+          )
+        : []
     );
-  });
+  };
+
+  const manejarCambioCliente = (e) => {
+    const valor = e.target.value;
+    setClienteFiltro(valor);
+    setSugerenciasClientes(
+      valor.length > 0
+        ? clientesLista.filter((c) =>
+            c.nombre.toLowerCase().includes(valor.toLowerCase())
+          )
+        : []
+    );
+  };
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "700px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center", fontSize: "20px", marginBottom: "1rem" }}>Trazabilidad de Artículos</h2>
+    <div style={{ maxWidth: "900px", margin: "auto", padding: "1rem" }}>
+      <h2 style={{ textAlign: "center" }}>Trazabilidad de Artículos</h2>
 
-      {/* Buscador de producto por nombre */}
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Buscar producto por nombre:</label>
-        <input
-          type="text"
-          value={filtroNombre}
-          onChange={(e) => setFiltroNombre(e.target.value)}
-          placeholder="Ej: silla"
-          style={{ width: "100%", padding: "8px", marginTop: 4 }}
-        />
-      </div>
-
-      {/* Lista de productos filtrados */}
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Seleccionar producto:</label>
-        <select
-          value={productoSeleccionado || ""}
-          onChange={(e) => setProductoSeleccionado(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginTop: 4 }}
-        >
-          <option value="">-- Seleccionar --</option>
-          {productosFiltrados.map((p) => (
-            <option key={p.id} value={p.id}>{p.nombre}</option>
+      <label>Nombre del producto:</label>
+      <input
+        type="text"
+        value={productoBuscar}
+        onChange={manejarCambioProducto}
+        placeholder="Ej: silla rimax"
+        style={{ width: "100%", marginBottom: 4 }}
+      />
+      {sugerenciasProductos.length > 0 && (
+        <ul style={{ listStyle: "none", padding: 4, border: "1px solid #ccc", borderRadius: 4, maxHeight: 100, overflowY: "auto" }}>
+          {sugerenciasProductos.map((p, index) => (
+            <li
+              key={index}
+              onClick={() => {
+                setProductoBuscar(p.nombre);
+                setSugerenciasProductos([]);
+              }}
+              style={{ padding: 4, cursor: "pointer" }}
+            >
+              {p.nombre}
+            </li>
           ))}
-        </select>
-      </div>
+        </ul>
+      )}
 
-      {/* Filtro por categoría */}
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Filtrar por categoría:</label>
-        <select
-          value={categoriaSeleccionada}
-          onChange={(e) => setCategoriaSeleccionada(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginTop: 4 }}
-        >
-          <option value="">Todas</option>
-          {categorias.map((cat) => (
-            <option key={cat} value={cat}>{cat}</option>
+      <label>Filtrar por cliente (opcional):</label>
+      <input
+        type="text"
+        value={clienteFiltro}
+        onChange={manejarCambioCliente}
+        placeholder="Nombre del cliente"
+        style={{ width: "100%", marginBottom: 4 }}
+      />
+      {sugerenciasClientes.length > 0 && (
+        <ul style={{ listStyle: "none", padding: 4, border: "1px solid #ccc", borderRadius: 4, maxHeight: 100, overflowY: "auto" }}>
+          {sugerenciasClientes.map((c, index) => (
+            <li
+              key={index}
+              onClick={() => {
+                setClienteFiltro(c.nombre);
+                setSugerenciasClientes([]);
+              }}
+              style={{ padding: 4, cursor: "pointer" }}
+            >
+              {c.nombre}
+            </li>
           ))}
-        </select>
-      </div>
+        </ul>
+      )}
 
-      {/* Fechas */}
-      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", gap: "10px", marginBottom: 10 }}>
         <div style={{ flex: 1 }}>
           <label>Desde:</label>
           <input
             type="date"
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
-            style={{ width: "100%", padding: "8px", marginTop: 4 }}
+            style={{ width: "100%" }}
           />
         </div>
         <div style={{ flex: 1 }}>
@@ -122,29 +189,63 @@ export default function Trazabilidad() {
             type="date"
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
-            style={{ width: "100%", padding: "8px", marginTop: 4 }}
+            style={{ width: "100%" }}
           />
         </div>
       </div>
 
       <button
-        onClick={buscarTrazabilidad}
-        style={{ width: "100%", padding: "10px", fontWeight: "bold", backgroundColor: "#1f2937", color: "white", border: "none", borderRadius: "6px" }}
+        onClick={buscarDocumentos}
+        style={{ width: "100%", padding: "10px", background: "#1f2937", color: "white", marginBottom: "20px" }}
       >
-        Buscar
+        Buscar movimientos
       </button>
 
-      {/* Resultados */}
-      <h3 style={{ marginTop: "2rem" }}>Resultados</h3>
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {movimientos.map((m) => (
-          <li key={m.id} style={{ borderBottom: "1px solid #ccc", padding: "10px 0" }}>
-            <strong>Fecha:</strong> {m.fecha?.split("T")[0]}<br />
-            <strong>Cliente:</strong> {m.cliente}<br />
-            <strong>Detalle:</strong> {m.descripcion}
-          </li>
-        ))}
-      </ul>
+      {resultados.length > 0 ? (
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          {resultados.map((doc) => {
+            const tipo = doc.numero?.startsWith("COT") ? "cotizacion" : "orden";
+            const fecha = doc.fecha || doc.fecha_creacion || "-";
+            const nombrePDF = `${tipo === "cotizacion" ? "COT" : "Ord"}_${fecha?.split("T")[0]}_${doc.nombre_cliente?.replace(/\s+/g, "_")}.pdf`;
+
+            return (
+              <li key={doc.id} style={{ borderBottom: "1px solid #ccc", padding: "10px 0" }}>
+                <strong>Documento:</strong> {doc.numero || "-"}<br />
+                <strong>Cliente:</strong> {doc.nombre_cliente || "Sin cliente"}<br />
+                <strong>Fecha:</strong> {fecha?.split("T")[0] || "-"}<br />
+                <strong>Archivo:</strong> {nombrePDF}
+                <div style={{ marginTop: 6 }}>
+                  <span
+                    style={{ cursor: "pointer", marginRight: 10 }}
+                    onClick={() => generarPDF(doc, tipo)}
+                    title="Descargar PDF"
+                  >
+                    📄
+                  </span>
+                  {tipo === "orden" && (
+                    <span
+                      style={{ cursor: "pointer" }}
+                      onClick={() => generarRemision(doc)}
+                      title="Descargar Remisión"
+                    >
+                      🚚
+                    </span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p>No se encontraron documentos con ese producto.</p>
+      )}
+
+      <button
+        onClick={limpiar}
+        style={{ width: "100%", marginTop: 30, backgroundColor: "#e53935", color: "white", padding: "10px", borderRadius: "6px" }}
+      >
+        🧹 Limpiar módulo
+      </button>
     </div>
   );
 }

@@ -41,10 +41,10 @@ export default function BuscarDocumento() {
       if (clienteEncontrado) query = query.eq("cliente_id", clienteEncontrado.id);
     }
 
-    const campoFecha = tipo === "ordenes_pedido" ? "fecha_evento" : "fecha_creacion";
+    const campoFecha = tipo === "ordenes_pedido" ? "fecha_evento" : "fecha";
 
-    if (fechaInicioCreacion) query = query.gte("fecha_creacion", fechaInicioCreacion);
-    if (fechaFinCreacion) query = query.lte("fecha_creacion", fechaFinCreacion);
+   if (fechaInicioCreacion) query = query.gte(campoFecha, fechaInicioCreacion);
+if (fechaFinCreacion) query = query.lte(campoFecha, fechaFinCreacion);
     if (fechaInicioEvento && tipo === "ordenes_pedido") query = query.gte("fecha_evento", fechaInicioEvento);
     if (fechaFinEvento && tipo === "ordenes_pedido") query = query.lte("fecha_evento", fechaFinEvento);
 
@@ -181,7 +181,8 @@ export default function BuscarDocumento() {
                 identificacion: cliente?.identificacion || "",
                 telefono: cliente?.telefono || "",
                 direccion: cliente?.direccion || "",
-                email: cliente?.email || ""
+                email: cliente?.email || "",
+                fecha_creacion: doc.fecha_creacion || doc.fecha || null
               };
               const fechaCreacion = doc.fecha_creacion?.split("T")[0] || "-";
               const fechaEvento = doc.fecha_evento?.split("T")[0] || "-";
