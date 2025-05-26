@@ -54,7 +54,7 @@ export default function Trazabilidad() {
       );
       if (!contieneProducto) return false;
 
-      const fechaBase = doc.fecha || doc.fecha_creacion;
+      const fechaBase = doc.fecha_evento || doc.fecha || doc.fecha_creacion;
       if (fechaDesde && fechaBase < fechaDesde) return false;
       if (fechaHasta && fechaBase > fechaHasta) return false;
 
