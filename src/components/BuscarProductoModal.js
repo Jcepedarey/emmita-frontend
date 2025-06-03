@@ -1,8 +1,9 @@
 // BuscarProductoModal.js
 import React, { useState, useEffect } from 'react';
 import supabase from "../supabaseClient";
+import { v4 as uuidv4 } from 'uuid'; // ✅ para productos temporales
 
-const BuscarProductoModal = ({ onSelect, onClose }) => {
+const BuscarProductoModal = ({ onSelect, onClose, onAgregarProducto }) => {
   const [productos, setProductos] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [form, setForm] = useState({
@@ -10,8 +11,10 @@ const BuscarProductoModal = ({ onSelect, onClose }) => {
     descripcion: '',
     precio: '',
     stock: '',
-    categoria: ''
+    categoria: '',
+    cantidad: 1
   });
+  const [temporal, setTemporal] = useState(false); // ✅ estado para checkbox
 
   useEffect(() => {
     fetchProductos();
@@ -29,22 +32,42 @@ const BuscarProductoModal = ({ onSelect, onClose }) => {
   );
 
   const guardarNuevoProducto = async () => {
-    const { nombre, descripcion, precio, stock, categoria } = form;
+    const { nombre, descripcion, precio, stock, categoria, cantidad } = form;
 
     if (!nombre || !precio || !stock) {
       alert("Nombre, precio y stock son obligatorios");
       return;
     }
 
-    const { error } = await supabase.from("productos").insert([{ nombre, descripcion, precio, stock, categoria }]);
-
-    if (!error) {
-      alert("Producto agregado correctamente");
-      setForm({ nombre: '', descripcion: '', precio: '', stock: '', categoria: '' });
-      fetchProductos(); // recargar
+    if (temporal) {
+      const productoTemporal = {
+        id: uuidv4(),
+        nombre,
+        precio: parseFloat(precio),
+        cantidad: parseInt(cantidad, 10),
+        temporal: true
+      };
+      onAgregarProducto(productoTemporal);
+      onClose();
     } else {
-      alert("Error al guardar el producto");
-      console.error(error);
+      const { data, error } = await supabase
+        .from("productos")
+        .insert([{ nombre, descripcion, precio, stock, categoria }])
+        .select();
+
+      if (!error && data?.length) {
+        const nuevoProducto = {
+          ...data[0],
+          cantidad: parseInt(cantidad, 10),
+          precio: parseFloat(precio),
+          temporal: false
+        };
+        onAgregarProducto(nuevoProducto);
+        onClose();
+      } else {
+        alert("Error al guardar el producto");
+        console.error(error);
+      }
     }
   };
 
@@ -115,6 +138,31 @@ const BuscarProductoModal = ({ onSelect, onClose }) => {
           onChange={(e) => setForm({ ...form, categoria: e.target.value })}
           style={{ width: "100%", marginBottom: "8px", padding: "6px" }}
         />
+        <input
+          type="number"
+          placeholder="Cantidad"
+          min="1"
+          value={form.cantidad}
+          onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
+          style={{ width: "100%", marginBottom: "8px", padding: "6px" }}
+        />
+
+        <div style={{ marginTop: "10px", marginBottom: "10px" }}>
+  <span style={{ display: "block", marginBottom: "4px" }}>¿Producto temporal?</span>
+  <input
+    type="checkbox"
+    checked={temporal}
+    onChange={(e) => setTemporal(e.target.checked)}
+    style={{
+      display: "inline-block",
+      width: "16px",
+      height: "16px",
+      padding: 0,
+      margin: 0,
+      verticalAlign: "middle"
+    }}
+  />
+</div>
 
         <button onClick={guardarNuevoProducto} style={{ marginTop: "10px" }}>
           Guardar producto

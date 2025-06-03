@@ -54,13 +54,13 @@ export const generarRemisionPDF = async (documento) => {
   doc.line(10, 44, 200, 44);
 
   // 🧾 Datos del cliente (izquierda)
-  doc.setFontSize(12);
-  doc.text(`No. de Remisión: ${remisionId}`, 10, 48);
-  doc.text(`Cliente: ${documento.nombre_cliente || "Cliente no especificado"}`, 10, 55);
-  if (documento.identificacion) doc.text(`Identificación: ${documento.identificacion}`, 10, 61);
-  if (documento.telefono) doc.text(`Teléfono: ${documento.telefono}`, 10, 67);
-  if (documento.direccion) doc.text(`Dirección: ${documento.direccion}`, 10, 73);
-  if (documento.email) doc.text(`Correo: ${documento.email}`, 10, 79);
+doc.setFontSize(12);
+doc.text(`No. de Remisión: ${remisionId}`, 10, 48);
+doc.text(`Cliente: ${documento.nombre_cliente || "Cliente no especificado"}`, 10, 55);
+doc.text(`Identificación: ${documento.identificacion || "N/A"}`, 10, 61);
+doc.text(`Teléfono: ${documento.telefono || "N/A"}`, 10, 67);
+doc.text(`Dirección: ${documento.direccion || "N/A"}`, 10, 73);
+doc.text(`Correo: ${documento.email || "N/A"}`, 10, 79);
 
   // 📅 Fechas (derecha)
   doc.setFontSize(11);

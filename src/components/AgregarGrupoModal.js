@@ -2,11 +2,21 @@ import React, { useState, useEffect } from "react";
 import supabase from "../supabaseClient";
 import "../estilos/GrupoModal.css";
 
-const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
+const AgregarGrupoModal = ({ onAgregarGrupo, onClose, stockDisponible, grupoEnEdicion }) => {
   const [nombreGrupo, setNombreGrupo] = useState("");
   const [productos, setProductos] = useState([]);
   const [seleccionados, setSeleccionados] = useState([]);
   const [busqueda, setBusqueda] = useState("");
+  const [cantidad, setCantidad] = useState(1); // ✅ Necesario para edición
+
+  // ✅ PASO 2: Precargar datos si se está editando
+  useEffect(() => {
+    if (grupoEnEdicion) {
+      setNombreGrupo(grupoEnEdicion.nombre || "");
+      setCantidad(grupoEnEdicion.cantidad || 1);
+      setSeleccionados(grupoEnEdicion.productos || []);
+    }
+  }, [grupoEnEdicion]);
 
   useEffect(() => {
     const cargarProductos = async () => {
@@ -67,21 +77,27 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
     setSeleccionados(actualizados);
   };
 
-  const guardarGrupo = () => {
-    if (!nombreGrupo || seleccionados.length === 0) {
-      alert("Debes nombrar el grupo y agregar artículos.");
-      return;
-    }
+  // ✅ PASO 3: Devolver grupo con estructura completa
+const guardarGrupo = () => {
+  if (!nombreGrupo || seleccionados.length === 0) {
+    alert("Debes nombrar el grupo y agregar artículos.");
+    return;
+  }
 
-    const subtotalGrupo = seleccionados.reduce((acc, p) => acc + p.subtotal, 0);
-    const grupo = {
-      nombre: nombreGrupo,
-      subtotal: subtotalGrupo,
-      articulos: seleccionados,
-    };
-    onAgregarGrupo(grupo);
-    onClose();
+  const subtotalGrupo = seleccionados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
+
+  const grupo = {
+    es_grupo: true,
+    nombre: nombreGrupo,
+    cantidad,
+    productos: seleccionados,
+    subtotal: subtotalGrupo,
+    precio: subtotalGrupo
   };
+
+  onAgregarGrupo(grupo);
+  onClose();
+};
 
   const filtrados = productos.filter((p) => {
     const texto = busqueda.toLowerCase();
@@ -130,6 +146,10 @@ const AgregarGrupoModal = ({ onAgregarGrupo, onClose }) => {
           {seleccionados.map((item, index) => (
             <li key={item.id} style={{ listStyle: "none", marginBottom: "8px" }}>
               {item.nombre} <br />
+              <span style={{ fontSize: "12px", color: "gray" }}>
+                Stock disponible: {stockDisponible?.[item.id] ?? "N/A"}
+              </span>
+              <br />
               Cantidad:
               <input
                 type="number"

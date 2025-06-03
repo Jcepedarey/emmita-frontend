@@ -13,15 +13,25 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
 
   const guardarCliente = async () => {
     const { nombre, identificacion, telefono, direccion, email } = form;
-    if (!nombre || !identificacion || !telefono) {
-      return Swal.fire("Campos requeridos", "Nombre, identificación y teléfono son obligatorios.", "warning");
+
+    if (!nombre.trim()) {
+      return Swal.fire("Campo requerido", "El nombre del cliente es obligatorio.", "warning");
     }
 
-    // ✅ Verificar si ya existe cliente con esa identificación
+    const clienteCompleto = {
+  nombre: nombre.trim(),
+  identificacion: identificacion?.trim() || null,
+  telefono: telefono?.trim() || null,
+  direccion: direccion?.trim() || null,
+  email: email?.trim() || null,
+  codigo: "" // lo asignamos más abajo
+};
+
+    // Verificar si ya existe cliente con esa identificación
     const { data: existentes, error: errorExistentes } = await supabase
       .from("clientes")
       .select("id")
-      .eq("identificacion", identificacion);
+      .eq("identificacion", clienteCompleto.identificacion);
 
     if (errorExistentes) {
       console.error("Error buscando duplicados:", errorExistentes);
@@ -32,7 +42,7 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
       return Swal.fire("Ya existe", "Ya hay un cliente con esa identificación.", "warning");
     }
 
-    // ✅ Consultar códigos existentes para generar uno nuevo
+    // Generar código de cliente
     const { data: clientesExistentes } = await supabase
       .from("clientes")
       .select("codigo");
@@ -44,12 +54,12 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
       .map(c => parseInt(c.slice(1)));
 
     const siguiente = Math.max(...codigos, 1000) + 1;
-    const nuevoCodigo = `C${siguiente}`;
+    clienteCompleto.codigo = `C${siguiente}`;
 
-    // ✅ Insertar nuevo cliente
+    // Insertar nuevo cliente
     const { data, error } = await supabase
       .from("clientes")
-      .insert([{ codigo: nuevoCodigo, nombre, identificacion, telefono, direccion, email }])
+      .insert([clienteCompleto])
       .select();
 
     if (!error && data?.length) {

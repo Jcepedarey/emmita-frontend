@@ -53,14 +53,14 @@ export const generarPDFRecepcion = async (revision, clienteInput, productosRecib
   doc.text("Cel: 3166534685 - 3118222934", 105, 36, { align: "center" });
   doc.line(10, 44, 200, 44);
 
-  // 🧾 Datos generales
-  doc.setFontSize(12);
-  doc.text(`Orden de pedido: ${revision.numero || "-"}`, 10, 48);
-  doc.text(`Cliente: ${cliente?.nombre || "-"}`, 10, 55);
-  doc.text(`Identificación: ${cliente?.identificacion || "-"}`, 10, 61);
-  doc.text(`Dirección: ${cliente?.direccion || "-"}`, 10, 67);
-  doc.text(`Teléfono: ${cliente?.telefono || "-"}`, 10, 73);
-  doc.text(`Fecha revisión: ${new Date().toLocaleDateString("es-CO")}`, 10, 79);
+ // 🧾 Datos generales
+doc.setFontSize(12);
+doc.text(`Orden de pedido: ${revision.numero || "N/A"}`, 10, 48);
+doc.text(`Cliente: ${cliente?.nombre || "N/A"}`, 10, 55);
+doc.text(`Identificación: ${cliente?.identificacion || "N/A"}`, 10, 61);
+doc.text(`Dirección: ${cliente?.direccion || "N/A"}`, 10, 67);
+doc.text(`Teléfono: ${cliente?.telefono || "N/A"}`, 10, 73);
+doc.text(`Fecha revisión: ${new Date().toLocaleDateString("es-CO")}`, 10, 79);
 
   // 📋 Tabla de productos
   autoTable(doc, {

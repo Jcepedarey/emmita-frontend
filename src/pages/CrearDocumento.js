@@ -36,14 +36,23 @@ const CrearDocumento = () => {
   const [modalGrupo, setModalGrupo] = useState(false);
   const [modalProveedor, setModalProveedor] = useState(false);
 
-  // 🔁 PRECARGA DESDE DOCUMENTO (edición)
-  useEffect(() => {
-    if (documento) {
-      setTipoDocumento(documento.tipo || tipo || "cotizacion");
-      setFechaEvento(documento.fecha_evento?.split("T")[0] || "");
-      setProductosAgregados(documento.productos || []);
-      setGarantia(documento.garantia || "");
-      setAbonos(documento.abonos || [""]);
+  // ✅ NUEVOS ESTADOS PARA EDITAR GRUPO
+  const [grupoEnEdicion, setGrupoEnEdicion] = useState(null);
+  const [indiceGrupoEnEdicion, setIndiceGrupoEnEdicion] = useState(null);
+
+ // 🔁 PRECARGA DESDE DOCUMENTO (edición)
+useEffect(() => {
+  const precargarDatos = async () => {
+    if (!documento) return;
+
+    setTipoDocumento(documento.tipo || tipo || "cotizacion");
+    setFechaEvento(documento.fecha_evento?.split("T")[0] || "");
+    setProductosAgregados(documento.productos || []);
+    setGarantia(documento.garantia || "");
+    setAbonos(documento.abonos || [""]);
+
+    // Si ya vienen los datos del cliente
+    if (documento.nombre_cliente) {
       setClienteSeleccionado({
         nombre: documento.nombre_cliente,
         identificacion: documento.identificacion,
@@ -52,8 +61,22 @@ const CrearDocumento = () => {
         email: documento.email,
         id: documento.cliente_id || null
       });
+    } 
+    // Si no vienen, buscar por ID
+    else if (documento.cliente_id) {
+      const { data: cliente } = await supabase
+        .from("clientes")
+        .select("*")
+        .eq("id", documento.cliente_id)
+        .single();
+
+      if (cliente) setClienteSeleccionado(cliente);
     }
-  }, [documento, tipo]);
+  };
+
+  precargarDatos();
+}, [documento, tipo]);
+
 
   // 🧾 CARGAR CLIENTES AL ABRIR
   useEffect(() => {
@@ -77,11 +100,19 @@ const CrearDocumento = () => {
 
       const reservas = {};
       ordenesData?.forEach((orden) => {
-        orden.productos?.forEach((p) => {
-          const id = p.producto_id || p.id;
-          reservas[id] = (reservas[id] || 0) + (p.cantidad || 0);
-        });
+  orden.productos?.forEach((p) => {
+    if (p.es_grupo && Array.isArray(p.productos)) {
+      p.productos.forEach((sub) => {
+        const id = sub.producto_id || sub.id;
+        const cantidadTotal = (sub.cantidad || 0) * (p.cantidad || 1);
+        reservas[id] = (reservas[id] || 0) + cantidadTotal;
       });
+    } else {
+      const id = p.producto_id || p.id;
+      reservas[id] = (reservas[id] || 0) + (p.cantidad || 0);
+    }
+  });
+});
 
       const stockCalculado = {};
       productosData.forEach((producto) => {
@@ -141,22 +172,21 @@ const CrearDocumento = () => {
     setModalProveedor(false);
   };
 
-  // ✅ Agregar grupo de artículos
-  const agregarGrupo = (grupo) => {
-    setProductosAgregados([
-      ...productosAgregados,
-      {
-        nombre: grupo.nombre,
-        cantidad: 1,
-        precio: grupo.subtotal,
-        subtotal: grupo.subtotal,
-        es_grupo: true,
-        productos: grupo.articulos,
-        temporal: false
-      }
-    ]);
-    setModalGrupo(false);
-  };
+  // ✅ Agregar producto temporal (llamado desde BuscarProductoModal)
+const agregarProductoTemporal = (producto) => {
+  setProductosAgregados((prev) => [...prev, producto]);
+  setModalBuscarProducto(false); // opcional: cierra el modal al agregar
+};
+
+// ✅ Editar grupo 
+const editarGrupo = (index) => {
+  const grupo = productosAgregados[index];
+  if (grupo && grupo.es_grupo) {
+    setGrupoEnEdicion(grupo);
+    setIndiceGrupoEnEdicion(index);
+    setModalGrupo(true);
+  }
+};
 
   // ✅ Actualizar cantidad en tabla
   const actualizarCantidad = (index, cantidad) => {
@@ -316,91 +346,94 @@ return (
 
     {clienteSeleccionado && (
       <div style={{ marginTop: "15px", padding: "10px", backgroundColor: "#f1f1f1", borderRadius: "6px" }}>
-        <strong>Cliente seleccionado:</strong><br />
-        🧑 {clienteSeleccionado.nombre}<br />
-        🆔 {clienteSeleccionado.identificacion}<br />
-        📞 {clienteSeleccionado.telefono}<br />
-        📍 {clienteSeleccionado.direccion}<br />
-        ✉️ {clienteSeleccionado.email}
-      </div>
+  <strong>Cliente seleccionado:</strong><br />
+  🧑 {clienteSeleccionado.nombre || "N/A"}<br />
+  🆔 {clienteSeleccionado.identificacion || "N/A"}<br />
+  📞 {clienteSeleccionado.telefono || "N/A"}<br />
+  📍 {clienteSeleccionado.direccion || "N/A"}<br />
+  ✉️ {clienteSeleccionado.email || "N/A"}
+</div>
     )}
 
     <hr style={{ margin: "30px 0" }} />
     <h3>Productos o Grupos Agregados</h3>
     {/* TABLA DE PRODUCTOS */}
     <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
-      <thead>
-        <tr>
-          <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
-          <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
-          <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
-          <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
-          <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
-          <th>Temporal</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {productosAgregados.map((item, index) => {
-          const idProducto = item.producto_id || item.id;
-          const stockDisp = stock?.[idProducto] ?? "—";
-          const sobrepasado = stockDisp !== "—" && item.cantidad > stockDisp;
+  <thead>
+    <tr>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
+      <th>Temporal</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {productosAgregados.map((item, index) => {
+      const idProducto = item.producto_id || item.id;
+      const stockDisp = stock?.[idProducto] ?? "—";
+      const sobrepasado = stockDisp !== "—" && item.cantidad > stockDisp;
 
-          return (
-            <tr key={index}>
-              <td>
-                <input
-                  type="number"
-                  value={item.cantidad}
-                  min="1"
-                  onChange={(e) => actualizarCantidad(index, e.target.value)}
-                  style={{ width: "60px" }}
-                  disabled={item.es_grupo}
-                />
-              </td>
-              <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
-                {stockDisp}
-              </td>
-              <td>{item.nombre}</td>
-              <td>
-                {item.es_grupo ? (
-                  `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
-                ) : (
-                  <input
-                    type="number"
-                    value={item.precio}
-                    min="0"
-                    onChange={(e) => {
-                      const nuevos = [...productosAgregados];
-                      nuevos[index].precio = parseFloat(e.target.value || 0);
-                      nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
-                      setProductosAgregados(nuevos);
-                    }}
-                    style={{ width: "100px" }}
-                  />
-                )}
-              </td>
-              <td>
-                ${item.subtotal.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
-              </td>
-              <td>
-                {!item.es_grupo && (
-                  <input
-                    type="checkbox"
-                    checked={item.temporal}
-                    onChange={(e) => marcarTemporal(index, e.target.checked)}
-                    title="¿Producto temporal?"
-                  />
-                )}
-              </td>
-              <td>
-                <button onClick={() => eliminarProducto(index)}>🗑️</button>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+      return (
+        <tr key={index}>
+          <td>
+            <input
+              type="number"
+              value={item.cantidad}
+              min="1"
+              onChange={(e) => actualizarCantidad(index, e.target.value)}
+              style={{ width: "60px" }}
+              disabled={item.es_grupo}
+            />
+          </td>
+          <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
+            {stockDisp}
+          </td>
+          <td>{item.nombre}</td>
+          <td>
+            {item.es_grupo ? (
+              `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
+            ) : (
+              <input
+                type="number"
+                value={item.precio}
+                min="0"
+                onChange={(e) => {
+                  const nuevos = [...productosAgregados];
+                  nuevos[index].precio = parseFloat(e.target.value || 0);
+                  nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
+                  setProductosAgregados(nuevos);
+                }}
+                style={{ width: "100px" }}
+              />
+            )}
+          </td>
+          <td>
+            ${(item.subtotal ?? 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+          </td>
+          <td>
+            {!item.es_grupo && (
+              <input
+                type="checkbox"
+                checked={item.temporal}
+                onChange={(e) => marcarTemporal(index, e.target.checked)}
+                title="¿Producto temporal?"
+              />
+            )}
+          </td>
+          <td>
+            {item.es_grupo && (
+              <button onClick={() => editarGrupo(index)} title="Editar grupo">✏️</button>
+            )}
+            <button onClick={() => eliminarProducto(index)}>🗑️</button>
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
 
     {/* BOTONES PARA AGREGAR ARTÍCULOS */}
     <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -501,18 +534,37 @@ return (
 
     {/* MODALES */}
     {modalBuscarProducto && (
-      <BuscarProductoModal
-        onSelect={agregarProducto}
-        onClose={() => setModalBuscarProducto(false)}
-      />
-    )}
+  <BuscarProductoModal
+    onSelect={agregarProducto}
+    onClose={() => setModalBuscarProducto(false)}
+    onAgregarProducto={agregarProductoTemporal} // ✅ agregada
+  />
+)}
+
 
     {modalGrupo && (
-      <AgregarGrupoModal
-        onAgregarGrupo={agregarGrupo}
-        onClose={() => setModalGrupo(false)}
-      />
-    )}
+  <AgregarGrupoModal
+    onAgregarGrupo={(grupo) => {
+      if (indiceGrupoEnEdicion !== null) {
+        const nuevos = [...productosAgregados];
+        nuevos[indiceGrupoEnEdicion] = grupo;
+        setProductosAgregados(nuevos);
+      } else {
+        setProductosAgregados([...productosAgregados, grupo]);
+      }
+      setModalGrupo(false);
+      setGrupoEnEdicion(null);
+      setIndiceGrupoEnEdicion(null);
+    }}
+    onClose={() => {
+      setModalGrupo(false);
+      setGrupoEnEdicion(null);
+      setIndiceGrupoEnEdicion(null);
+    }}
+    stockDisponible={stock}
+    grupoEnEdicion={grupoEnEdicion}
+  />
+)}
 
     {modalProveedor && (
   <BuscarProveedorYProductoModal
