@@ -26,11 +26,6 @@ export default function BuscarDocumento() {
     if (data) setClientes(data);
   };
 
-  const obtenerNombreCliente = (id) => {
-    const cliente = clientes.find((c) => c.id === id);
-    return cliente ? cliente.nombre : "Cliente no encontrado";
-  };
-
   const cargarDocumentos = async () => {
     let query = supabase.from(tipo).select("*");
 
@@ -43,8 +38,8 @@ export default function BuscarDocumento() {
 
     const campoFecha = tipo === "ordenes_pedido" ? "fecha_evento" : "fecha";
 
-   if (fechaInicioCreacion) query = query.gte(campoFecha, fechaInicioCreacion);
-if (fechaFinCreacion) query = query.lte(campoFecha, fechaFinCreacion);
+    if (fechaInicioCreacion) query = query.gte(campoFecha, fechaInicioCreacion);
+    if (fechaFinCreacion) query = query.lte(campoFecha, fechaFinCreacion);
     if (fechaInicioEvento && tipo === "ordenes_pedido") query = query.gte("fecha_evento", fechaInicioEvento);
     if (fechaFinEvento && tipo === "ordenes_pedido") query = query.lte("fecha_evento", fechaFinEvento);
 
@@ -67,15 +62,31 @@ if (fechaFinCreacion) query = query.lte(campoFecha, fechaFinCreacion);
 
   const cargarEnCrear = (doc) => {
     const cliente = clientes.find((c) => c.id === doc.cliente_id);
-    const documentoConCliente = {
+
+    const documentoCompleto = {
       ...doc,
       nombre_cliente: cliente?.nombre || "",
       identificacion: cliente?.identificacion || "",
       telefono: cliente?.telefono || "",
       direccion: cliente?.direccion || "",
-      email: cliente?.email || ""
+      email: cliente?.email || "",
+      fecha_creacion: doc.fecha_creacion || doc.fecha || null,
+      abonos: doc.abonos || [],
+      garantia: doc.garantia || "",
+      fechaGarantia: doc.fechaGarantia || "",
+      garantiaRecibida: doc.garantiaRecibida || false,
+      estado: doc.estado || "",
+      numero: doc.numero || "",
+      esEdicion: true,
+      idOriginal: doc.id,
     };
-    navigate("/crear-documento", { state: { documento: documentoConCliente, tipo } });
+
+    navigate("/crear-documento", {
+      state: {
+        documento: documentoCompleto,
+        tipo,
+      },
+    });
   };
 
   const limpiarFiltros = () => {

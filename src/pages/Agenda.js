@@ -1,5 +1,5 @@
 // C:\Users\pc\frontend-emmita\src\pages\Agenda.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { useNavigate } from "react-router-dom";
@@ -14,33 +14,33 @@ export default function Agenda() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const navigate = useNavigate();
 
+   const cargarDatos = useCallback(async () => {
+  const fecha = fechaSeleccionada.toISOString().split("T")[0];
+
+  const { data: notasData } = await supabase
+    .from("agenda")
+    .select("*")
+    .eq("fecha", fecha)
+    .order("created_at", { ascending: true });
+
+  const { data: ordenesData } = await supabase
+    .from("ordenes_pedido")
+    .select("*")
+    .eq("fecha_evento", fecha);
+
+  const { data: cotizacionesData } = await supabase
+    .from("cotizaciones")
+    .select("*")
+    .eq("fecha_evento", fecha);
+
+  setNotas(notasData || []);
+  setOrdenes(ordenesData || []);
+  setCotizaciones(cotizacionesData || []);
+}, [fechaSeleccionada]);
+
   useEffect(() => {
-    cargarDatos();
-  }, [fechaSeleccionada]);
-
-  const cargarDatos = async () => {
-    const fecha = fechaSeleccionada.toISOString().split("T")[0];
-
-    const { data: notasData } = await supabase
-      .from("agenda")
-      .select("*")
-      .eq("fecha", fecha)
-      .order("created_at", { ascending: true });
-
-    const { data: ordenesData } = await supabase
-      .from("ordenes_pedido")
-      .select("*")
-      .eq("fecha_evento", fecha);
-
-    const { data: cotizacionesData } = await supabase
-      .from("cotizaciones")
-      .select("*")
-      .eq("fecha_evento", fecha);
-
-    setNotas(notasData || []);
-    setOrdenes(ordenesData || []);
-    setCotizaciones(cotizacionesData || []);
-  };
+  cargarDatos();
+}, [cargarDatos]);
 
   const guardarNota = async () => {
     if (!nuevaNota.trim()) return;
@@ -80,27 +80,46 @@ export default function Agenda() {
   };
 
   const irADocumento = async (tipo, id) => {
-    const tabla = tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
-  
-    const { data, error } = await supabase
-      .from(tabla)
-      .select("*, clientes (*)") // 👈 aquí pedimos todo junto
-      .eq("id", id)
-      .single();
-  
-    if (!error && data) {
-      navigate("/crear-documento", { 
-        state: { 
-          documento: data,
-          tipo,
-          cliente: data.clientes || null // 👈 enviamos explícitamente el cliente
-        }
-      });
-    } else {
-      console.error("Error al cargar documento:", error);
-      Swal.fire("Error", "No se pudo cargar el documento", "error");
-    }
-  };
+  const tabla = tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+
+  const { data, error } = await supabase
+    .from(tabla)
+    .select("*, clientes (*)")
+    .eq("id", id)
+    .single();
+
+  if (!error && data) {
+    const cliente = data.clientes || {};
+
+    const documentoCompleto = {
+      ...data,
+      nombre_cliente: cliente.nombre || "",
+      identificacion: cliente.identificacion || "",
+      telefono: cliente.telefono || "",
+      direccion: cliente.direccion || "",
+      email: cliente.email || "",
+      fecha_creacion: data.fecha_creacion || data.fecha || null,
+      abonos: data.abonos || [],
+      garantia: data.garantia || "",
+      fechaGarantia: data.fechaGarantia || "",
+      garantiaRecibida: data.garantiaRecibida || false,
+      estado: data.estado || "",
+      numero: data.numero || "",
+      esEdicion: true,
+      idOriginal: data.id,
+    };
+
+    navigate("/crear-documento", {
+      state: {
+        documento: documentoCompleto,
+        tipo,
+      },
+    });
+  } else {
+    console.error("Error al cargar documento:", error);
+    Swal.fire("Error", "No se pudo cargar el documento", "error");
+  }
+};
 
   return (
     <div style={{ padding: "1rem", maxWidth: "1000px", margin: "auto" }}>

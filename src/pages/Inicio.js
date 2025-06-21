@@ -44,8 +44,33 @@ const Inicio = () => {
   }, [navigate, usuario]);
 
   const editarOrden = (orden) => {
-    navigate("/crear-documento", { state: { documento: orden } });
+  const cliente = orden.clientes || {};
+
+  const documentoCompleto = {
+    ...orden,
+    nombre_cliente: cliente.nombre || "",
+    identificacion: cliente.identificacion || "",
+    telefono: cliente.telefono || "",
+    direccion: cliente.direccion || "",
+    email: cliente.email || "",
+    fecha_creacion: orden.fecha_creacion || orden.fecha || null,
+    abonos: orden.abonos || [],
+    garantia: orden.garantia || "",
+    fechaGarantia: orden.fechaGarantia || "",
+    garantiaRecibida: orden.garantiaRecibida || false,
+    estado: orden.estado || "",
+    numero: orden.numero || "",
+    esEdicion: true,
+    idOriginal: orden.id,
   };
+
+  navigate("/crear-documento", {
+    state: {
+      documento: documentoCompleto,
+      tipo: "ordenes_pedido", // siempre es OP desde este módulo
+    },
+  });
+};
 
   const manejarPDF = async (orden) => {
     const doc = {

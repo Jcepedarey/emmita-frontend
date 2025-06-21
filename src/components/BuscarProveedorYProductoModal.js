@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Swal from "sweetalert2";
 import supabase from "../supabaseClient";
 
 const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
@@ -11,7 +12,16 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   const [busquedaProducto, setBusquedaProducto] = useState("");
   const [productosFiltrados, setProductosFiltrados] = useState([]);
 
-  // 🔁 Cargar proveedores al abrir
+  const [mostrarFormProveedor, setMostrarFormProveedor] = useState(false);
+  const [formProv, setFormProv] = useState({ nombre: "", telefono: "", tipo_servicio: "" });
+  const [formProd, setFormProd] = useState({
+    nombre: "",
+    precio_venta: "",
+    precio_compra: "",
+    proveedor_id: ""
+  });
+
+  // Cargar proveedores al abrir
   useEffect(() => {
     const cargarProveedores = async () => {
       const { data } = await supabase.from("proveedores").select("*").order("nombre", { ascending: true });
@@ -20,9 +30,9 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     cargarProveedores();
   }, []);
 
-  // 🔁 Cargar productos del proveedor seleccionado
+  // Cargar productos del proveedor seleccionado
   useEffect(() => {
-    const cargarProductos = async () => {
+    const cargarProductosProveedor = async () => {
       if (!proveedorSeleccionado) return;
       const { data } = await supabase
         .from("productos_proveedores")
@@ -30,10 +40,10 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
         .eq("proveedor_id", proveedorSeleccionado.id);
       setProductos(data || []);
     };
-    cargarProductos();
+    cargarProductosProveedor();
   }, [proveedorSeleccionado]);
 
-  // 🔍 Filtro dinámico al escribir
+  // Filtro dinámico al escribir producto
   useEffect(() => {
     const texto = busquedaProducto.toLowerCase();
     if (!texto) {
@@ -50,6 +60,62 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     setProveedorSeleccionado(proveedor);
     setBusquedaProducto("");
     setProductosFiltrados([]);
+  };
+
+  const guardarProveedor = async () => {
+    if (!formProv.nombre.trim()) {
+      return Swal.fire("Campo requerido", "El nombre del proveedor es obligatorio", "warning");
+    }
+
+    const { data, error } = await supabase
+      .from("proveedores")
+      .insert([formProv])
+      .select();
+
+    if (error) {
+      console.error("Error al guardar proveedor:", error);
+      return Swal.fire("Error", "No se pudo guardar el proveedor", "error");
+    }
+
+    const nuevoProveedor = data[0];
+    setProveedorSeleccionado(nuevoProveedor);
+    setFormProd((prev) => ({ ...prev, proveedor_id: nuevoProveedor.id }));
+    setFormProv({ nombre: "", telefono: "", tipo_servicio: "" });
+    setMostrarFormProveedor(false);
+    Swal.fire("Guardado", "Proveedor creado correctamente", "success");
+  };
+
+  const guardarProductoProveedor = async () => {
+    if (
+      !formProd.nombre ||
+      !formProd.precio_venta ||
+      !formProd.precio_compra ||
+      !formProd.proveedor_id
+    ) {
+      return Swal.fire("Faltan datos", "Completa todos los campos", "warning");
+    }
+
+    const { error } = await supabase
+      .from("productos_proveedores")
+      .insert([formProd]);
+
+    if (error) {
+      console.error("Error al guardar producto proveedor:", error);
+      Swal.fire("Error", "No se pudo guardar el producto", "error");
+    } else {
+      Swal.fire("Guardado", "Producto agregado correctamente", "success");
+      setFormProd({
+        nombre: "",
+        precio_venta: "",
+        precio_compra: "",
+        proveedor_id: formProd.proveedor_id
+      });
+      const { data } = await supabase
+        .from("productos_proveedores")
+        .select("*")
+        .eq("proveedor_id", formProd.proveedor_id);
+      setProductos(data || []);
+    }
   };
 
   return (
@@ -84,6 +150,12 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
               onChange={(e) => setBusquedaProveedor(e.target.value)}
               style={{ width: "100%" }}
             />
+            <button
+              style={{ marginTop: "10px", padding: "6px", fontSize: "14px" }}
+              onClick={() => setMostrarFormProveedor(true)}
+            >
+              ➕ Agregar proveedor
+            </button>
             <ul style={{ listStyle: "none", padding: 0, marginTop: "10px", maxHeight: "150px", overflowY: "auto" }}>
               {busquedaProveedor &&
                 proveedores
@@ -134,6 +206,63 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
         <button onClick={onClose} style={{ backgroundColor: "#e53935", color: "white", padding: "8px 16px" }}>
           ✖️ Cerrar
         </button>
+
+        {mostrarFormProveedor && (
+          <div style={{ marginTop: "20px", borderTop: "1px solid #ccc", paddingTop: "10px" }}>
+            <h4>🧾 Nuevo proveedor</h4>
+            <input
+              type="text"
+              placeholder="Nombre del proveedor"
+              value={formProv.nombre}
+              onChange={(e) => setFormProv({ ...formProv, nombre: e.target.value })}
+              style={{ width: "100%", marginBottom: "5px" }}
+            />
+            <input
+              type="text"
+              placeholder="Teléfono"
+              value={formProv.telefono}
+              onChange={(e) => setFormProv({ ...formProv, telefono: e.target.value })}
+              style={{ width: "100%", marginBottom: "5px" }}
+            />
+            <input
+              type="text"
+              placeholder="Tipo de servicio"
+              value={formProv.tipo_servicio}
+              onChange={(e) => setFormProv({ ...formProv, tipo_servicio: e.target.value })}
+              style={{ width: "100%", marginBottom: "10px" }}
+            />
+            <button onClick={guardarProveedor}>💾 Guardar proveedor</button>
+          </div>
+        )}
+
+        {proveedorSeleccionado && (
+  <div style={{ marginTop: "20px" }}>
+    <h4>➕ Producto para {proveedorSeleccionado.nombre}</h4>
+    <input
+      type="text"
+      placeholder="Nombre del producto"
+      value={formProd.nombre}
+      onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })}
+      style={{ width: "100%", marginBottom: "5px" }}
+    />
+    <input
+      type="number"
+      placeholder="Precio de compra"
+      value={formProd.precio_compra}
+      onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })}
+      style={{ width: "100%", marginBottom: "5px" }}
+    />
+    <input
+      type="number"
+      placeholder="Precio de venta"
+      value={formProd.precio_venta}
+      onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })}
+      style={{ width: "100%", marginBottom: "10px" }}
+    />
+    <button onClick={guardarProductoProveedor}>💾 Guardar producto</button>
+  </div>
+)}
+
       </div>
     </div>
   );

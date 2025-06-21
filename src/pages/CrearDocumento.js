@@ -16,6 +16,9 @@ import Swal from "sweetalert2";
 const CrearDocumento = () => {
   const location = useLocation();
   const { documento, tipo } = location.state || {};
+  const esEdicion = documento?.esEdicion || false;
+  const idOriginal = documento?.idOriginal || null;
+  
 
   // 🧠 ESTADOS INICIALES
   const [tipoDocumento, setTipoDocumento] = useState(tipo || "cotizacion");
@@ -28,7 +31,27 @@ const CrearDocumento = () => {
 
   const [productosAgregados, setProductosAgregados] = useState([]);
   const [garantia, setGarantia] = useState("");
-  const [abonos, setAbonos] = useState([""]);
+
+// Nuevo estado para check de garantía
+const [garantiaRecibida, setGarantiaRecibida] = useState(false);
+
+// Abonos con fecha
+const [abonos, setAbonos] = useState([
+  // Cada abono será un objeto: { valor: 0, fecha: "19-06-2025" }
+]);
+
+const agregarAbono = () => {
+  const nuevaFecha = new Date().toLocaleDateString("es-CO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+
+  setAbonos([...abonos, { valor: 0, fecha: nuevaFecha }]);
+};
+
+// Fecha de entrega de la garantía
+const [fechaGarantia, setFechaGarantia] = useState("");
 
   const [stock, setStock] = useState({});
   const [modalBuscarProducto, setModalBuscarProducto] = useState(false);
@@ -50,8 +73,8 @@ useEffect(() => {
     setProductosAgregados(documento.productos || []);
     setGarantia(documento.garantia || "");
     setAbonos(documento.abonos || [""]);
+    setGarantiaRecibida(!!documento?.garantiaRecibida);
 
-    // Si ya vienen los datos del cliente
     if (documento.nombre_cliente) {
       setClienteSeleccionado({
         nombre: documento.nombre_cliente,
@@ -61,9 +84,7 @@ useEffect(() => {
         email: documento.email,
         id: documento.cliente_id || null
       });
-    } 
-    // Si no vienen, buscar por ID
-    else if (documento.cliente_id) {
+    } else if (documento.cliente_id) {
       const { data: cliente } = await supabase
         .from("clientes")
         .select("*")
@@ -128,7 +149,7 @@ useEffect(() => {
   }, [fechaEvento]);
   // 🧾 Total y saldo
   const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
-  const sumaAbonos = abonos.reduce((acc, val) => acc + parseFloat(val || 0), 0);
+  const sumaAbonos = abonos.reduce((acc, abono) => acc + parseFloat(abono.valor || 0), 0);
   const saldo = Math.max(0, total - sumaAbonos);
 
   // ✅ Seleccionar cliente
@@ -210,58 +231,92 @@ const editarGrupo = (index) => {
     setProductosAgregados(nuevos);
   };
 
-  // ✅ Manejo de abonos
-  const agregarAbono = () => setAbonos([...abonos, ""]);
-
-  const actualizarAbono = (index, valor) => {
-    const nuevos = [...abonos];
-    nuevos[index] = valor;
-    setAbonos(nuevos);
-  };
-
   // ✅ Guardar documento
   const guardarDocumento = async () => {
-    if (!clienteSeleccionado || productosAgregados.length === 0) {
-      return Swal.fire("Faltan datos", "Debes seleccionar un cliente y agregar al menos un producto.", "warning");
-    }
+  if (!clienteSeleccionado || productosAgregados.length === 0) {
+    return Swal.fire("Faltan datos", "Debes seleccionar un cliente y agregar al menos un producto.", "warning");
+  }
 
-    const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
-    const prefijo = tipoDocumento === "cotizacion" ? "COT" : "OP";
-    const fecha = new Date().toISOString().slice(0, 10);
-    const fechaNumerica = fecha.replaceAll("-", "");
+  const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+  const prefijo = tipoDocumento === "cotizacion" ? "COT" : "OP";
+  const fecha = new Date().toISOString().slice(0, 10);
+  const fechaNumerica = fecha.replaceAll("-", "");
 
-    const { data: existentes } = await supabase
-      .from(tabla)
-      .select("id")
-      .like("numero", `${prefijo}-${fechaNumerica}-%`);
+  let numeroDocumento = documento?.numero;
 
-    const consecutivo = (existentes?.length || 0) + 1;
-    const numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
+if (!esEdicion) {
+  const { data: existentes } = await supabase
+    .from(tabla)
+    .select("id")
+    .like("numero", `${prefijo}-${fechaNumerica}-%`);
 
-    const dataGuardar = {
-      cliente_id: clienteSeleccionado.id,
-      productos: productosAgregados,
-      total,
-      abonos,
-      garantia: parseFloat(garantia || 0),
-      estado: saldo === 0 ? "pagado" : "pendiente",
-      tipo: tipoDocumento,
-      numero: numeroDocumento,
-      ...(tipoDocumento === "cotizacion"
-        ? { fecha: fechaCreacion }
-        : { fecha_creacion: fechaCreacion }),
-      fecha_evento: fechaEvento || null
-    };
+  const consecutivo = (existentes?.length || 0) + 1;
+  numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
+}
 
-    const { error } = await supabase.from(tabla).insert([dataGuardar]);
+  const totalPedido = total;
+  const totalAbonos = abonos.reduce((acc, ab) => acc + Number(ab.valor || 0), 0);
 
-    if (!error) {
-      Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
-    } else {
-      console.error(error);
-      Swal.fire("Error", "No se pudo guardar el documento", "error");
-    }
+  const redondear = (num) => Math.round(num * 100) / 100;
+
+  if (redondear(totalAbonos) > redondear(totalPedido)) {
+    return Swal.fire("Error", "El total de abonos no puede superar el valor del pedido.", "warning");
+  }
+
+  const estadoFinal = redondear(totalAbonos) === redondear(totalPedido) ? "pagado" : "pendiente";
+
+  // 🔍 Mostrar en consola los valores antes de guardar
+console.log("🧾 Total pedido:", totalPedido);
+console.log("💵 Total abonos:", totalAbonos);
+console.log("📦 Estado final:", estadoFinal);
+
+  const dataGuardar = {
+    cliente_id: clienteSeleccionado.id,
+    productos: productosAgregados,
+    total: totalPedido,
+    abonos,
+    garantia: parseFloat(garantia || 0),
+    garantia_recibida: garantiaRecibida,
+    fecha_garantia: fechaGarantia,
+    estado: estadoFinal,
+    tipo: tipoDocumento,
+    numero: numeroDocumento,
+    ...(tipoDocumento === "cotizacion"
+      ? { fecha: fechaCreacion }
+      : { fecha_creacion: fechaCreacion }),
+    fecha_evento: fechaEvento || null
   };
+
+  let error;
+
+if (esEdicion && idOriginal) {
+  const confirmar = await Swal.fire({
+    title: "¿Actualizar documento?",
+    text: "Este documento ya existe. ¿Deseas actualizarlo?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Sí, actualizar",
+    cancelButtonText: "Cancelar",
+  });
+
+  if (confirmar.isConfirmed) {
+    const res = await supabase.from(tabla).update(dataGuardar).eq("id", idOriginal);
+    error = res.error;
+  } else {
+    return; // Canceló el usuario
+  }
+} else {
+  const res = await supabase.from(tabla).insert([dataGuardar]);
+  error = res.error;
+}
+
+  if (!error) {
+    Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
+  } else {
+    console.error(error);
+    Swal.fire("Error", "No se pudo guardar el documento", "error");
+  }
+};
 
   // ✅ Obtener datos para PDF o remisión
 const obtenerDatosPDF = () => ({
@@ -285,6 +340,7 @@ productosAgregados.forEach((item) => {
   stockDisponible[item.id] = disponible;
 });
 
+// 👇 Aquí empieza el retorno visual
 return (
   <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
     <h2 style={{ textAlign: "center" }}>
@@ -385,17 +441,16 @@ return (
               min="1"
               onChange={(e) => actualizarCantidad(index, e.target.value)}
               style={{ width: "60px" }}
-              disabled={item.es_grupo}
-            />
+              />
           </td>
           <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
             {stockDisp}
           </td>
           <td>{item.nombre}</td>
           <td>
-            {item.es_grupo ? (
-              `$${item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
-            ) : (
+  {item.es_grupo ? (
+    "$" + item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })
+  ) : (
               <input
                 type="number"
                 value={item.precio}
@@ -453,33 +508,64 @@ return (
     {/* GARANTÍA Y ABONOS */}
     <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
       <div style={{ flex: "1" }}>
-        <label>Garantía ($):</label>
+  <label>Monto de garantía:</label>
+  <input
+    type="number"
+    min="0"
+    value={garantia}
+    onChange={(e) => {
+      setGarantia(e.target.value);
+
+      const hoy = new Date().toLocaleDateString("es-CO", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+      setFechaGarantia(hoy);
+    }}
+    style={{ width: "100%" }}
+  />
+
+  <div style={{ marginTop: "10px" }}>
+    <label>
+      <input
+        type="checkbox"
+        checked={garantiaRecibida}
+        onChange={(e) => setGarantiaRecibida(e.target.checked)}
+      />
+      ¿Cliente ya entregó la garantía?
+    </label>
+  </div>
+</div>
+
+      <div style={{ flex: "2" }}>
+  <label>Abonos ($):</label>
+  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+    {abonos.map((abono, index) => (
+      <div key={index} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <label style={{ minWidth: "80px" }}>Abono {index + 1}:</label>
         <input
           type="number"
           min="0"
-          value={garantia}
-          onChange={(e) => setGarantia(e.target.value)}
-          style={{ width: "100%" }}
+          value={abono.valor}
+          onChange={(e) => {
+            const nuevosAbonos = [...abonos];
+            nuevosAbonos[index].valor = parseFloat(e.target.value || 0);
+            setAbonos(nuevosAbonos);
+          }}
+          style={{ width: "100px" }}
         />
+        <span style={{ fontStyle: "italic", color: "gray" }}>
+          Fecha: {abono.fecha}
+        </span>
       </div>
-
-      <div style={{ flex: "2" }}>
-        <label>Abonos ($):</label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-          {abonos.map((abono, index) => (
-            <input
-              key={index}
-              type="number"
-              min="0"
-              value={abono}
-              onChange={(e) => actualizarAbono(index, e.target.value)}
-              style={{ width: "100px" }}
-            />
-          ))}
-          <button onClick={agregarAbono}>➕</button>
-        </div>
-      </div>
-    </div>
+    ))}
+    <button onClick={agregarAbono}>
+  ➕ Agregar abono
+</button>
+  </div>
+</div>
+</div> {/* ← este cierre faltaba */}
 
     {/* TOTALES */}
     <div style={{ marginTop: "20px", textAlign: "right" }}>
@@ -585,5 +671,5 @@ return (
     )}
   </div>
 );
-}
+};
 export default CrearDocumento;

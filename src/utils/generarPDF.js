@@ -2,7 +2,6 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { generarNombreArchivo } from "./nombrePDF";
 
-// ✅ Función reutilizable para optimizar imágenes (logo o fondo)
 const procesarImagen = (src, width = 150, calidad = 1.0) =>
   new Promise((resolve) => {
     const img = new Image();
@@ -50,19 +49,19 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   doc.setLineWidth(0.5);
   doc.line(10, 42, 200, 42);
 
-  // 📌 Datos generales
-  const fechaCreacion = documento.fecha_creacion ? new Date(documento.fecha_creacion).toISOString().slice(0, 10) : "-";
-  const fechaEvento = documento.fecha_evento ? new Date(documento.fecha_evento).toISOString().slice(0, 10) : "-";
+  // 📌 Datos del cliente
+  const fechaCreacion = documento.fecha_creacion || "-";
+  const fechaEvento = documento.fecha_evento || "-";
 
   doc.setFontSize(12);
-doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 48);
-doc.text(`Cliente: ${documento.nombre_cliente || "Cliente seleccionado"}`, 10, 55);
-doc.text(`Identificación: ${documento.identificacion || "N/A"}`, 10, 61);
-doc.text(`Teléfono: ${documento.telefono || "N/A"}`, 10, 67);
-doc.text(`Dirección: ${documento.direccion || "N/A"}`, 10, 73);
-doc.text(`Correo: ${documento.email || "N/A"}`, 10, 79);
-doc.text(`Fecha creación: ${fechaCreacion}`, 150, 48);
-doc.text(`Fecha evento: ${fechaEvento}`, 150, 55);
+  doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 48);
+  doc.text(`Cliente: ${documento.nombre_cliente || "Cliente"}`, 10, 55);
+  doc.text(`Identificación: ${documento.identificacion || "N/A"}`, 10, 61);
+  doc.text(`Teléfono: ${documento.telefono || "N/A"}`, 10, 67);
+  doc.text(`Dirección: ${documento.direccion || "N/A"}`, 10, 73);
+  doc.text(`Correo: ${documento.email || "N/A"}`, 10, 79);
+  doc.text(`Fecha creación: ${fechaCreacion}`, 150, 48);
+  doc.text(`Fecha evento: ${fechaEvento}`, 150, 55);
 
   // 🧾 Tabla de productos
   const filas = (documento.productos || []).map((p) => [
@@ -85,29 +84,41 @@ doc.text(`Fecha evento: ${fechaEvento}`, 150, 55);
 
   // 💰 Garantía
   if (documento.garantia && documento.garantia !== "0") {
-    doc.text(`GARANTÍA: $${Number(documento.garantia).toLocaleString("es-CO")}`, 10, y);
+    let garantiaTexto = `GARANTÍA: $${Number(documento.garantia).toLocaleString("es-CO")}`;
+    if (documento.fecha_garantia) {
+      garantiaTexto += ` - Fecha: ${documento.fecha_garantia}`;
+    }
+    doc.text(garantiaTexto, 10, y);
     y += 8;
   }
 
   // 💸 Abonos
-  if (documento.abonos?.length > 0) {
+  if (documento.abonos && documento.abonos.length > 0) {
+    doc.setFont(undefined, "bold");
     doc.text("ABONOS:", 10, y);
-    documento.abonos.forEach((abono, i) => {
+    y += 6;
+    doc.setFont(undefined, "normal");
+
+    documento.abonos.forEach((abono, index) => {
+      const valor = typeof abono === "object" ? abono.valor : abono;
+      const fecha = typeof abono === "object" ? abono.fecha : "sin fecha";
+      doc.text(`• Abono ${index + 1}: $${Number(valor).toLocaleString("es-CO")} - Fecha: ${fecha}`, 15, y);
       y += 6;
-      doc.text(`• Abono ${i + 1}: $${Number(abono).toLocaleString("es-CO")}`, 15, y);
     });
-    y += 8;
-  }
 
-  // 📊 Totales
-  doc.setFontSize(12);
-  doc.text(`TOTAL: $${Number(documento.total).toLocaleString("es-CO")}`, 150, y);
-  y += 8;
-
-  if (documento.abonos?.length > 0) {
-    const totalAbonos = documento.abonos.reduce((a, b) => a + parseFloat(b || 0), 0);
+    const totalAbonos = documento.abonos.reduce(
+      (acc, ab) => acc + parseFloat(typeof ab === "object" ? ab.valor : ab || 0),
+      0
+    );
     const saldo = documento.total - totalAbonos;
+    doc.setFontSize(12);
+    y += 4;
+    doc.text(`TOTAL: $${Number(documento.total).toLocaleString("es-CO")}`, 150, y);
+    y += 8;
     doc.text(`SALDO FINAL: $${Number(saldo).toLocaleString("es-CO")}`, 150, y);
+  } else {
+    doc.setFontSize(12);
+    doc.text(`TOTAL: $${Number(documento.total).toLocaleString("es-CO")}`, 150, y);
   }
 
   // 📎 Pie de página
@@ -117,7 +128,7 @@ doc.text(`Fecha evento: ${fechaEvento}`, 150, 55);
   doc.text("Facebook: Facebook.com/alquileresemmita", 10, yFinal + 5);
   doc.text("Email: alquileresemmita@hotmail.com", 10, yFinal + 10);
 
-  // 💾 Guardar archivo con nombre correcto
+  // 💾 Guardar archivo
   const fechaSegura = documento.fecha_creacion || new Date();
   const nombreArchivo = generarNombreArchivo(tipo, fechaSegura, documento.nombre_cliente);
   doc.save(nombreArchivo);
