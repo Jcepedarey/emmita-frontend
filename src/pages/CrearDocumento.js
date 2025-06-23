@@ -117,7 +117,8 @@ useEffect(() => {
       const { data: ordenesData } = await supabase
         .from("ordenes_pedido")
         .select("productos, fecha_evento")
-        .eq("fecha_evento", fechaEvento);
+        .eq("fecha_evento", fechaEvento)
+        .eq("cerrada", false);
 
       const reservas = {};
       ordenesData?.forEach((orden) => {

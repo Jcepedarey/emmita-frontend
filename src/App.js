@@ -11,6 +11,7 @@ import Inicio from "./pages/Inicio";
 import CrearDocumento from "./pages/CrearDocumento";
 import Clientes from "./pages/Clientes";
 import BuscarDocumento from "./pages/BuscarDocumento";
+import BuscarRecepcion from "./pages/BuscarRecepcion"; // ✅ nuevo
 import Trazabilidad from "./pages/Trazabilidad";
 import Proveedores from "./pages/Proveedores";
 import CotizacionesGuardadas from "./pages/CotizacionesGuardadas";
@@ -38,6 +39,7 @@ function App() {
               <Route path="/crear-documento" element={<CrearDocumento />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/buscar-documento" element={<BuscarDocumento />} />
+              <Route path="/buscar-recepcion" element={<BuscarRecepcion />} />
               <Route path="/cotizacionesguardadas" element={<CotizacionesGuardadas />} />
               <Route path="/ordenesguardadas" element={<OrdenesGuardadas />} />
               <Route path="/trazabilidad" element={<Trazabilidad />} />

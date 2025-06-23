@@ -225,6 +225,11 @@ const Inicio = () => {
         imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
         onClick={() => navigate("/contabilidad")}
       />
+      <BotonModulo
+      titulo="Buscar recepción"
+      imagen={`${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`}
+      onClick={() => navigate("/buscar-recepcion")}
+      />
   {usuario?.rol === "admin" && (
     <>   
     </>

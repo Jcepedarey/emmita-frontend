@@ -240,7 +240,7 @@ const Contabilidad = () => {
               <span>
   <strong>{m.tipo.toUpperCase()}:</strong>{" "}
   <span style={{ color: m.tipo === "ingreso" ? "green" : "red" }}>
-    ${m.monto.toLocaleString()}
+    ${Math.abs(m.monto).toLocaleString()}
   </span>{" "}
   – {m.descripcion || "Sin descripción"} – {m.fecha?.split("T")[0]}
   {m.estado === "eliminado" && m.justificacion ? (
@@ -250,38 +250,68 @@ const Contabilidad = () => {
   ) : null}
 </span>
 
-{m.estado !== "eliminado" && (
-  <div style={{ display: "flex", gap: "8px" }}>
-    <button
-      onClick={() => editarMovimiento(m)}
-      title="Editar movimiento"
-      style={{
-        background: "#2196f3",
-        color: "white",
-        border: "none",
-        borderRadius: "5px",
-        padding: "4px 10px",
-        cursor: "pointer"
-      }}
-    >
-      ✏️
-    </button>
-    <button
-      onClick={() => eliminarMovimiento(m.id)}
-      title="Eliminar movimiento"
-      style={{
-        background: "#f44336",
-        color: "white",
-        border: "none",
-        borderRadius: "5px",
-        padding: "4px 10px",
-        cursor: "pointer"
-      }}
-    >
-      🗑️
-    </button>
-  </div>
-)}
+<div style={{ display: "flex", gap: "8px" }}>
+  {m.estado !== "eliminado" && (
+    <>
+      <button
+        onClick={() => editarMovimiento(m)}
+        title="Editar movimiento"
+        style={{
+          background: "#2196f3",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
+          padding: "4px 10px",
+          cursor: "pointer"
+        }}
+      >
+        ✏️
+      </button>
+      <button
+        onClick={() => eliminarMovimiento(m.id)}
+        title="Eliminar movimiento"
+        style={{
+          background: "#f44336",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
+          padding: "4px 10px",
+          cursor: "pointer"
+        }}
+      >
+        🗑️
+      </button>
+    </>
+  )}
+
+  <button
+    onClick={async () => {
+      const { value: code } = await Swal.fire({
+        title: "Código de autorización",
+        input: "password",
+        inputLabel: "Ingresa el código para borrar definitivamente",
+        inputPlaceholder: "Código secreto",
+        showCancelButton: true
+      });
+      if (code === "4860") {
+        await supabase.from("movimientos_contables").delete().eq("id", m.id);
+        Swal.fire("✅ Borrado", "El movimiento fue eliminado permanentemente", "success");
+        cargarMovimientos();
+      } else if (code) {
+        Swal.fire("❌ Código incorrecto", "No se autorizó el borrado", "error");
+      }
+    }}
+    title="Eliminar definitivamente"
+    style={{
+      background: "transparent",
+      color: "#f00",
+      fontSize: "1.2rem",
+      cursor: "pointer"
+    }}
+  >
+    ❌
+  </button>
+</div>
 </li>
 ))} {/* Fin del map */}
 </ul>
