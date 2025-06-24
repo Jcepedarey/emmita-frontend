@@ -11,9 +11,11 @@ const Recepcion = () => {
   const [productosRevisados, setProductosRevisados] = useState([]);
   const [danos, setDanos] = useState([]);
   const [garantiaDevueltaManual, setGarantiaDevueltaManual] = useState(null);
+  const [retencionManual, setRetencionManual] = useState(0);
   const [comentarioGeneral, setComentarioGeneral] = useState("");
   const [usuario, setUsuario] = useState({ nombre: "Administrador" });
   const location = useLocation();
+  const [gastosExtras, setGastosExtras] = useState([{ motivo: "", valor: "" }]);
 const queryParams = new URLSearchParams(location.search);
 const ordenId = queryParams.get("id");
 
@@ -153,111 +155,162 @@ const ordenId = queryParams.get("id");
       usuario
     );
 
-    // 4️⃣ Marcar orden como revisada y registrar garantía devuelta
-    const { error: updateError } = await supabase
-      .from("ordenes_pedido")
-      .update({
-        revisada: true,
-        comentario_revision: comentarioGeneral,
-        garantia_devuelta: garantiaDevuelta,
-      })
-      .match({ id: ordenSeleccionada.id });
+     await registrarContabilidadPorPedido(
+    ordenSeleccionada,
+    productosRevisados.map((p, i) => ({
+      nombre: p.nombre,
+      monto: parseInt(danos[i]?.monto || 0),
+      tipo: p.tipo_origen,
+    })),
+    garantiaTotal,
+    garantiaDevuelta,
+    usuario
+  );
 
-     if (updateError) {
-      console.error("❌ Error al actualizar orden:", updateError);
-      return Swal.fire("Error", "No se pudo cerrar la orden", "error");
-    }
+      // 4️⃣ Marcar orden como revisada
+  await supabase
+    .from("ordenes_pedido")
+    .update({
+      revisada: true,
+      comentario_revision: comentarioGeneral,
+      garantia_devuelta: garantiaDevuelta,
+    })
+    .match({ id: ordenSeleccionada.id });
 
-    // ✅ Calcular ingresos y gastos
-    const ingresos = (ordenSeleccionada.abonos || []).reduce((acc, ab) => acc + (Number(ab.valor) || 0), 0);
-    const gastos =
-      (Number(ordenSeleccionada.costo_danos) || 0) +
-      (Number(ordenSeleccionada.costo_transporte) || 0) +
-      (Number(ordenSeleccionada.costo_proveedor) || 0) +
-      (Number(ordenSeleccionada.costo_logistica) || 0);
+  // ✅ Calcular ingresos
+  const ingresos = (ordenSeleccionada.abonos || []).reduce((acc, ab) => acc + (Number(ab.valor) || 0), 0);
 
-    const utilidad_neta = ingresos - gastos - (Number(ordenSeleccionada.retencion) || 0) - (Number(garantiaDevuelta) || 0);
-
-    await supabase.from("movimientos_contables").insert([
-  {
+  // ✅ Registrar ingreso principal
+  await supabase.from("movimientos_contables").insert([{
     orden_id: ordenSeleccionada.id,
     fecha: new Date().toISOString().split("T")[0],
     tipo: "ingreso",
-    monto: utilidad_neta, // Este lo podés calcular como antes
+    monto: ingresos,
     descripcion: comentarioGeneral || "Auto generado desde Recepción",
     categoria: "Cierre de orden",
     estado: "activo",
     usuario: usuario?.nombre || "Administrador",
     fecha_modificacion: null
-  }
-]);
+  }]);
 
-    // ✅ Confirmación
-    Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
-// navigate("/inicio"); // Comentado para no salir del módulo
-
-  } catch (error) {
-    console.error("❌ Error general:", error);
-    Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
+  // ✅ Guardar los gastos adicionales ingresados manualmente
+  for (const gasto of gastosExtras) {
+    const valorNumerico = Number(gasto.valor);
+    if (gasto.motivo && valorNumerico > 0) {
+      await supabase.from("movimientos_contables").insert([{
+        orden_id: ordenSeleccionada.id,
+        fecha: new Date().toISOString().split("T")[0],
+        tipo: "gasto",
+        monto: valorNumerico,
+        descripcion: gasto.motivo,
+        categoria: "Gasto adicional (manual)",
+        estado: "activo",
+        usuario: usuario?.nombre || "Administrador",
+        fecha_modificacion: null
+      }]);
+    }
   }
+
+  // ✅ Calcular gastos automáticos
+const gastosCalculados = (
+  (Number(garantiaTotal) - Number(garantiaDevuelta)) + // garantía retenida
+  productosRevisados.reduce((acc, _, i) => acc + (Number(danos[i]?.monto) || 0), 0) + // daños
+  gastosExtras.reduce((acc, g) => acc + (Number(g.valor) || 0), 0) // gastos manuales
+);
+
+const utilidadNeta = ingresos - gastosCalculados - (retencionManual || 0);
+
+// ✅ Insertar resumen en movimientos_contables
+await supabase.from("movimientos_contables").insert([{
+  orden_id: ordenSeleccionada.id,
+  cliente_id: ordenSeleccionada.cliente_id,
+  numero_orden: ordenSeleccionada.numero,
+  ingresos,
+  gastos: gastosCalculados,
+  retencion: retencionManual || 0,
+  garantia_devuelta: Number(garantiaDevuelta) || 0,
+  utilidad_neta: utilidadNeta,
+  descripcion: comentarioGeneral || "Revisión completa registrada desde Recepción",
+  fecha: new Date().toISOString().split("T")[0],
+  tipo: "resumen",
+  estado: "activo"
+}]);
+// ✅ Registrar ingreso neto limpio para módulo de contabilidad (reportes)
+await supabase.from("reportes").insert([{
+  tipo: "ingreso",
+  monto: utilidadNeta,
+  descripcion: `Ingreso neto por OP ${ordenSeleccionada.numero}`,
+  fecha: new Date().toISOString().split("T")[0]
+}]);
+  Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
+
+} catch (error) {
+  console.error("❌ Error general:", error);
+  Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
+}
 };
 
-  const registrarContabilidadPorPedido = async (orden, danos, garantiaOriginal, garantiaDevuelta, usuario) => {
-    try {
-      for (const d of danos) {
-        if (d.monto > 0) {
-          const movimiento = {
-            fecha: new Date().toISOString().split("T")[0],
-            estado: "activo",
-            usuario: usuario?.nombre || "Administrador",
-            fecha_modificacion: null,
-          };
-
-          if (d.tipo === "proveedor") {
-            await supabase.from("movimientos_contables").insert([{
-              ...movimiento,
-              tipo: "gasto",
-              monto: d.monto,
-              descripcion: `Daño en producto del proveedor: ${d.nombre}`,
-              categoria: "Daños proveedor",
-            }]);
-
-            await supabase.from("movimientos_contables").insert([{
-              ...movimiento,
-              tipo: "ingreso",
-              monto: d.monto,
-              descripcion: `Garantía retenida por daño (proveedor): ${d.nombre}`,
-              categoria: "Garantías retenidas",
-            }]);
-          } else {
-            await supabase.from("movimientos_contables").insert([{
-              ...movimiento,
-              tipo: "ingreso",
-              monto: d.monto,
-              descripcion: `Compensación por daño (producto propio): ${d.nombre}`,
-              categoria: "Daños propios",
-            }]);
-          }
-        }
-      }
-
-      const diferencia = garantiaOriginal - garantiaDevuelta;
-      if (diferencia > 0) {
-        await supabase.from("movimientos_contables").insert([{
-          tipo: "ingreso",
-          monto: diferencia,
-          descripcion: `Garantía no devuelta al cliente por daños`,
-          categoria: "Garantías retenidas",
+ const registrarContabilidadPorPedido = async (orden, danos, garantiaOriginal, garantiaDevuelta, usuario) => {
+  try {
+    for (const d of danos) {
+      if (d.monto > 0) {
+        const movimiento = {
           fecha: new Date().toISOString().split("T")[0],
           estado: "activo",
           usuario: usuario?.nombre || "Administrador",
-          fecha_modificacion: null
-        }]);
+          fecha_modificacion: null,
+        };
+
+        if (d.tipo === "proveedor") {
+          // 🧾 Gasto por daño a proveedor
+          await supabase.from("movimientos_contables").insert([{
+            ...movimiento,
+            tipo: "gasto",
+            monto: Math.abs(d.monto),
+            descripcion: `Daño en producto del proveedor: ${d.nombre}`,
+            categoria: "Daños proveedor",
+          }]);
+
+          // ✅ Ingreso por garantía retenida (proveedor)
+          await supabase.from("movimientos_contables").insert([{
+            ...movimiento,
+            tipo: "ingreso",
+            monto: Math.abs(d.monto),
+            descripcion: `Garantía retenida por daño (proveedor): ${d.nombre}`,
+            categoria: "Garantías retenidas",
+          }]);
+        } else {
+          // ✅ Ingreso por compensación de daño (propio)
+          await supabase.from("movimientos_contables").insert([{
+            ...movimiento,
+            tipo: "ingreso",
+            monto: Math.abs(d.monto),
+            descripcion: `Compensación por daño (producto propio): ${d.nombre}`,
+            categoria: "Daños propios",
+          }]);
+        }
       }
-    } catch (error) {
-      console.error("❌ Error registrando contabilidad del pedido:", error);
     }
-  };
+
+    // ✅ Garantía no devuelta (también ingreso positivo)
+    const diferencia = garantiaOriginal - garantiaDevuelta;
+    if (diferencia > 0) {
+      await supabase.from("movimientos_contables").insert([{
+        tipo: "ingreso",
+        monto: Math.abs(diferencia),
+        descripcion: `Garantía no devuelta al cliente por daños`,
+        categoria: "Garantías retenidas",
+        fecha: new Date().toISOString().split("T")[0],
+        estado: "activo",
+        usuario: usuario?.nombre || "Administrador",
+        fecha_modificacion: null
+      }]);
+    }
+    
+  } catch (error) {
+    console.error("❌ Error registrando contabilidad del pedido:", error);
+  }
+};
   return (
     <div className="p-4">
       <h2 className="text-xl font-semibold mb-4">📦 Recepción de pedidos</h2>
@@ -385,7 +438,57 @@ const ordenId = queryParams.get("id");
     onChange={(e) => setGarantiaDevueltaManual(parseInt(e.target.value))}
     className="border p-2 rounded w-48"
   />
+    {/* 👇 AQUI AGREGAS ESTE BLOQUE */}
+  <div className="mt-2">
+    <label className="block text-sm text-gray-600 mb-1">
+      Retención (opcional):
+    </label>
+    <input
+      type="number"
+      min="0"
+      value={retencionManual || ""}
+      onChange={(e) => setRetencionManual(parseFloat(e.target.value) || 0)}
+      className="border p-2 rounded w-48"
+    />
+  </div>
 </div>
+
+<div className="mt-6">
+  <h3 className="text-lg font-semibold mb-2">🧾 Gastos adicionales (opcional)</h3>
+  {gastosExtras.map((gasto, index) => (
+    <div key={index} className="flex items-center gap-4 mb-2">
+      <input
+        type="text"
+        placeholder="Motivo del gasto"
+        value={gasto.motivo}
+        onChange={(e) => {
+          const nuevosGastos = [...gastosExtras];
+          nuevosGastos[index].motivo = e.target.value;
+          setGastosExtras(nuevosGastos);
+        }}
+        className="flex-1 px-3 py-2 border border-gray-300 rounded"
+      />
+      <input
+        type="number"
+        placeholder="Valor"
+        value={gasto.valor}
+        onChange={(e) => {
+          const nuevosGastos = [...gastosExtras];
+          nuevosGastos[index].valor = e.target.value;
+          setGastosExtras(nuevosGastos);
+        }}
+        className="w-32 px-3 py-2 border border-gray-300 rounded"
+      />
+    </div>
+  ))}
+  <button
+    onClick={() => setGastosExtras([...gastosExtras, { motivo: "", valor: "" }])}
+    className="text-sm text-blue-600 hover:underline"
+  >
+    ➕ Agregar otro gasto
+  </button>
+</div>
+
 
 {/* ✅ Botones rediseñados estilo imagen 3 */}
 <div className="flex flex-col md:flex-row gap-4 mt-6">
@@ -397,20 +500,27 @@ const ordenId = queryParams.get("id");
     <span className="font-semibold text-lg">Guardar Revisión</span>
   </button>
 
-  <button
-    onClick={() =>
-      generarPDFRecepcion(
-        ordenSeleccionada,
-        productosRevisados,
-        usuario.nombre,
-        comentarioGeneral
-      )
-    }
-    className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105"
-  >
-    <span className="text-xl">🧾</span>
-    <span className="font-semibold text-lg">Descargar PDF</span>
-  </button>
+<button
+  onClick={() => {
+    const productosParaPDF = productosRevisados.map(p => ({
+      descripcion: p.nombre,
+      esperado: p.esperado,
+      recibido: p.recibido,
+      observacion: p.observacion || ""
+    }));
+
+    generarPDFRecepcion(
+      ordenSeleccionada,
+      ordenSeleccionada.clientes,
+      productosParaPDF,
+      comentarioGeneral
+    );
+  }}
+  className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105"
+>
+  <span className="text-xl">🧾</span>
+  <span className="font-semibold text-lg">Descargar PDF</span>
+</button>
 </div>
    </div>
       )}

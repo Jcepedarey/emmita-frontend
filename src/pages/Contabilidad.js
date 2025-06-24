@@ -21,8 +21,8 @@ const Contabilidad = () => {
 
   const cargarMovimientos = async () => {
     const { data, error } = await supabase
-      .from("movimientos_contables")
-      .select("*")
+  .from("movimientos_contables")
+  .select("*, clientes:cliente_id(nombre)")
       .order("fecha", { ascending: false });
 
     if (!error) setMovimientos(data);
@@ -48,39 +48,6 @@ const Contabilidad = () => {
     }
   };
 
-  const eliminarMovimiento = async (id) => {
-    const { value: justificacion } = await Swal.fire({
-      title: "¿Estás seguro?",
-      input: "text",
-      inputLabel: "Motivo de eliminación",
-      inputPlaceholder: "Escribe una razón",
-      inputValidator: (value) => {
-        if (!value) return "Debes escribir una justificación";
-      },
-      showCancelButton: true,
-      confirmButtonText: "Eliminar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (!justificacion) return;
-
-    const { error } = await supabase
-      .from("movimientos_contables")
-      .update({
-        estado: "eliminado",
-        justificacion,
-        fecha_modificacion: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (!error) {
-      Swal.fire("✅ Eliminado", "Movimiento marcado como eliminado", "success");
-      cargarMovimientos();
-    } else {
-      console.error("❌ Error al eliminar movimiento:", error);
-      Swal.fire("Error", "No se pudo eliminar el movimiento", "error");
-    }
-  };
   const editarMovimiento = async (movimiento) => {
     const { value: formValues } = await Swal.fire({
       title: "Editar movimiento",
@@ -192,9 +159,24 @@ const Contabilidad = () => {
 
       <div style={{ marginTop: "2rem" }}>
   <h3>Balance actual</h3>
-  <p><strong>Total ingresos:</strong> ${totalIngresos.toLocaleString("es-CO")}</p>
-  <p><strong>Total gastos:</strong> ${totalGastos.toLocaleString("es-CO")}</p>
-  <p><strong>Balance:</strong> ${(totalIngresos - totalGastos).toLocaleString("es-CO")}</p>
+  <p>
+  <strong>Total ingresos:</strong>{" "}
+  <span style={{ color: "green" }}>
+    ${totalIngresos.toLocaleString("es-CO")}
+  </span>
+</p>
+<p>
+  <strong>Total gastos:</strong>{" "}
+  <span style={{ color: "red" }}>
+    ${totalGastos.toLocaleString("es-CO")}
+  </span>
+</p>
+  <p>
+  <strong>Balance:</strong>{" "}
+  <span style={{ color: totalIngresos - totalGastos >= 0 ? "green" : "red" }}>
+    ${Math.abs(totalIngresos - totalGastos).toLocaleString("es-CO")}
+  </span>
+</p>
 
   <button
   onClick={() =>
@@ -243,6 +225,12 @@ const Contabilidad = () => {
     ${Math.abs(m.monto).toLocaleString()}
   </span>{" "}
   – {m.descripcion || "Sin descripción"} – {m.fecha?.split("T")[0]}
+  {m.numero_orden && (
+    <> – OP: {m.numero_orden}</>
+  )}
+  {m.clientes?.nombre && (
+    <> – Cliente: {m.clientes.nombre}</>
+  )}
   {m.estado === "eliminado" && m.justificacion ? (
     <em style={{ display: "block", fontSize: "0.8rem" }}>
       Justificación: {m.justificacion}
@@ -251,38 +239,22 @@ const Contabilidad = () => {
 </span>
 
 <div style={{ display: "flex", gap: "8px" }}>
-  {m.estado !== "eliminado" && (
-    <>
-      <button
-        onClick={() => editarMovimiento(m)}
-        title="Editar movimiento"
-        style={{
-          background: "#2196f3",
-          color: "white",
-          border: "none",
-          borderRadius: "5px",
-          padding: "4px 10px",
-          cursor: "pointer"
-        }}
-      >
-        ✏️
-      </button>
-      <button
-        onClick={() => eliminarMovimiento(m.id)}
-        title="Eliminar movimiento"
-        style={{
-          background: "#f44336",
-          color: "white",
-          border: "none",
-          borderRadius: "5px",
-          padding: "4px 10px",
-          cursor: "pointer"
-        }}
-      >
-        🗑️
-      </button>
-    </>
-  )}
+ {m.estado !== "eliminado" && (
+  <button
+    onClick={() => editarMovimiento(m)}
+    title="Editar movimiento"
+    style={{
+      background: "#2196f3",
+      color: "white",
+      border: "none",
+      borderRadius: "5px",
+      padding: "4px 10px",
+      cursor: "pointer"
+    }}
+  >
+    ✏️
+  </button>
+)}
 
   <button
     onClick={async () => {
