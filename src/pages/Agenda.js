@@ -5,6 +5,8 @@ import "react-calendar/dist/Calendar.css";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
+import { generarPDF } from "../utils/generarPDF";
+import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
 
 export default function Agenda() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
@@ -24,9 +26,9 @@ export default function Agenda() {
     .order("created_at", { ascending: true });
 
   const { data: ordenesData } = await supabase
-    .from("ordenes_pedido")
-    .select("*")
-    .eq("fecha_evento", fecha);
+  .from("ordenes_pedido")
+  .select("*, clientes(*)")
+  .eq("fecha_evento", fecha);
 
   const { data: cotizacionesData } = await supabase
     .from("cotizaciones")
@@ -78,7 +80,60 @@ export default function Agenda() {
       Swal.fire("Error", "No se pudo eliminar la nota", "error");
     }
   };
+const editarOrden = (orden) => {
+  const cliente = orden.clientes || {};
 
+  const documentoCompleto = {
+    ...orden,
+    nombre_cliente: cliente.nombre || "",
+    identificacion: cliente.identificacion || "",
+    telefono: cliente.telefono || "",
+    direccion: cliente.direccion || "",
+    email: cliente.email || "",
+    fecha_creacion: orden.fecha_creacion || orden.fecha || null,
+    abonos: orden.abonos || [],
+    garantia: orden.garantia || "",
+    fechaGarantia: orden.fechaGarantia || "",
+    garantiaRecibida: orden.garantiaRecibida || false,
+    estado: orden.estado || "",
+    numero: orden.numero || "",
+    esEdicion: true,
+    idOriginal: orden.id,
+  };
+
+  navigate("/crear-documento", {
+    state: {
+      documento: documentoCompleto,
+      tipo: "ordenes_pedido",
+    },
+  });
+};
+
+const manejarPDF = async (orden) => {
+  const doc = {
+    ...orden,
+    nombre_cliente: orden.clientes?.nombre || "No disponible",
+    identificacion: orden.clientes?.identificacion || "-",
+    telefono: orden.clientes?.telefono || "-",
+    direccion: orden.clientes?.direccion || "-",
+    email: orden.clientes?.email || "-",
+  };
+
+  await generarPDF(doc, "orden");
+};
+
+const manejarRemision = async (orden) => {
+  const doc = {
+    ...orden,
+    nombre_cliente: orden.clientes?.nombre || "No disponible",
+    identificacion: orden.clientes?.identificacion || "-",
+    telefono: orden.clientes?.telefono || "-",
+    direccion: orden.clientes?.direccion || "-",
+    email: orden.clientes?.email || "-",
+  };
+
+  await generarRemision(doc);
+};
   const irADocumento = async (tipo, id) => {
   const tabla = tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
 
@@ -175,14 +230,53 @@ export default function Agenda() {
           <h4>📦 Órdenes de Pedido</h4>
           {ordenes.length === 0 && <p>No hay pedidos para este día.</p>}
           {ordenes.map((orden) => (
-            <div
-              key={orden.id}
-              onClick={() => irADocumento("orden", orden.id)}
-              style={{ backgroundColor: "#bbdefb", padding: "8px", margin: "5px 0", borderRadius: "6px", cursor: "pointer" }}
-            >
-              {orden.numero}
-            </div>
-          ))}
+  <div
+    key={orden.id}
+    style={{
+      backgroundColor: "#fff",
+      padding: "10px",
+      margin: "5px 0",
+      borderRadius: "8px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+    }}
+  >
+    <div>
+      <p style={{ fontWeight: "bold", color: "#1976d2", margin: 0 }}>
+        {orden.numero || "OP-???"}
+      </p>
+      <p style={{ margin: 0 }}>{orden.clientes?.nombre || "Cliente"}</p>
+      <p style={{ margin: 0, fontSize: "12px", color: "gray" }}>
+        {new Date(orden.fecha_evento).toLocaleDateString()}
+      </p>
+    </div>
+    <div style={{ display: "flex", gap: "8px", fontSize: "18px" }}>
+      <button
+        onClick={() => editarOrden(orden)}
+        title="Editar"
+        style={{ border: "none", background: "none", cursor: "pointer" }}
+      >
+        ✏️
+      </button>
+      <button
+        onClick={() => manejarPDF(orden)}
+        title="PDF"
+        style={{ border: "none", background: "none", cursor: "pointer" }}
+      >
+        📄
+      </button>
+      <button
+        onClick={() => manejarRemision(orden)}
+        title="Remisión"
+        style={{ border: "none", background: "none", cursor: "pointer" }}
+      >
+        🚚
+      </button>
+    </div>
+  </div>
+))}
         </div>
 
         {/* Cotizaciones */}
