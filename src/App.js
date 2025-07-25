@@ -1,9 +1,11 @@
 // src/App.js
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import { CssBaseline, CircularProgress, Container } from "@mui/material";
 import Navbar from "./components/Navbar";
 import Navegacion from "./components/Navegacion";
+import BotonIAFlotante from "./components/BotonIAFlotante";
+import AsistenteModal from "./components/AsistenteModal"; // ✅ Importar el modal
 
 // 📦 Páginas principales
 import Login from "./pages/Login";
@@ -11,7 +13,7 @@ import Inicio from "./pages/Inicio";
 import CrearDocumento from "./pages/CrearDocumento";
 import Clientes from "./pages/Clientes";
 import BuscarDocumento from "./pages/BuscarDocumento";
-import BuscarRecepcion from "./pages/BuscarRecepcion"; // ✅ nuevo
+import BuscarRecepcion from "./pages/BuscarRecepcion";
 import Trazabilidad from "./pages/Trazabilidad";
 import Proveedores from "./pages/Proveedores";
 import CotizacionesGuardadas from "./pages/CotizacionesGuardadas";
@@ -25,6 +27,9 @@ import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
 
 function App() {
+  // ✅ Estado global para mostrar/ocultar el modal IA
+  const [modalVisible, setModalVisible] = useState(false);
+
   return (
     <>
       <CssBaseline />
@@ -55,6 +60,10 @@ function App() {
             </Routes>
           </Suspense>
         </Container>
+
+        {/* ✅ Asistente IA: modal y botón flotante */}
+        <AsistenteModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+        <BotonIAFlotante onClick={() => setModalVisible(true)} />
       </Router>
     </>
   );

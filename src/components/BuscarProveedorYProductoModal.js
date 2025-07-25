@@ -4,24 +4,20 @@ import supabase from "../supabaseClient";
 
 const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   const [proveedores, setProveedores] = useState([]);
-  const [productos, setProductos] = useState([]);
-
-  const [busquedaProveedor, setBusquedaProveedor] = useState("");
   const [proveedorSeleccionado, setProveedorSeleccionado] = useState(null);
+  const [busquedaProveedor, setBusquedaProveedor] = useState("");
 
-  const [busquedaProducto, setBusquedaProducto] = useState("");
+  const [productos, setProductos] = useState([]);
   const [productosFiltrados, setProductosFiltrados] = useState([]);
+  const [busquedaProducto, setBusquedaProducto] = useState("");
+  const [mostrarTodos, setMostrarTodos] = useState(false);
 
-  const [mostrarFormProveedor, setMostrarFormProveedor] = useState(false);
   const [formProv, setFormProv] = useState({ nombre: "", telefono: "", tipo_servicio: "" });
-  const [formProd, setFormProd] = useState({
-    nombre: "",
-    precio_venta: "",
-    precio_compra: "",
-    proveedor_id: ""
-  });
+  const [formProd, setFormProd] = useState({ nombre: "", precio_compra: "", precio_venta: "" });
 
-  // Cargar proveedores al abrir
+  const [productoEditando, setProductoEditando] = useState(null);
+  const [productoForm, setProductoForm] = useState({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
+
   useEffect(() => {
     const cargarProveedores = async () => {
       const { data } = await supabase.from("proveedores").select("*").order("nombre", { ascending: true });
@@ -30,239 +26,178 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     cargarProveedores();
   }, []);
 
-  // Cargar productos del proveedor seleccionado
-  useEffect(() => {
-    const cargarProductosProveedor = async () => {
-      if (!proveedorSeleccionado) return;
-      const { data } = await supabase
-        .from("productos_proveedores")
-        .select("*")
-        .eq("proveedor_id", proveedorSeleccionado.id);
-      setProductos(data || []);
-    };
-    cargarProductosProveedor();
-  }, [proveedorSeleccionado]);
-
-  // Filtro dinámico al escribir producto
-  useEffect(() => {
-    const texto = busquedaProducto.toLowerCase();
-    if (!texto) {
-      setProductosFiltrados([]);
-      return;
-    }
-    const filtrados = productos.filter((p) =>
-      p.nombre?.toLowerCase().includes(texto)
-    );
-    setProductosFiltrados(filtrados);
-  }, [busquedaProducto, productos]);
-
-  const seleccionarProveedor = (proveedor) => {
+  const seleccionarProveedor = (proveedorId) => {
+    const proveedor = proveedores.find(p => p.id === proveedorId);
     setProveedorSeleccionado(proveedor);
     setBusquedaProducto("");
+    setProductos([]);
     setProductosFiltrados([]);
+    setMostrarTodos(false);
   };
+
+  const buscarProductos = async () => {
+    if (!proveedorSeleccionado) return;
+    const { data } = await supabase
+      .from("productos_proveedores")
+      .select("*")
+      .eq("proveedor_id", proveedorSeleccionado.id);
+
+    setProductos(data || []);
+    if (busquedaProducto.trim()) {
+      const texto = busquedaProducto.toLowerCase();
+      const filtrados = data.filter((p) => p.nombre?.toLowerCase().includes(texto));
+      setProductosFiltrados(filtrados);
+    } else {
+      setProductosFiltrados([]);
+    }
+  };
+
+  useEffect(() => {
+    if (mostrarTodos && proveedorSeleccionado) buscarProductos();
+  }, [mostrarTodos, proveedorSeleccionado]);
 
   const guardarProveedor = async () => {
     if (!formProv.nombre.trim()) {
       return Swal.fire("Campo requerido", "El nombre del proveedor es obligatorio", "warning");
     }
-
-    const { data, error } = await supabase
-      .from("proveedores")
-      .insert([formProv])
-      .select();
-
-    if (error) {
-      console.error("Error al guardar proveedor:", error);
-      return Swal.fire("Error", "No se pudo guardar el proveedor", "error");
-    }
-
-    const nuevoProveedor = data[0];
-    setProveedorSeleccionado(nuevoProveedor);
-    setFormProd((prev) => ({ ...prev, proveedor_id: nuevoProveedor.id }));
+    const { data, error } = await supabase.from("proveedores").insert([formProv]).select();
+    if (error) return Swal.fire("Error", "No se pudo guardar el proveedor", "error");
+    const nuevo = data[0];
+    setProveedores((prev) => [...prev, nuevo]);
+    seleccionarProveedor(nuevo.id);
     setFormProv({ nombre: "", telefono: "", tipo_servicio: "" });
-    setMostrarFormProveedor(false);
     Swal.fire("Guardado", "Proveedor creado correctamente", "success");
   };
 
   const guardarProductoProveedor = async () => {
-    if (
-      !formProd.nombre ||
-      !formProd.precio_venta ||
-      !formProd.precio_compra ||
-      !formProd.proveedor_id
-    ) {
+    if (!formProd.nombre || !formProd.precio_compra || !formProd.precio_venta || !proveedorSeleccionado?.id) {
       return Swal.fire("Faltan datos", "Completa todos los campos", "warning");
     }
+    const { error } = await supabase.from("productos_proveedores").insert([{ ...formProd, proveedor_id: proveedorSeleccionado.id }]);
+    if (error) return Swal.fire("Error", "No se pudo guardar el producto", "error");
+    Swal.fire("Guardado", "Producto agregado correctamente", "success");
+    setFormProd({ nombre: "", precio_compra: "", precio_venta: "" });
+    buscarProductos();
+  };
 
-    const { error } = await supabase
-      .from("productos_proveedores")
-      .insert([formProd]);
+  const manejarEditar = (prod) => {
+    setProductoEditando(prod.id);
+    setProductoForm({
+      nombre: prod.nombre,
+      precio_compra: prod.precio_compra || "",
+      precio_venta: prod.precio_venta || "",
+      stock: prod.stock || 0
+    });
+  };
 
-    if (error) {
-      console.error("Error al guardar producto proveedor:", error);
-      Swal.fire("Error", "No se pudo guardar el producto", "error");
-    } else {
-      Swal.fire("Guardado", "Producto agregado correctamente", "success");
-      setFormProd({
-        nombre: "",
-        precio_venta: "",
-        precio_compra: "",
-        proveedor_id: formProd.proveedor_id
-      });
-      const { data } = await supabase
-        .from("productos_proveedores")
-        .select("*")
-        .eq("proveedor_id", formProd.proveedor_id);
-      setProductos(data || []);
+  const guardarEdicion = async () => {
+    const { nombre, precio_compra, precio_venta, stock } = productoForm;
+    if (!nombre || !precio_venta || !stock) return Swal.fire("Campos incompletos", "Completa todos los campos", "warning");
+    const { error } = await supabase.from("productos_proveedores")
+      .update({ nombre, precio_compra, precio_venta, stock })
+      .eq("id", productoEditando);
+    if (!error) {
+      Swal.fire("Producto actualizado", "", "success");
+      setProductoEditando(null);
+      setProductoForm({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
+      buscarProductos();
     }
   };
 
+  const cancelarEdicion = () => {
+    setProductoEditando(null);
+    setProductoForm({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
+  };
+
+  const manejarSeleccion = (prod) => {
+  onSelect(prod); // ✅ Esto llama a agregarProductoProveedor sin cerrar el modal
+  // ❌ NO pongas: onClose();
+};
+
   return (
-    <div style={{
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100vw",
-      height: "100vh",
-      backgroundColor: "rgba(0,0,0,0.5)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 1000
-    }}>
-      <div style={{
-        background: "white",
-        padding: "20px",
-        width: "90%",
-        maxWidth: "800px",
-        borderRadius: "8px"
-      }}>
-        <h3>🔍 Buscar producto de proveedor</h3>
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+      <div className="bg-white p-6 rounded w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">📦 Buscar producto por proveedor</h2>
 
-        <div style={{ display: "flex", gap: "20px", marginBottom: "20px" }}>
-          <div style={{ flex: 1 }}>
-            <label>Buscar proveedor:</label>
-            <input
-              type="text"
-              placeholder="Nombre del proveedor"
-              value={busquedaProveedor}
-              onChange={(e) => setBusquedaProveedor(e.target.value)}
-              style={{ width: "100%" }}
-            />
-            <button
-              style={{ marginTop: "10px", padding: "6px", fontSize: "14px" }}
-              onClick={() => setMostrarFormProveedor(true)}
-            >
-              ➕ Agregar proveedor
-            </button>
-            <ul style={{ listStyle: "none", padding: 0, marginTop: "10px", maxHeight: "150px", overflowY: "auto" }}>
-              {busquedaProveedor &&
-                proveedores
-                  .filter((p) =>
-                    p.nombre.toLowerCase().includes(busquedaProveedor.toLowerCase())
-                  )
-                  .map((p) => (
-                    <li key={p.id}>
-                      <button
-                        onClick={() => seleccionarProveedor(p)}
-                        style={{ width: "100%", textAlign: "left", marginBottom: "5px" }}
-                      >
-                        {p.nombre}
-                      </button>
-                    </li>
-                  ))}
-            </ul>
-          </div>
+        <label className="block mb-1 font-medium">Proveedor:</label>
+        <input
+          type="text"
+          value={busquedaProveedor}
+          onChange={(e) => setBusquedaProveedor(e.target.value)}
+          className="border p-2 rounded w-full mb-2"
+          placeholder="Buscar proveedor..."
+        />
+        <select
+          className="border p-2 rounded w-full mb-4"
+          value={proveedorSeleccionado?.id || ""}
+          onChange={(e) => seleccionarProveedor(e.target.value)}
+        >
+          <option value="">Selecciona un proveedor...</option>
+          {proveedores
+            .filter((p) => p.nombre.toLowerCase().includes(busquedaProveedor.toLowerCase()))
+            .map((prov) => (
+              <option key={prov.id} value={prov.id}>{prov.nombre}</option>
+            ))}
+        </select>
 
-          <div style={{ flex: 1 }}>
-            <label>Buscar producto:</label>
-            <input
-              type="text"
-              placeholder="Nombre del producto"
-              value={busquedaProducto}
-              onChange={(e) => setBusquedaProducto(e.target.value)}
-              disabled={!proveedorSeleccionado}
-              style={{ width: "100%" }}
-            />
-            <ul style={{ listStyle: "none", padding: 0, marginTop: "10px", maxHeight: "150px", overflowY: "auto" }}>
-              {productosFiltrados.map((prod) => (
-                <li key={prod.id}>
-                  <button
-                    onClick={() => {
-                      onSelect(prod);
-                      onClose();
-                    }}
-                    style={{ width: "100%", textAlign: "left", marginBottom: "5px" }}
-                  >
-                    {prod.nombre} – ${prod.precio_venta?.toLocaleString("es-CO")}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        {proveedorSeleccionado && (
+          <div className="mb-4">
+            <h3 className="font-semibold">Proveedor: {proveedorSeleccionado.nombre}</h3>
+            <div className="flex gap-2 mt-2">
+              {!mostrarTodos ? (
+                <button onClick={() => setMostrarTodos(true)} className="bg-blue-600 text-white px-3 py-1 rounded">
+                  🔍 Ver productos
+                </button>
+              ) : (
+                <button onClick={() => { setMostrarTodos(false); setProductosFiltrados([]); }} className="bg-gray-400 text-white px-3 py-1 rounded">
+                  ❌ Ocultar productos
+                </button>
+              )}
+            </div>
 
-        <button onClick={onClose} style={{ backgroundColor: "#e53935", color: "white", padding: "8px 16px" }}>
-          ✖️ Cerrar
-        </button>
+            {mostrarTodos && productos.map((prod) => (
+              <div key={prod.id} className="border p-2 rounded mt-2 bg-gray-100">
+                {productoEditando === prod.id ? (
+                  <div className="space-y-2">
+                    <input value={productoForm.nombre} onChange={(e) => setProductoForm({ ...productoForm, nombre: e.target.value })} className="border p-1 rounded w-full" />
+                    <input type="number" value={productoForm.precio_compra} onChange={(e) => setProductoForm({ ...productoForm, precio_compra: e.target.value })} className="border p-1 rounded w-full" />
+                    <input type="number" value={productoForm.precio_venta} onChange={(e) => setProductoForm({ ...productoForm, precio_venta: e.target.value })} className="border p-1 rounded w-full" />
+                    <input type="number" value={productoForm.stock} onChange={(e) => setProductoForm({ ...productoForm, stock: e.target.value })} className="border p-1 rounded w-full" />
+                    <div className="flex gap-2">
+                      <button onClick={guardarEdicion} className="bg-green-500 text-white px-2 py-1 rounded">💾</button>
+                      <button onClick={cancelarEdicion} className="bg-gray-400 px-2 py-1 rounded">Cancelar</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold">{prod.nombre}</p>
+                      <p>Compra: ${prod.precio_compra}</p>
+                      <p>Venta: ${prod.precio_venta}</p>
+                      <p>Stock: {prod.stock}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => manejarSeleccion(prod)} className="bg-blue-500 text-white px-2 py-1 rounded">➕</button>
+                      <button onClick={() => manejarEditar(prod)} className="bg-yellow-400 text-white px-2 py-1 rounded">✏️</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
 
-        {mostrarFormProveedor && (
-          <div style={{ marginTop: "20px", borderTop: "1px solid #ccc", paddingTop: "10px" }}>
-            <h4>🧾 Nuevo proveedor</h4>
-            <input
-              type="text"
-              placeholder="Nombre del proveedor"
-              value={formProv.nombre}
-              onChange={(e) => setFormProv({ ...formProv, nombre: e.target.value })}
-              style={{ width: "100%", marginBottom: "5px" }}
-            />
-            <input
-              type="text"
-              placeholder="Teléfono"
-              value={formProv.telefono}
-              onChange={(e) => setFormProv({ ...formProv, telefono: e.target.value })}
-              style={{ width: "100%", marginBottom: "5px" }}
-            />
-            <input
-              type="text"
-              placeholder="Tipo de servicio"
-              value={formProv.tipo_servicio}
-              onChange={(e) => setFormProv({ ...formProv, tipo_servicio: e.target.value })}
-              style={{ width: "100%", marginBottom: "10px" }}
-            />
-            <button onClick={guardarProveedor}>💾 Guardar proveedor</button>
+            <div className="mt-6">
+              <h4 className="font-semibold mb-2">➕ Nuevo producto</h4>
+              <input type="text" placeholder="Nombre" value={formProd.nombre} onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })} className="border p-1 rounded w-full mb-2" />
+              <input type="number" placeholder="Precio compra" value={formProd.precio_compra} onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })} className="border p-1 rounded w-full mb-2" />
+              <input type="number" placeholder="Precio venta" value={formProd.precio_venta} onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })} className="border p-1 rounded w-full mb-2" />
+              <button onClick={guardarProductoProveedor} className="bg-green-600 text-white px-4 py-1 rounded">Guardar producto</button>
+            </div>
           </div>
         )}
 
-        {proveedorSeleccionado && (
-  <div style={{ marginTop: "20px" }}>
-    <h4>➕ Producto para {proveedorSeleccionado.nombre}</h4>
-    <input
-      type="text"
-      placeholder="Nombre del producto"
-      value={formProd.nombre}
-      onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })}
-      style={{ width: "100%", marginBottom: "5px" }}
-    />
-    <input
-      type="number"
-      placeholder="Precio de compra"
-      value={formProd.precio_compra}
-      onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })}
-      style={{ width: "100%", marginBottom: "5px" }}
-    />
-    <input
-      type="number"
-      placeholder="Precio de venta"
-      value={formProd.precio_venta}
-      onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })}
-      style={{ width: "100%", marginBottom: "10px" }}
-    />
-    <button onClick={guardarProductoProveedor}>💾 Guardar producto</button>
-  </div>
-)}
-
+        <div className="flex justify-end mt-6">
+          <button onClick={onClose} className="bg-red-500 text-white px-4 py-2 rounded">✖️ Cerrar</button>
+        </div>
       </div>
     </div>
   );

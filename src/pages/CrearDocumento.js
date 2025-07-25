@@ -191,7 +191,6 @@ useEffect(() => {
       temporal: true
     };
     setProductosAgregados([...productosAgregados, nuevo]);
-    setModalProveedor(false);
   };
 
   // ✅ Agregar producto temporal (llamado desde BuscarProductoModal)
@@ -655,9 +654,12 @@ return (
 
     {modalProveedor && (
   <BuscarProveedorYProductoModal
-    onSelect={agregarProductoProveedor}
-    onClose={() => setModalProveedor(false)}
-  />
+  onSelect={(producto) => {
+    agregarProductoProveedor(producto); // ✅ ejecuta sin cerrar el modal
+    // ❌ No pongas: setModalProveedor(false)
+  }}
+  onClose={() => setModalProveedor(false)} // ✅ Solo este botón cerrará el modal
+/>
 )}
 
     {modalCrearCliente && (
