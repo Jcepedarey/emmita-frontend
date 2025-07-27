@@ -289,6 +289,8 @@ console.log("📦 Estado final:", estadoFinal);
 
   let error;
 
+  console.log("📄 Documento original:", documento);
+
 if (esEdicion && idOriginal) {
   const confirmar = await Swal.fire({
     title: "¿Actualizar documento?",
@@ -300,22 +302,46 @@ if (esEdicion && idOriginal) {
   });
 
   if (confirmar.isConfirmed) {
-    const res = await supabase.from(tabla).update(dataGuardar).eq("id", idOriginal);
-    error = res.error;
+    const tablaOriginal = documento?.numero?.startsWith("COT")
+  ? "cotizaciones"
+  : "ordenes_pedido";
+
+if (tablaOriginal !== tabla) {
+      // 🗑️ Eliminar documento anterior
+      await supabase.from(tablaOriginal).delete().eq("id", idOriginal);
+
+      // 🆕 Crear nuevo número de documento para la tabla nueva
+      const { data: existentes } = await supabase
+        .from(tabla)
+        .select("id")
+        .like("numero", `${prefijo}-${fechaNumerica}-%`);
+
+      const consecutivo = (existentes?.length || 0) + 1;
+      numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
+      dataGuardar.numero = numeroDocumento;
+
+      // 📥 Insertar en nueva tabla
+      const res = await supabase.from(tabla).insert([dataGuardar]);
+      error = res.error;
+    } else {
+      // ✏️ Si el tipo no cambió, actualizar normalmente
+      const res = await supabase.from(tabla).update(dataGuardar).eq("id", idOriginal);
+      error = res.error;
+    }
   } else {
-    return; // Canceló el usuario
+    return; // Usuario canceló
   }
 } else {
   const res = await supabase.from(tabla).insert([dataGuardar]);
   error = res.error;
 }
 
-  if (!error) {
-    Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
-  } else {
-    console.error(error);
-    Swal.fire("Error", "No se pudo guardar el documento", "error");
-  }
+if (!error) {
+  Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
+} else {
+  console.error(error);
+  Swal.fire("Error", "No se pudo guardar el documento", "error");
+}
 };
 
   // ✅ Obtener datos para PDF o remisión
