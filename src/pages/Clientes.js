@@ -3,8 +3,11 @@ import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import Papa from "papaparse";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Clientes() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [clientes, setClientes] = useState([]);
   const [buscar, setBuscar] = useState("");
   const [form, setForm] = useState({

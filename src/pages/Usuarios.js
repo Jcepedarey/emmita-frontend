@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Usuarios() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [usuario, setUsuario] = useState(null);
   const [form, setForm] = useState({ nombre: "", email: "", password: "", nueva_password: "" });
 

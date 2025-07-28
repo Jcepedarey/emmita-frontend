@@ -3,8 +3,11 @@ import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
 import { useNavigate } from "react-router-dom";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function BuscarDocumento() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [tipo, setTipo] = useState("cotizaciones");
   const [documentos, setDocumentos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -25,7 +28,6 @@ export default function BuscarDocumento() {
     const { data } = await supabase.from("clientes").select("*");
     if (data) setClientes(data);
   };
-
   const cargarDocumentos = async () => {
     let query = supabase.from(tipo).select("*");
 

@@ -4,8 +4,11 @@ import Swal from "sweetalert2";
 import { FaTrash, FaEdit } from "react-icons/fa";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Proveedores() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [proveedores, setProveedores] = useState([]);
   const [productosProveedor, setProductosProveedor] = useState([]);
   const [formProv, setFormProv] = useState({ nombre: "", telefono: "", tipo_servicio: "" });

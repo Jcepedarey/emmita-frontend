@@ -4,8 +4,11 @@ import supabase from "../supabaseClient";
 import { exportarCSV } from "../utils/exportarCSV";
 import { generarPDFContable } from "../utils/generarPDFContable";
 import Swal from "sweetalert2";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 const Contabilidad = () => {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [movimientos, setMovimientos] = useState([]);
   const [filtro, setFiltro] = useState("todos");
   const [form, setForm] = useState({
@@ -21,13 +24,14 @@ const Contabilidad = () => {
 
   const cargarMovimientos = async () => {
     const { data, error } = await supabase
-  .from("movimientos_contables")
-  .select("*, clientes:cliente_id(nombre)")
+      .from("movimientos_contables")
+      .select("*, clientes:cliente_id(nombre)")
       .order("fecha", { ascending: false });
 
     if (!error) setMovimientos(data);
     else console.error("❌ Error cargando movimientos:", error);
   };
+
 
   const guardarMovimiento = async () => {
     if (!form.monto || !form.tipo) return alert("Completa el tipo y monto");

@@ -4,8 +4,11 @@ import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import Papa from "papaparse";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Inventario() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [productos, setProductos] = useState([]);
   const [form, setForm] = useState({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "" });
   const [buscar, setBuscar] = useState("");

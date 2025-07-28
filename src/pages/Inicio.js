@@ -1,9 +1,10 @@
-// src/pages/Inicio.js
+// src/pages/Inicio.js 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div
@@ -16,6 +17,8 @@ const BotonModulo = ({ titulo, imagen, onClick }) => (
 );
 
 const Inicio = () => {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem("usuario"));
   const [ordenesProximas, setOrdenesProximas] = useState([]);

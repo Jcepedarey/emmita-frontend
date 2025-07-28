@@ -7,8 +7,11 @@ import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Agenda() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
   const [nuevaNota, setNuevaNota] = useState("");
   const [notas, setNotas] = useState([]);
@@ -16,14 +19,14 @@ export default function Agenda() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const navigate = useNavigate();
 
-   const cargarDatos = useCallback(async () => {
-  const fecha = fechaSeleccionada.toISOString().split("T")[0];
+  const cargarDatos = useCallback(async () => {
+    const fecha = fechaSeleccionada.toISOString().split("T")[0];
 
-  const { data: notasData } = await supabase
-    .from("agenda")
-    .select("*")
-    .eq("fecha", fecha)
-    .order("created_at", { ascending: true });
+    const { data: notasData } = await supabase
+      .from("agenda")
+      .select("*")
+      .eq("fecha", fecha)
+      .order("created_at", { ascending: true });
 
   const { data: ordenesData } = await supabase
   .from("ordenes_pedido")

@@ -4,8 +4,11 @@ import { useNavigate } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Swal from "sweetalert2";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function BuscarRecepcion() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [cliente, setCliente] = useState("");
   const [inicio, setInicio] = useState(null);
   const [fin, setFin] = useState(null);

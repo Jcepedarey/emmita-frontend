@@ -4,8 +4,11 @@ import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { generarPDFRecepcion } from "../utils/generarPDFRecepcion";
 import { useLocation } from "react-router-dom";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 const Recepcion = () => {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [ordenes, setOrdenes] = useState([]);
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
   const [productosRevisados, setProductosRevisados] = useState([]);
@@ -16,8 +19,9 @@ const Recepcion = () => {
   const [usuario, setUsuario] = useState({ nombre: "Administrador" });
   const location = useLocation();
   const [gastosExtras, setGastosExtras] = useState([{ motivo: "", valor: "" }]);
-const queryParams = new URLSearchParams(location.search);
-const ordenId = queryParams.get("id");
+
+  const queryParams = new URLSearchParams(location.search);
+  const ordenId = queryParams.get("id");
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("usuario"));

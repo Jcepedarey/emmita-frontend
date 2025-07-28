@@ -1,11 +1,10 @@
-// src/App.js
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import { CssBaseline, CircularProgress, Container } from "@mui/material";
 import Navbar from "./components/Navbar";
 import Navegacion from "./components/Navegacion";
 import BotonIAFlotante from "./components/BotonIAFlotante";
-import AsistenteModal from "./components/AsistenteModal"; // ✅ Importar el modal
+import AsistenteModal from "./components/AsistenteModal";
 
 // 📦 Páginas principales
 import Login from "./pages/Login";
@@ -27,8 +26,39 @@ import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
 
 function App() {
-  // ✅ Estado global para mostrar/ocultar el modal IA
   const [modalVisible, setModalVisible] = useState(false);
+
+  // 🔐 FASE 1: Cierre de sesión por inactividad
+  useEffect(() => {
+    let timer;
+    const MAX_INACTIVIDAD = 20 * 60 * 1000; // 20 minutos
+
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const usuario = localStorage.getItem("usuario");
+        if (usuario) {
+          localStorage.removeItem("usuario");
+          alert("Sesión cerrada por inactividad.");
+          window.location.href = "/";
+        }
+      }, MAX_INACTIVIDAD);
+    };
+
+    // Detectar actividad del usuario
+    window.addEventListener("mousemove", resetTimer);
+    window.addEventListener("keydown", resetTimer);
+    window.addEventListener("click", resetTimer);
+
+    resetTimer(); // iniciar el temporizador
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("mousemove", resetTimer);
+      window.removeEventListener("keydown", resetTimer);
+      window.removeEventListener("click", resetTimer);
+    };
+  }, []);
 
   return (
     <>

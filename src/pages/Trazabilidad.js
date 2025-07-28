@@ -2,8 +2,11 @@ import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Trazabilidad() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [productoBuscar, setProductoBuscar] = useState("");
   const [clienteFiltro, setClienteFiltro] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");

@@ -3,10 +3,13 @@ import supabase from "../supabaseClient";
 import { Bar, Pie } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend } from "chart.js";
 import { exportarCSV } from "../utils/exportarCSV";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
 export default function Reportes() {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const [reportes, setReportes] = useState([]);
   const [form, setForm] = useState({ tipo: "ingreso", monto: "", descripcion: "" });
   const [productosMasUsados, setProductosMasUsados] = useState([]);

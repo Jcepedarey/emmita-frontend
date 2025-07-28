@@ -12,13 +12,15 @@ import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF } from "../utils/generarRemision";
 
 import Swal from "sweetalert2";
+import Protegido from "../components/Protegido"; // 🔐 Protección
 
 const CrearDocumento = () => {
+  <Protegido />; // ⛔ Redirige si no hay sesión activa
+
   const location = useLocation();
   const { documento, tipo } = location.state || {};
   const esEdicion = documento?.esEdicion || false;
   const idOriginal = documento?.idOriginal || null;
-  
 
   // 🧠 ESTADOS INICIALES
   const [tipoDocumento, setTipoDocumento] = useState(tipo || "cotizacion");
@@ -32,23 +34,23 @@ const CrearDocumento = () => {
   const [productosAgregados, setProductosAgregados] = useState([]);
   const [garantia, setGarantia] = useState("");
 
-// Nuevo estado para check de garantía
-const [garantiaRecibida, setGarantiaRecibida] = useState(false);
+  // Nuevo estado para check de garantía
+  const [garantiaRecibida, setGarantiaRecibida] = useState(false);
 
-// Abonos con fecha
-const [abonos, setAbonos] = useState([
-  // Cada abono será un objeto: { valor: 0, fecha: "19-06-2025" }
-]);
+  // Abonos con fecha
+  const [abonos, setAbonos] = useState([
+    // Cada abono será un objeto: { valor: 0, fecha: "19-06-2025" }
+  ]);
 
-const agregarAbono = () => {
-  const nuevaFecha = new Date().toLocaleDateString("es-CO", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
+  const agregarAbono = () => {
+    const nuevaFecha = new Date().toLocaleDateString("es-CO", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
 
-  setAbonos([...abonos, { valor: 0, fecha: nuevaFecha }]);
-};
+    setAbonos([...abonos, { valor: 0, fecha: nuevaFecha }]);
+  };
 
 // Fecha de entrega de la garantía
 const [fechaGarantia, setFechaGarantia] = useState("");
