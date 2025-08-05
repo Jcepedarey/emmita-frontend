@@ -17,7 +17,6 @@ const BotonModulo = ({ titulo, imagen, onClick }) => (
 );
 
 const Inicio = () => {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
 
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem("usuario"));
@@ -102,6 +101,7 @@ const Inicio = () => {
 };
 
   return (
+    <Protegido>
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Bienvenido, {usuario?.nombre || "Administrador"}</h1>
 
@@ -239,6 +239,7 @@ const Inicio = () => {
   )}
 </div>
 </div>
+</Protegido>
 );
 };
 

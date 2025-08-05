@@ -4,8 +4,6 @@ import Swal from "sweetalert2";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Usuarios() {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
-
   const [usuario, setUsuario] = useState(null);
   const [form, setForm] = useState({ nombre: "", email: "", password: "", nueva_password: "" });
 
@@ -17,7 +15,12 @@ export default function Usuarios() {
     const usuarioLocal = JSON.parse(localStorage.getItem("usuario"));
     if (!usuarioLocal) return;
     setUsuario(usuarioLocal);
-    setForm({ nombre: usuarioLocal.nombre, email: usuarioLocal.email, password: "", nueva_password: "" });
+    setForm({
+      nombre: usuarioLocal.nombre,
+      email: usuarioLocal.email,
+      password: "",
+      nueva_password: "",
+    });
   };
 
   const actualizarUsuario = async () => {
@@ -31,7 +34,11 @@ export default function Usuarios() {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/usuarios/cambiar-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password_actual: password, nueva_password }),
+        body: JSON.stringify({
+          email,
+          password_actual: password,
+          nueva_password,
+        }),
       });
 
       const data = await res.json();
@@ -50,46 +57,48 @@ export default function Usuarios() {
   };
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "500px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center" }}>Tu Perfil</h2>
+    <Protegido>
+      <div style={{ padding: "1rem", maxWidth: "500px", margin: "auto" }}>
+        <h2 style={{ textAlign: "center" }}>Tu Perfil</h2>
 
-      <label>Nombre</label>
-      <input
-        type="text"
-        value={form.nombre}
-        onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
-      />
+        <label>Nombre</label>
+        <input
+          type="text"
+          value={form.nombre}
+          onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+          style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
+        />
 
-      <label>Correo</label>
-      <input
-        type="email"
-        value={form.email}
-        onChange={(e) => setForm({ ...form, email: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
-      />
+        <label>Correo</label>
+        <input
+          type="email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
+        />
 
-      <label>Contraseña actual</label>
-      <input
-        type="password"
-        placeholder="Contraseña actual"
-        value={form.password}
-        onChange={(e) => setForm({ ...form, password: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
-      />
+        <label>Contraseña actual</label>
+        <input
+          type="password"
+          placeholder="Contraseña actual"
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
+        />
 
-      <label>Nueva contraseña</label>
-      <input
-        type="password"
-        placeholder="Nueva contraseña"
-        value={form.nueva_password}
-        onChange={(e) => setForm({ ...form, nueva_password: e.target.value })}
-        style={{ width: "100%", padding: "8px", marginBottom: "20px" }}
-      />
+        <label>Nueva contraseña</label>
+        <input
+          type="password"
+          placeholder="Nueva contraseña"
+          value={form.nueva_password}
+          onChange={(e) => setForm({ ...form, nueva_password: e.target.value })}
+          style={{ width: "100%", padding: "8px", marginBottom: "20px" }}
+        />
 
-      <button onClick={actualizarUsuario} style={{ width: "100%", padding: "10px" }}>
-        Actualizar datos
-      </button>
-    </div>
+        <button onClick={actualizarUsuario} style={{ width: "100%", padding: "10px" }}>
+          Actualizar datos
+        </button>
+      </div>
+    </Protegido>
   );
 }

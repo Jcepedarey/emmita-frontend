@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import { exportarCSV } from "../utils/exportarCSV";
+import Protegido from "../components/Protegido";
 
 export default function Exportar() {
   const [desde, setDesde] = useState("");
@@ -22,6 +23,7 @@ export default function Exportar() {
   };
 
   return (
+    <Protegido>
     <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
       <h2 style={{ textAlign: "center" }}>📁 Exportar respaldos</h2>
 
@@ -45,6 +47,7 @@ export default function Exportar() {
       <button onClick={() => exportarSinFechas("clientes", "clientes")} style={btnStyle}>📤 Exportar Clientes</button>
       <button onClick={() => exportarSinFechas("usuarios", "usuarios")} style={btnStyle}>📤 Exportar Usuarios</button>
     </div>
+    </Protegido>
   );
 }
 

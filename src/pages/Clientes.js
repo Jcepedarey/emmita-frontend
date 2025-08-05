@@ -6,8 +6,6 @@ import Papa from "papaparse";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Clientes() {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
-
   const [clientes, setClientes] = useState([]);
   const [buscar, setBuscar] = useState("");
   const [form, setForm] = useState({
@@ -45,69 +43,69 @@ export default function Clientes() {
   };
 
   const guardarCliente = async () => {
-  const { nombre, identificacion, telefono, direccion, email } = form;
+    const { nombre, identificacion, telefono, direccion, email } = form;
 
-  if (!nombre.trim()) {
-    return Swal.fire("Campo requerido", "El nombre del cliente es obligatorio.", "warning");
-  }
+    if (!nombre.trim()) {
+      return Swal.fire("Campo requerido", "El nombre del cliente es obligatorio.", "warning");
+    }
 
-  const clienteCompleto = {
-    nombre: nombre.trim(),
-    identificacion: identificacion?.trim() || null,
-    telefono: telefono?.trim() || null,
-    direccion: direccion?.trim() || null,
-    email: email?.trim() || null
+    const clienteCompleto = {
+      nombre: nombre.trim(),
+      identificacion: identificacion?.trim() || null,
+      telefono: telefono?.trim() || null,
+      direccion: direccion?.trim() || null,
+      email: email?.trim() || null
+    };
+
+    const { data: existentes, error: errorExistentes } = await supabase
+      .from("clientes")
+      .select("id")
+      .eq("identificacion", clienteCompleto.identificacion);
+
+    if (errorExistentes) {
+      console.error("Error buscando duplicados:", errorExistentes);
+      return Swal.fire("Error", "Problema verificando cliente existente.", "error");
+    }
+
+    if (existentes && existentes.length > 0 && !editando) {
+      return Swal.fire("Ya existe", "Ya hay un cliente con esa identificación.", "warning");
+    }
+
+    if (editando) {
+      const { error } = await supabase
+        .from("clientes")
+        .update(clienteCompleto)
+        .eq("id", editando);
+
+      if (!error) {
+        Swal.fire("Actualizado", "Cliente actualizado correctamente.", "success");
+        setEditando(null);
+        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
+        setMostrarFormulario(false);
+        cargarClientes();
+      } else {
+        console.error("Error al actualizar:", error);
+        Swal.fire("Error", "No se pudo actualizar el cliente.", "error");
+      }
+    } else {
+      const nuevoCodigo = generarCodigoCliente();
+      if (!nuevoCodigo) return;
+
+      const { error } = await supabase
+        .from("clientes")
+        .insert([{ codigo: nuevoCodigo, ...clienteCompleto }]);
+
+      if (!error) {
+        Swal.fire("Guardado", "Cliente guardado correctamente.", "success");
+        setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
+        setMostrarFormulario(false);
+        cargarClientes();
+      } else {
+        console.error("Error al guardar:", error);
+        Swal.fire("Error", "No se pudo guardar el cliente.", "error");
+      }
+    }
   };
-
-  const { data: existentes, error: errorExistentes } = await supabase
-    .from("clientes")
-    .select("id")
-    .eq("identificacion", clienteCompleto.identificacion);
-
-  if (errorExistentes) {
-    console.error("Error buscando duplicados:", errorExistentes);
-    return Swal.fire("Error", "Problema verificando cliente existente.", "error");
-  }
-
-  if (existentes && existentes.length > 0 && !editando) {
-    return Swal.fire("Ya existe", "Ya hay un cliente con esa identificación.", "warning");
-  }
-
-  if (editando) {
-    const { error } = await supabase
-      .from("clientes")
-      .update(clienteCompleto)
-      .eq("id", editando);
-
-    if (!error) {
-      Swal.fire("Actualizado", "Cliente actualizado correctamente.", "success");
-      setEditando(null);
-      setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
-      setMostrarFormulario(false);
-      cargarClientes();
-    } else {
-      console.error("Error al actualizar:", error);
-      Swal.fire("Error", "No se pudo actualizar el cliente.", "error");
-    }
-  } else {
-    const nuevoCodigo = generarCodigoCliente();
-    if (!nuevoCodigo) return;
-
-    const { error } = await supabase
-      .from("clientes")
-      .insert([{ codigo: nuevoCodigo, ...clienteCompleto }]);
-
-    if (!error) {
-      Swal.fire("Guardado", "Cliente guardado correctamente.", "success");
-      setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
-      setMostrarFormulario(false);
-      cargarClientes();
-    } else {
-      console.error("Error al guardar:", error);
-      Swal.fire("Error", "No se pudo guardar el cliente.", "error");
-    }
-  }
-};
 
   const editarCliente = (cliente) => {
     setEditando(cliente.id);
@@ -159,7 +157,8 @@ export default function Clientes() {
       .some((campo) => campo?.toLowerCase().includes(buscar.toLowerCase()))
   );
 
-  return (
+ return (
+  <Protegido>
     <div style={{ padding: "1rem", maxWidth: "650px", margin: "auto" }}>
       <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Clientes</h2>
 
@@ -232,5 +231,6 @@ export default function Clientes() {
         </>
       )}
     </div>
-  );
+  </Protegido>
+);
 }

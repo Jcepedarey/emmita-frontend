@@ -7,8 +7,6 @@ import Papa from "papaparse";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Inventario() {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
-
   const [productos, setProductos] = useState([]);
   const [form, setForm] = useState({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "" });
   const [buscar, setBuscar] = useState("");
@@ -90,6 +88,7 @@ export default function Inventario() {
   });
 
   const categoriasUnicas = [...new Set(productos.map((p) => p.categoria).filter(Boolean))];
+
   const exportarCSV = () => {
     if (productos.length === 0) {
       Swal.fire("Sin datos", "No hay productos para exportar.", "info");
@@ -168,83 +167,85 @@ export default function Inventario() {
   };
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Inventario</h2>
+    <Protegido>
+      <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
+        <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Inventario</h2>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px" }}>
-        <button onClick={() => { limpiarFormulario(); setMostrarFormulario(true); }} style={{ padding: "10px", background: "#ccc", borderRadius: "5px" }}>
-          ➕ Agregar
-        </button>
-        <button onClick={exportarCSV} style={{ padding: "10px", background: "#4caf50", color: "#fff", borderRadius: "5px" }}>
-          📁 Exportar CSV
-        </button>
-        <button onClick={() => document.getElementById("archivoExcel").click()} style={{ padding: "10px", background: "#2196f3", color: "#fff", borderRadius: "5px" }}>
-          📥 Importar desde Excel
-        </button>
-        <button onClick={() => { setBuscar(""); setCategoriaFiltro(""); setMostrarTodo(true); }} style={{ padding: "10px", background: "#795548", color: "#fff", borderRadius: "5px" }}>
-          📋 Ver todo el stock
-        </button>
-        <button onClick={borrarTodo} style={{ padding: "10px", background: "#f44336", color: "#fff", borderRadius: "5px" }}>
-          🗑️ Borrar todo el inventario
-        </button>
-      </div>
-
-      <input type="file" accept=".xlsx,.xls,.csv" onChange={importarDesdeArchivo} id="archivoExcel" style={{ display: "none" }} />
-
-      <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", gap: "10px" }}>
-        <input type="text" placeholder="Buscar por nombre" value={buscar} onChange={(e) => { setBuscar(e.target.value); setMostrarTodo(false); }} />
-        <select value={categoriaFiltro} onChange={(e) => { setCategoriaFiltro(e.target.value); setMostrarTodo(false); }}>
-          <option value="">Filtrar por categoría</option>
-          {categoriasUnicas.map((cat, idx) => (<option key={idx} value={cat}>{cat}</option>))}
-        </select>
-      </div>
-
-      {mostrarFormulario && (
-        <>
-          <h3 style={{ marginTop: "2rem" }}>{editandoId ? "Editar Producto" : "Agregar Producto"}</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "1rem" }}>
-            <input type="text" placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
-            <input type="text" placeholder="Descripción" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
-            <input type="number" placeholder="Precio" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} />
-            <input type="number" placeholder="Stock" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
-            <input type="text" placeholder="Categoría" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
-          </div>
-          <button onClick={guardarProducto} style={{ padding: "10px", width: "100%", background: "#2196f3", color: "#fff" }}>
-            {editandoId ? "Actualizar" : "Guardar"}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px" }}>
+          <button onClick={() => { limpiarFormulario(); setMostrarFormulario(true); }} style={{ padding: "10px", background: "#ccc", borderRadius: "5px" }}>
+            ➕ Agregar
           </button>
-          <button onClick={limpiarFormulario} style={{ padding: "10px", width: "100%", marginTop: "8px", background: "#eee" }}>
-            Cancelar
+          <button onClick={exportarCSV} style={{ padding: "10px", background: "#4caf50", color: "#fff", borderRadius: "5px" }}>
+            📁 Exportar CSV
           </button>
-        </>
-      )}
-
-      {productosFiltrados.length > 0 && (
-        <div style={{ marginTop: "2rem" }}>
-          <h3>Resultados</h3>
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {productosFiltrados.map((producto) => (
-              <li key={producto.id} style={{
-                marginBottom: "1rem",
-                border: "1px solid #ccc",
-                borderRadius: "8px",
-                padding: "12px"
-              }}>
-                <strong>{producto.nombre}</strong><br />
-                {producto.descripcion}<br />
-                💲 {producto.precio} | Stock: {producto.stock} | {producto.categoria}
-                <div style={{ marginTop: "0.5rem" }}>
-                  <button onClick={() => editarProducto(producto)} title="Editar" style={{ marginRight: "10px" }}>
-                    <FaEdit />
-                  </button>
-                  <button onClick={() => eliminarProducto(producto.id)} title="Eliminar">
-                    <FaTrash />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <button onClick={() => document.getElementById("archivoExcel").click()} style={{ padding: "10px", background: "#2196f3", color: "#fff", borderRadius: "5px" }}>
+            📥 Importar desde Excel
+          </button>
+          <button onClick={() => { setBuscar(""); setCategoriaFiltro(""); setMostrarTodo(true); }} style={{ padding: "10px", background: "#795548", color: "#fff", borderRadius: "5px" }}>
+            📋 Ver todo el stock
+          </button>
+          <button onClick={borrarTodo} style={{ padding: "10px", background: "#f44336", color: "#fff", borderRadius: "5px" }}>
+            🗑️ Borrar todo el inventario
+          </button>
         </div>
-      )}
-    </div>
+
+        <input type="file" accept=".xlsx,.xls,.csv" onChange={importarDesdeArchivo} id="archivoExcel" style={{ display: "none" }} />
+
+        <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <input type="text" placeholder="Buscar por nombre" value={buscar} onChange={(e) => { setBuscar(e.target.value); setMostrarTodo(false); }} />
+          <select value={categoriaFiltro} onChange={(e) => { setCategoriaFiltro(e.target.value); setMostrarTodo(false); }}>
+            <option value="">Filtrar por categoría</option>
+            {categoriasUnicas.map((cat, idx) => (<option key={idx} value={cat}>{cat}</option>))}
+          </select>
+        </div>
+
+        {mostrarFormulario && (
+          <>
+            <h3 style={{ marginTop: "2rem" }}>{editandoId ? "Editar Producto" : "Agregar Producto"}</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "1rem" }}>
+              <input type="text" placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+              <input type="text" placeholder="Descripción" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+              <input type="number" placeholder="Precio" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} />
+              <input type="number" placeholder="Stock" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
+              <input type="text" placeholder="Categoría" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
+            </div>
+            <button onClick={guardarProducto} style={{ padding: "10px", width: "100%", background: "#2196f3", color: "#fff" }}>
+              {editandoId ? "Actualizar" : "Guardar"}
+            </button>
+            <button onClick={limpiarFormulario} style={{ padding: "10px", width: "100%", marginTop: "8px", background: "#eee" }}>
+              Cancelar
+            </button>
+          </>
+        )}
+
+        {productosFiltrados.length > 0 && (
+          <div style={{ marginTop: "2rem" }}>
+            <h3>Resultados</h3>
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {productosFiltrados.map((producto) => (
+                <li key={producto.id} style={{
+                  marginBottom: "1rem",
+                  border: "1px solid #ccc",
+                  borderRadius: "8px",
+                  padding: "12px"
+                }}>
+                  <strong>{producto.nombre}</strong><br />
+                  {producto.descripcion}<br />
+                  💲 {producto.precio} | Stock: {producto.stock} | {producto.categoria}
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <button onClick={() => editarProducto(producto)} title="Editar" style={{ marginRight: "10px" }}>
+                      <FaEdit />
+                    </button>
+                    <button onClick={() => eliminarProducto(producto.id)} title="Eliminar">
+                      <FaTrash />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Protegido>
   );
 }

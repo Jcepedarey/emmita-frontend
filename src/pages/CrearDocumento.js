@@ -15,7 +15,6 @@ import Swal from "sweetalert2";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
 const CrearDocumento = () => {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
 
   const location = useLocation();
   const { documento, tipo } = location.state || {};
@@ -370,6 +369,7 @@ productosAgregados.forEach((item) => {
 
 // 👇 Aquí empieza el retorno visual
 return (
+  <Protegido>
   <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
     <h2 style={{ textAlign: "center" }}>
       📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
@@ -690,17 +690,18 @@ return (
 />
 )}
 
-    {modalCrearCliente && (
-      <CrearClienteModal
-        onClienteCreado={(cliente) => {
-          setClientes([...clientes, cliente]);
-          setClienteSeleccionado(cliente);
-          setModalCrearCliente(false);
-        }}
-        onClose={() => setModalCrearCliente(false)}
-      />
-    )}
-  </div>
+     {modalCrearCliente && (
+        <CrearClienteModal
+          onClienteCreado={(cliente) => {
+            setClientes([...clientes, cliente]);
+            setClienteSeleccionado(cliente);
+            setModalCrearCliente(false);
+          }}
+          onClose={() => setModalCrearCliente(false)}
+        />
+      )}
+    </div>
+  </Protegido>
 );
 };
 export default CrearDocumento;

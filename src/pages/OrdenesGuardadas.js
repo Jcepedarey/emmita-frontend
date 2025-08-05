@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
+import Protegido from "../components/Protegido";
 
 const OrdenesGuardadas = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -21,6 +22,7 @@ const OrdenesGuardadas = () => {
   }, []);
 
   return (
+    <Protegido>
     <div style={{ padding: "1rem", maxWidth: "700px", margin: "auto" }}>
       <h2 style={{ textAlign: "center" }}>Órdenes Guardadas</h2>
       <ul style={{ listStyle: "none", padding: 0 }}>
@@ -38,6 +40,7 @@ const OrdenesGuardadas = () => {
         ))}
       </ul>
     </div>
+    </Protegido>
   );
 };
 

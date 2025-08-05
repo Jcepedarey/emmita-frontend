@@ -7,8 +7,6 @@ import * as XLSX from "xlsx";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function Proveedores() {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
-
   const [proveedores, setProveedores] = useState([]);
   const [productosProveedor, setProductosProveedor] = useState([]);
   const [formProv, setFormProv] = useState({ nombre: "", telefono: "", tipo_servicio: "" });
@@ -36,6 +34,7 @@ export default function Proveedores() {
     const { data } = await supabase.from("productos_proveedores").select("*");
     if (data) setProductosProveedor(data);
   };
+
   const guardarProveedor = async () => {
     if (!formProv.nombre.trim()) {
       return Swal.fire("Campo requerido", "El nombre del proveedor es obligatorio.", "warning");
@@ -87,6 +86,7 @@ export default function Proveedores() {
       cargarProductosProveedor();
     }
   };
+
   const guardarProductoProveedor = async () => {
     const { proveedor_id, nombre, precio_compra, precio_venta } = formProd;
 
@@ -209,11 +209,13 @@ export default function Proveedores() {
     link.click();
     document.body.removeChild(link);
   };
+
   const proveedoresFiltrados = proveedores.filter((p) =>
     p.nombre.toLowerCase().includes(buscar.toLowerCase())
   );
 
   return (
+    <Protegido>
     <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
       <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
         Gestión de Proveedores
@@ -425,5 +427,6 @@ export default function Proveedores() {
         </>
       )}
     </div>
-  );
+  </Protegido>
+);
 }

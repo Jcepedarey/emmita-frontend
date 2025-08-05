@@ -7,7 +7,6 @@ import Swal from "sweetalert2";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
 const Contabilidad = () => {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
 
   const [movimientos, setMovimientos] = useState([]);
   const [filtro, setFiltro] = useState("todos");
@@ -117,6 +116,7 @@ const Contabilidad = () => {
     .reduce((acc, m) => acc + m.monto, 0);
 
   return (
+     <Protegido>
     <div style={{ padding: "1rem", maxWidth: "900px", margin: "auto" }}>
       <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2.2rem)" }}>
         💰 Panel de Contabilidad
@@ -290,10 +290,10 @@ const Contabilidad = () => {
 </div>
 </li>
 ))} {/* Fin del map */}
-</ul>
-</div>
-</div>
+  </ul>
+    </div>
+  </div>
+</Protegido>  // ⬅️ Aquí
 );
 };
-
 export default Contabilidad;

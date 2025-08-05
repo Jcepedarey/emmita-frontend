@@ -7,7 +7,6 @@ import { useLocation } from "react-router-dom";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
 const Recepcion = () => {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
 
   const [ordenes, setOrdenes] = useState([]);
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
@@ -316,6 +315,7 @@ await supabase.from("reportes").insert([{
   }
 };
   return (
+      <Protegido>
     <div className="p-4">
       <h2 className="text-xl font-semibold mb-4">📦 Recepción de pedidos</h2>
 
@@ -529,6 +529,7 @@ await supabase.from("reportes").insert([{
    </div>
       )}
     </div>
+      </Protegido>
   );
 };
 

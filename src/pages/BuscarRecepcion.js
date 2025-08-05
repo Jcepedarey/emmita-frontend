@@ -7,7 +7,6 @@ import Swal from "sweetalert2";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
 export default function BuscarRecepcion() {
-  <Protegido />; // ⛔ Redirige si no hay sesión activa
 
   const [cliente, setCliente] = useState("");
   const [inicio, setInicio] = useState(null);
@@ -92,6 +91,7 @@ export default function BuscarRecepcion() {
   };
 
   return (
+    <Protegido>
     <div className="p-4 max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold text-center mb-6">🔍 Buscar Recepción</h2>
 
@@ -195,5 +195,6 @@ export default function BuscarRecepcion() {
         </div>
       )}
     </div>
-  );
+  </Protegido>
+);
 }
