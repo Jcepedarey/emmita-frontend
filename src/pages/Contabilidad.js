@@ -18,66 +18,90 @@ const Contabilidad = () => {
   });
 
   useEffect(() => {
-    cargarMovimientos();
-  }, []);
+  cargarMovimientos();
+}, []);
 
-  const cargarMovimientos = async () => {
-    const { data, error } = await supabase
-      .from("movimientos_contables")
-      .select("*, clientes:cliente_id(nombre)")
-      .order("fecha", { ascending: false });
+const cargarMovimientos = async () => {
+  // 1) Traer movimientos "planos" (sin join)
+  const { data, error } = await supabase
+    .from("movimientos_contables")
+    .select("*")
+    .order("fecha", { ascending: false });
 
-    if (!error) setMovimientos(data);
-    else console.error("❌ Error cargando movimientos:", error);
-  };
+  if (error) {
+    console.error("❌ Error cargando movimientos:", error);
+    setMovimientos([]);
+    return;
+  }
 
+  // 2) Si hay cliente_id, traer nombres en una segunda consulta
+  const ids = Array.from(new Set((data || []).map(m => m.cliente_id).filter(Boolean)));
+  let nombresPorId = {};
+  if (ids.length) {
+    const { data: clientes, error: errorClientes } = await supabase
+      .from("clientes")
+      .select("id,nombre")
+      .in("id", ids);
 
-  const guardarMovimiento = async () => {
-    if (!form.monto || !form.tipo) return alert("Completa el tipo y monto");
-
-    const nuevo = {
-      ...form,
-      monto: parseFloat(form.monto),
-      fecha: new Date().toISOString().split("T")[0],
-      estado: "activo",
-    };
-
-    const { error } = await supabase.from("movimientos_contables").insert([nuevo]);
-    if (!error) {
-      setForm({ tipo: "ingreso", monto: "", descripcion: "", categoria: "" });
-      cargarMovimientos();
+    if (!errorClientes) {
+      (clientes || []).forEach(c => { nombresPorId[c.id] = c.nombre; });
     } else {
-      console.error("❌ Error al guardar:", error);
+      console.error("❌ Error cargando clientes:", errorClientes);
     }
+  }
+
+  // 3) Adjuntar nombre de cliente en memoria
+  setMovimientos(
+    (data || []).map(m => ({ ...m, cliente_nombre: nombresPorId[m.cliente_id] || null }))
+  );
+};
+
+const guardarMovimiento = async () => {
+  if (!form.monto || !form.tipo) return alert("Completa el tipo y monto");
+
+  const nuevo = {
+    ...form,
+    monto: parseFloat(form.monto),
+    fecha: new Date().toISOString().split("T")[0],
+    estado: "activo",
   };
 
-  const editarMovimiento = async (movimiento) => {
-    const { value: formValues } = await Swal.fire({
-      title: "Editar movimiento",
-      html:
-        `<input id="swal-monto" class="swal2-input" placeholder="Monto" type="number" value="${movimiento.monto}">` +
-        `<input id="swal-descripcion" class="swal2-input" placeholder="Descripción" value="${movimiento.descripcion || ''}">` +
-        `<input id="swal-categoria" class="swal2-input" placeholder="Categoría" value="${movimiento.categoria || ''}">` +
-        `<select id="swal-tipo" class="swal2-input">
-          <option value="ingreso" ${movimiento.tipo === "ingreso" ? "selected" : ""}>Ingreso</option>
-          <option value="gasto" ${movimiento.tipo === "gasto" ? "selected" : ""}>Gasto</option>
-        </select>` +
-        `<textarea id="swal-justificacion" class="swal2-textarea" placeholder="Justificación de la edición"></textarea>`,
-      focusConfirm: false,
-      showCancelButton: true,
-      preConfirm: () => {
-        const monto = document.getElementById("swal-monto").value;
-        const descripcion = document.getElementById("swal-descripcion").value;
-        const categoria = document.getElementById("swal-categoria").value;
-        const tipo = document.getElementById("swal-tipo").value;
-        const justificacion = document.getElementById("swal-justificacion").value;
-        if (!monto || !justificacion) {
-          Swal.showValidationMessage("Monto y justificación son obligatorios");
-          return false;
-        }
-        return { monto, descripcion, categoria, tipo, justificacion };
-      },
-    });
+  const { error } = await supabase.from("movimientos_contables").insert([nuevo]);
+  if (!error) {
+    setForm({ tipo: "ingreso", monto: "", descripcion: "", categoria: "" });
+    cargarMovimientos();
+  } else {
+    console.error("❌ Error al guardar:", error);
+  }
+};
+
+const editarMovimiento = async (movimiento) => {
+  const { value: formValues } = await Swal.fire({
+    title: "Editar movimiento",
+    html:
+      `<input id="swal-monto" class="swal2-input" placeholder="Monto" type="number" value="${movimiento.monto}">` +
+      `<input id="swal-descripcion" class="swal2-input" placeholder="Descripción" value="${movimiento.descripcion || ''}">` +
+      `<input id="swal-categoria" class="swal2-input" placeholder="Categoría" value="${movimiento.categoria || ''}">` +
+      `<select id="swal-tipo" class="swal2-input">
+        <option value="ingreso" ${movimiento.tipo === "ingreso" ? "selected" : ""}>Ingreso</option>
+        <option value="gasto" ${movimiento.tipo === "gasto" ? "selected" : ""}>Gasto</option>
+      </select>` +
+      `<textarea id="swal-justificacion" class="swal2-textarea" placeholder="Justificación de la edición"></textarea>`,
+    focusConfirm: false,
+    showCancelButton: true,
+    preConfirm: () => {
+      const monto = document.getElementById("swal-monto").value;
+      const descripcion = document.getElementById("swal-descripcion").value;
+      const categoria = document.getElementById("swal-categoria").value;
+      const tipo = document.getElementById("swal-tipo").value;
+      const justificacion = document.getElementById("swal-justificacion").value;
+      if (!monto || !justificacion) {
+        Swal.showValidationMessage("Monto y justificación son obligatorios");
+        return false;
+      }
+      return { monto, descripcion, categoria, tipo, justificacion };
+    },
+  });
   
     if (!formValues) return;
   
@@ -232,9 +256,9 @@ const Contabilidad = () => {
   {m.numero_orden && (
     <> – OP: {m.numero_orden}</>
   )}
-  {m.clientes?.nombre && (
-    <> – Cliente: {m.clientes.nombre}</>
-  )}
+  {m.cliente_nombre && (
+  <> – Cliente: {m.cliente_nombre}</>
+)}
   {m.estado === "eliminado" && m.justificacion ? (
     <em style={{ display: "block", fontSize: "0.8rem" }}>
       Justificación: {m.justificacion}

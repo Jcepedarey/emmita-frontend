@@ -158,17 +158,6 @@ const Recepcion = () => {
       usuario
     );
 
-     await registrarContabilidadPorPedido(
-    ordenSeleccionada,
-    productosRevisados.map((p, i) => ({
-      nombre: p.nombre,
-      monto: parseInt(danos[i]?.monto || 0),
-      tipo: p.tipo_origen,
-    })),
-    garantiaTotal,
-    garantiaDevuelta,
-    usuario
-  );
 
       // 4️⃣ Marcar orden como revisada
   await supabase
@@ -223,21 +212,20 @@ const gastosCalculados = (
 
 const utilidadNeta = ingresos - gastosCalculados - (retencionManual || 0);
 
-// ✅ Insertar resumen en movimientos_contables
-await supabase.from("movimientos_contables").insert([{
-  orden_id: ordenSeleccionada.id,
-  cliente_id: ordenSeleccionada.cliente_id,
-  numero_orden: ordenSeleccionada.numero,
-  ingresos,
-  gastos: gastosCalculados,
-  retencion: retencionManual || 0,
-  garantia_devuelta: Number(garantiaDevuelta) || 0,
-  utilidad_neta: utilidadNeta,
-  descripcion: comentarioGeneral || "Revisión completa registrada desde Recepción",
-  fecha: new Date().toISOString().split("T")[0],
-  tipo: "resumen",
-  estado: "activo"
-}]);
+// ✅ Registrar retención como gasto (para que aparezca en Contabilidad)
+if ((retencionManual || 0) > 0) {
+  await supabase.from("movimientos_contables").insert([{
+    orden_id: ordenSeleccionada.id,
+    fecha: new Date().toISOString().split("T")[0],
+    tipo: "gasto",
+    monto: Number(retencionManual),
+    descripcion: "Retención legal",
+    categoria: "Retenciones",
+    estado: "activo",
+    usuario: usuario?.nombre || "Administrador",
+    fecha_modificacion: null
+  }]);
+  }
 // ✅ Registrar ingreso neto limpio para módulo de contabilidad (reportes)
 await supabase.from("reportes").insert([{
   tipo: "ingreso",
