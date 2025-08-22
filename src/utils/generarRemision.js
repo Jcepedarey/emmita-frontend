@@ -42,16 +42,15 @@ export const generarRemisionPDF = async (documento) => {
   const fechaCreacion = documento.fecha_creacion ? new Date(documento.fecha_creacion).toISOString().slice(0, 10) : "-";
   const fechaEvento = documento.fecha_evento ? new Date(documento.fecha_evento).toISOString().slice(0, 10) : "-";
 
-  // 🧾 Encabezado
-  doc.addImage(logo, "PNG", 10, 10, 35, 30);
-  doc.setFontSize(16);
-  doc.text("REMISIÓN", 105, 20, { align: "center" });
-  doc.setFontSize(10);
-  doc.text("Alquiler & Eventos Emmita", 105, 26, { align: "center" });
-  doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio", 105, 31, { align: "center" });
-  doc.text("Cel: 3166534685 - 3118222934", 105, 36, { align: "center" });
-  doc.setLineWidth(0.5); // 💪 igualar grosor a PDF normal
-  doc.line(10, 44, 200, 44);
+  // 🧾 Encabezado (unificado con generarPDF)
+doc.addImage(logo, "PNG", 10, 10, 35, 30);
+doc.setFontSize(16);
+doc.text("Alquiler & Eventos Emmita", 50, 20);
+doc.setFontSize(10);
+doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio, Meta", 50, 26);
+doc.text("Cel-Whatsapp 3166534685 - 3118222934", 50, 31);
+doc.setLineWidth(0.5);
+doc.line(10, 42, 200, 42);
 
   // 🧾 Datos del cliente (izquierda)
 doc.setFontSize(12);
@@ -67,31 +66,34 @@ doc.text(`Correo: ${documento.email || "N/A"}`, 10, 79);
   doc.text(`Fecha creación: ${fechaCreacion}`, 150, 48);
   doc.text(`Fecha del evento: ${fechaEvento}`, 150, 55);
 
-  // 📋 Tabla de artículos
-  const filas = [];
-  (documento.productos || []).forEach((p) => {
-    if (p.es_grupo && Array.isArray(p.productos)) {
-      p.productos.forEach((sub) => {
-        filas.push([sub.cantidad, `(${p.nombre}) ${sub.nombre}`]);
-      });
-    } else {
-      filas.push([p.cantidad, p.nombre]);
-    }
-  });
+  // 📋 Tabla de artículos (grupos con título centrado y artículos debajo)
+const filas = [];
+(documento.productos || []).forEach((p) => {
+  if (p.es_grupo && Array.isArray(p.productos)) {
+    const tituloGrupo = p.nombre || "Grupo";
+    // Fila de título: ocupa 2 columnas, centrado y en negrita
+    filas.push([{ content: tituloGrupo, colSpan: 2, styles: { fontStyle: "bold", halign: "center" } }]);
+    // Sub-ítems sin prefijo del grupo
+    p.productos.forEach((sub) => {
+      filas.push([sub.cantidad || "-", sub.nombre || "—"]);
+    });
+  } else {
+    filas.push([p.cantidad || "-", p.nombre || "—"]);
+  }
+});
 
   autoTable(doc, {
-    startY: 100,
-    head: [["Cantidad", "Artículo"]],
-    body: filas,
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [41, 128, 185] },
-    columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 150 }
-    },
-    didDrawPage: insertarFondo,
-    margin: { left: 10, right: 10 }
-  });
+  startY: 85,
+  head: [["Cantidad", "Artículo"]],
+  body: filas,
+  styles: { fontSize: 10 },
+  headStyles: { fillColor: [41, 128, 185] },
+  columnStyles: {
+    0: { cellWidth: 30 },
+    // ...
+  },
+  // ...
+});
 
   // ✍️ Firmas
   const h = doc.internal.pageSize.height;

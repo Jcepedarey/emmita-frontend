@@ -19,7 +19,7 @@ export default function Trazabilidad() {
 
   useEffect(() => {
     const cargarDatos = async () => {
-      const { data: productos } = await supabase.from("productos").select("nombre");
+      const { data: productos } = await supabase.from("productos").select("id, nombre");
       const { data: clientes } = await supabase.from("clientes").select("*");
 
       setProductosLista(productos || []);
@@ -48,23 +48,56 @@ export default function Trazabilidad() {
         .map((c) => c.id);
     }
 
-    const resultadosFiltrados = todos.filter((doc) => {
-      const productos = doc.productos || [];
-      const contieneProducto = productos.some((p) =>
-        p.nombre.toLowerCase().includes(productoBuscar.toLowerCase())
-      );
-      if (!contieneProducto) return false;
+    // 🔎 Devuelve true si el documento contiene el producto buscado
+const coincideEnDoc = (doc, idsCoinciden, nombreBuscado) => {
+  const productos = doc.productos || [];
+  for (const p of productos) {
+    // Coincidencia por nombre o por ID (nivel 1)
+    const pId = p.producto_id || p.id;
+    const matchNivel1 =
+      ((p.nombre || "").toLowerCase().includes(nombreBuscado)) ||
+      (pId && idsCoinciden.has(pId));
+    if (matchNivel1) return true;
 
-      const fechaBase = doc.fecha_evento || doc.fecha || doc.fecha_creacion;
-      if (fechaDesde && fechaBase < fechaDesde) return false;
-      if (fechaHasta && fechaBase > fechaHasta) return false;
-
-      if (clienteFiltro && clienteIdsFiltrados.length > 0) {
-        return clienteIdsFiltrados.includes(doc.cliente_id);
+    // Si es grupo, abrir sub-ítems
+    if (p.es_grupo && Array.isArray(p.productos)) {
+      for (const sub of p.productos) {
+        const subId = sub.producto_id || sub.id;
+        const matchSub =
+          ((sub.nombre || "").toLowerCase().includes(nombreBuscado)) ||
+          (subId && idsCoinciden.has(subId));
+        if (matchSub) return true;
       }
+    }
+  }
+  return false;
+};
 
-      return true;
-    });
+// 🧮 Precomputar IDs de productos cuyo nombre coincide con la búsqueda
+const nombreBuscado = productoBuscar.trim().toLowerCase();
+const idsCoinciden = new Set(
+  (productosLista || [])
+    .filter((p) => (p.nombre || "").toLowerCase().includes(nombreBuscado))
+    .map((p) => p.id)
+);
+
+const resultadosFiltrados = todos.filter((doc) => {
+  // ✅ Reemplazo: usar coincideEnDoc para revisar productos y sub-items de grupos
+  const contieneProducto = coincideEnDoc(doc, idsCoinciden, nombreBuscado);
+  if (!contieneProducto) return false;
+
+  // ✅ Filtrar por fechas
+  const fechaBase = doc.fecha_evento || doc.fecha || doc.fecha_creacion;
+  if (fechaDesde && fechaBase < fechaDesde) return false;
+  if (fechaHasta && fechaBase > fechaHasta) return false;
+
+  // ✅ Filtrar por cliente (si aplica)
+  if (clienteFiltro && clienteIdsFiltrados.length > 0) {
+    return clienteIdsFiltrados.includes(doc.cliente_id);
+  }
+
+  return true;
+});
 
     resultadosFiltrados.forEach((doc) => {
       const cliente = clientesLista.find((c) => c.id === doc.cliente_id);
@@ -78,10 +111,9 @@ export default function Trazabilidad() {
     });
 
     resultadosFiltrados.sort((a, b) => {
-      const fechaA = new Date(a.fecha || a.fecha_creacion);
-      const fechaB = new Date(b.fecha || b.fecha_creacion);
-      return fechaB - fechaA;
-    });
+  const getF = (x) => x.fecha_evento || x.fecha || x.fecha_creacion || "";
+  return new Date(getF(b)) - new Date(getF(a));
+});
 
     setResultados(resultadosFiltrados);
   };

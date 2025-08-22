@@ -50,8 +50,17 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   doc.line(10, 42, 200, 42);
 
   // 📌 Datos del cliente
-  const fechaCreacion = documento.fecha_creacion || "-";
-  const fechaEvento = documento.fecha_evento || "-";
+  const soloFecha = (f) => {
+  if (!f) return "-";
+  try {
+    const d = new Date(f);
+    return d.toISOString().slice(0, 10); // AAAA-MM-DD
+  } catch {
+    return "-";
+  }
+};
+const fechaCreacion = soloFecha(documento.fecha_creacion);
+const fechaEvento   = soloFecha(documento.fecha_evento);
 
   doc.setFontSize(12);
   doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 48);
@@ -72,13 +81,13 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   ]);
 
   autoTable(doc, {
-    head: [["Cantidad", "Producto", "Precio", "Subtotal"]],
-    body: filas,
-    startY: 85,
-    styles: { font: "helvetica", fontSize: 10 },
-    headStyles: { fillColor: [41, 128, 185] },
-    didDrawPage: insertarFondo
-  });
+  head: [["Cantidad", "Artículo", "Precio", "Subtotal"]],
+  body: filas,
+  startY: 85,
+  styles: { font: "helvetica", fontSize: 10 },
+  headStyles: { fillColor: [41, 128, 185] },
+  didDrawPage: insertarFondo
+});
 
   let y = (doc.lastAutoTable?.finalY || 100) + 10;
 
