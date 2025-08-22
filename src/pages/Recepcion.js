@@ -111,6 +111,14 @@ const Recepcion = () => {
     setDanos(copia);
   };
 
+  const insertMC = async (row, label = "") => {
+  const { error } = await supabase.from("movimientos_contables").insert([row]);
+  if (error) {
+    console.error(`❌ Error insert ${label}:`, error);
+    throw error; // hará que entremos al catch y NO salga "Revisión guardada"
+  }
+};
+
   const guardarRevision = async () => {
   if (!ordenSeleccionada) {
     Swal.fire("Error", "No hay una orden cargada para revisar", "error");
@@ -170,38 +178,50 @@ const Recepcion = () => {
     .match({ id: ordenSeleccionada.id });
 
   // ✅ Calcular ingresos
-  const ingresos = (ordenSeleccionada.abonos || []).reduce((acc, ab) => acc + (Number(ab.valor) || 0), 0);
+const ingresos = (ordenSeleccionada.abonos || []).reduce(
+  (acc, ab) => acc + (Number(ab.valor) || 0), 0
+);
 
-  // ✅ Registrar ingreso principal
-  await supabase.from("movimientos_contables").insert([{
+// Evitar doble "OP-"
+const numeroOP = String(ordenSeleccionada.numero || "");
+const numeroLimpio = numeroOP.startsWith("OP-") ? numeroOP : `OP-${numeroOP}`;
+
+// ✅ Registrar ingreso principal (si es > 0; si quieres siempre, quita el if)
+if (ingresos > 0) {
+  await insertMC({
     orden_id: ordenSeleccionada.id,
+    cliente_id: ordenSeleccionada.cliente_id,
     fecha: new Date().toISOString().split("T")[0],
     tipo: "ingreso",
     monto: ingresos,
-    descripcion: comentarioGeneral || "Auto generado desde Recepción",
+    descripcion:
+      `${numeroLimpio} — ${new Date(ordenSeleccionada.fecha_evento).toISOString().slice(0,10)} — ${ordenSeleccionada?.clientes?.nombre || "N/A"}` +
+      (comentarioGeneral ? ` | ${comentarioGeneral}` : ""),
     categoria: "Cierre de orden",
     estado: "activo",
     usuario: usuario?.nombre || "Administrador",
     fecha_modificacion: null
-  }]);
+  }, "ingreso principal");
+}
 
   // ✅ Guardar los gastos adicionales ingresados manualmente
-  for (const gasto of gastosExtras) {
-    const valorNumerico = Number(gasto.valor);
-    if (gasto.motivo && valorNumerico > 0) {
-      await supabase.from("movimientos_contables").insert([{
-        orden_id: ordenSeleccionada.id,
-        fecha: new Date().toISOString().split("T")[0],
-        tipo: "gasto",
-        monto: valorNumerico,
-        descripcion: gasto.motivo,
-        categoria: "Gasto adicional (manual)",
-        estado: "activo",
-        usuario: usuario?.nombre || "Administrador",
-        fecha_modificacion: null
-      }]);
-    }
+for (const gasto of gastosExtras) {
+  const valorNumerico = Number(gasto.valor);
+  if (gasto.motivo && valorNumerico > 0) {
+    await insertMC({
+      orden_id: ordenSeleccionada.id,
+      cliente_id: ordenSeleccionada.cliente_id,
+      fecha: new Date().toISOString().split("T")[0],
+      tipo: "gasto",
+      monto: valorNumerico,
+      descripcion: `[${numeroLimpio}] ${gasto.motivo}`,
+      categoria: "Gasto adicional (manual)",
+      estado: "activo",
+      usuario: usuario?.nombre || "Administrador",
+      fecha_modificacion: null
+    }, "gasto adicional");
   }
+}
 
   // ✅ Calcular gastos automáticos
 const gastosCalculados = (
@@ -214,18 +234,19 @@ const utilidadNeta = ingresos - gastosCalculados - (retencionManual || 0);
 
 // ✅ Registrar retención como gasto (para que aparezca en Contabilidad)
 if ((retencionManual || 0) > 0) {
-  await supabase.from("movimientos_contables").insert([{
+  await insertMC({
     orden_id: ordenSeleccionada.id,
+    cliente_id: ordenSeleccionada.cliente_id,
     fecha: new Date().toISOString().split("T")[0],
     tipo: "gasto",
     monto: Number(retencionManual),
-    descripcion: "Retención legal",
+    descripcion: `[${numeroLimpio}] Retención legal`,
     categoria: "Retenciones",
     estado: "activo",
     usuario: usuario?.nombre || "Administrador",
     fecha_modificacion: null
-  }]);
-  }
+  }, "retención");
+}
 // ✅ Registrar ingreso neto limpio para módulo de contabilidad (reportes)
 await supabase.from("reportes").insert([{
   tipo: "ingreso",
@@ -243,63 +264,62 @@ await supabase.from("reportes").insert([{
 
  const registrarContabilidadPorPedido = async (orden, danos, garantiaOriginal, garantiaDevuelta, usuario) => {
   try {
+    const base = {
+      orden_id: orden.id,
+      cliente_id: orden.cliente_id,
+      fecha: new Date().toISOString().split("T")[0],
+      estado: "activo",
+      usuario: usuario?.nombre || "Administrador",
+      fecha_modificacion: null,
+    };
+
+    // Número limpio para evitar "OP-OP-"
+    const numeroOP = String(orden.numero || "");
+    const numeroLimpio = numeroOP.startsWith("OP-") ? numeroOP : `OP-${numeroOP}`;
+
     for (const d of danos) {
       if (d.monto > 0) {
-        const movimiento = {
-          fecha: new Date().toISOString().split("T")[0],
-          estado: "activo",
-          usuario: usuario?.nombre || "Administrador",
-          fecha_modificacion: null,
-        };
-
         if (d.tipo === "proveedor") {
-          // 🧾 Gasto por daño a proveedor
-          await supabase.from("movimientos_contables").insert([{
-            ...movimiento,
+          await insertMC({
+            ...base,
             tipo: "gasto",
             monto: Math.abs(d.monto),
-            descripcion: `Daño en producto del proveedor: ${d.nombre}`,
+            descripcion: `[${numeroLimpio}] Daño en producto del proveedor: ${d.nombre}`,
             categoria: "Daños proveedor",
-          }]);
+          }, "daño proveedor");
 
-          // ✅ Ingreso por garantía retenida (proveedor)
-          await supabase.from("movimientos_contables").insert([{
-            ...movimiento,
+          await insertMC({
+            ...base,
             tipo: "ingreso",
             monto: Math.abs(d.monto),
-            descripcion: `Garantía retenida por daño (proveedor): ${d.nombre}`,
+            descripcion: `[${numeroLimpio}] Garantía retenida por daño (proveedor): ${d.nombre}`,
             categoria: "Garantías retenidas",
-          }]);
+          }, "garantía retenida proveedor");
         } else {
-          // ✅ Ingreso por compensación de daño (propio)
-          await supabase.from("movimientos_contables").insert([{
-            ...movimiento,
+          await insertMC({
+            ...base,
             tipo: "ingreso",
             monto: Math.abs(d.monto),
-            descripcion: `Compensación por daño (producto propio): ${d.nombre}`,
+            descripcion: `[${numeroLimpio}] Compensación por daño (producto propio): ${d.nombre}`,
             categoria: "Daños propios",
-          }]);
+          }, "daño propio");
         }
       }
     }
 
-    // ✅ Garantía no devuelta (también ingreso positivo)
     const diferencia = garantiaOriginal - garantiaDevuelta;
     if (diferencia > 0) {
-      await supabase.from("movimientos_contables").insert([{
+      await insertMC({
+        ...base,
         tipo: "ingreso",
         monto: Math.abs(diferencia),
-        descripcion: `Garantía no devuelta al cliente por daños`,
+        descripcion: `[${numeroLimpio}] Garantía no devuelta al cliente por daños`,
         categoria: "Garantías retenidas",
-        fecha: new Date().toISOString().split("T")[0],
-        estado: "activo",
-        usuario: usuario?.nombre || "Administrador",
-        fecha_modificacion: null
-      }]);
+      }, "garantía no devuelta");
     }
-    
   } catch (error) {
     console.error("❌ Error registrando contabilidad del pedido:", error);
+    throw error; // Propaga para que el catch de guardarRevision muestre el Swal de error
   }
 };
   return (
