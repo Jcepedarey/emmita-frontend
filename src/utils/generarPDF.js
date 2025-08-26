@@ -85,8 +85,18 @@ const fechaEvento   = soloFecha(documento.fecha_evento);
   body: filas,
   startY: 85,
   styles: { font: "helvetica", fontSize: 10 },
-  headStyles: { fillColor: [41, 128, 185] },
-  didDrawPage: insertarFondo
+  // Encabezados centrados
+  headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: "center", valign: "middle" },
+  // Anchos y alineación por columna
+  // Total: 25 + 105 + 30 + 30 = 190 (con márgenes 10/10 en A4)
+  columnStyles: {
+  0: { cellWidth: 25, halign: "center" }, // Cantidad centrada
+  1: { cellWidth: 105 },                  // Artículo
+  2: { cellWidth: 30, halign: "center" }, // Precio centrado
+  3: { cellWidth: 30, halign: "center" }, // Subtotal centrado
+},
+  margin: { left: 10, right: 10 },
+  didDrawPage: insertarFondo,
 });
 
   let y = (doc.lastAutoTable?.finalY || 100) + 10;
