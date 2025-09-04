@@ -92,12 +92,18 @@ export const generarRemisionPDF = async (documento) => {
       p.productos.forEach((sub) => {
         const cantSub = (Number(sub.cantidad) || 0) * factorGrupo; // 👈 MULTIPLICA
         if (cantSub > 0) {
-          filas.push([cantSub, sub.nombre]);
+          filas.push([
+  cantSub,
+  { content: sub.nombre, _temp: !!sub.temporal || !!sub.es_proveedor },
+]);
         }
       });
     } else {
       // Producto normal
-      filas.push([Number(p.cantidad) || 0, p.nombre]);
+      filas.push([
+  Number(p.cantidad) || 0,
+  { content: p.nombre, _temp: !!p.temporal || !!p.es_proveedor },
+]);
     }
   });
 
@@ -143,6 +149,20 @@ autoTable(doc, {
     const shade = zebraIndex % 2 === 0 ? 255 : 245;
     cell.styles.fillColor = [shade, shade, shade];
     if (column.index === lastCol) zebraIndex++;
+  }
+},
+didDrawCell: (data) => {
+  const { section, row, column, cell } = data;
+  // Solo cuerpo y solo columna "Artículo" (índice 1)
+  if (section === "body" && column.index === 1) {
+    const esTemporal = row.raw?.[1]?._temp === true;
+    if (esTemporal) {
+      // Subrayado suave (gris claro) dentro del ancho de la celda
+      doc.setDrawColor(170);       // gris suave
+      doc.setLineWidth(0.4);
+      const y = cell.y + cell.height - 2; // 2pt por encima del borde inferior
+      doc.line(cell.x + 2, y, cell.x + cell.width - 2, y);
+    }
   }
 },
   didDrawPage: insertarFondo,

@@ -1,106 +1,264 @@
-// BuscarProductoModal.js
-import React, { useState, useEffect } from 'react';
+// src/components/BuscarProductoModal.js
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../supabaseClient";
-import { v4 as uuidv4 } from 'uuid'; // ✅ para productos temporales
+import { v4 as uuidv4 } from "uuid";
 
-const BuscarProductoModal = ({ onSelect, onClose, onAgregarProducto }) => {
-  const [productos, setProductos] = useState([]);
-  const [busqueda, setBusqueda] = useState('');
+const DEBOUNCE_MS = 250;
+const PAGE_LIMIT = 50;
+
+export default function BuscarProductoModal({
+  onSelect,
+  onAgregarProducto,
+  onClose,
+  persistOpen = true, // si false, cierra al seleccionar
+}) {
+  // 🔎 búsqueda
+  const [q, setQ] = useState("");
+  const [resultados, setResultados] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // ➕ formulario "nuevo producto"
   const [form, setForm] = useState({
-    nombre: '',
-    descripcion: '',
-    precio: '',
-    stock: '',
-    categoria: '',
-    cantidad: 1
+    nombre: "",
+    descripcion: "",
+    precio: "",
+    stock: "",
+    categoria: "",
+    cantidad: 1,
   });
-  const [temporal, setTemporal] = useState(false); // ✅ estado para checkbox
+  const [temporal, setTemporal] = useState(false);
 
+  const inputRef = useRef(null);
+
+  // Autofocus
   useEffect(() => {
-    fetchProductos();
+    inputRef.current?.focus();
   }, []);
 
-  const fetchProductos = async () => {
-    const { data, error } = await supabase.from('productos').select('*').order("nombre", { ascending: true });
-    if (!error) setProductos(data);
-    else console.error('Error al obtener productos:', error);
+  // Debounce para q
+  const debouncedQ = useMemo(() => {
+    let h;
+    return {
+      set(value, setter) {
+        clearTimeout(h);
+        h = setTimeout(() => setter(value), DEBOUNCE_MS);
+      },
+    };
+  }, []);
+
+  // Ejecuta búsqueda con debounce
+  useEffect(() => {
+    let cancel = false;
+    setError("");
+
+    const run = async (term) => {
+      // Evita traer todo si q vacío (muestra top N por nombre, opcional)
+      if (!term || term.trim().length === 0) {
+        setResultados([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("productos")
+          .select("*")
+          .ilike("nombre", `%${term}%`)
+          .order("nombre", { ascending: true })
+          .limit(PAGE_LIMIT);
+
+        if (!cancel) {
+          if (error) {
+            setError("No se pudieron cargar productos.");
+            setResultados([]);
+          } else {
+            setResultados(data || []);
+          }
+        }
+      } catch (e) {
+        if (!cancel) {
+          setError("Error de conexión al buscar productos.");
+          setResultados([]);
+        }
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    };
+
+    debouncedQ.set(q, run);
+    return () => {
+      cancel = true;
+    };
+  }, [q, debouncedQ]);
+
+  const limpiarYContinuar = () => {
+    setQ("");
+    inputRef.current?.focus();
   };
 
-  const productosFiltrados = productos.filter(prod =>
-    (prod.nombre || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-    (prod.descripcion || '').toLowerCase().includes(busqueda.toLowerCase())
-  );
+  // Agregar seleccionado desde inventario (no cierra, a menos que persistOpen=false)
+  const handleAgregarSeleccion = (p) => {
+    if (onSelect) onSelect(p);
+    if (persistOpen) {
+      limpiarYContinuar();
+    } else {
+      onClose?.();
+    }
+  };
 
+  // Agregar como ítem temporal (a partir de un producto existente)
+  const handleAgregarTemporalDesdeInventario = (p) => {
+    if (onAgregarProducto) {
+      onAgregarProducto({
+        id: uuidv4(), // temporal independiente
+        nombre: p.nombre,
+        precio: Number(p.precio || 0),
+        cantidad: 1,
+        subtotal: Number(p.precio || 0),
+        temporal: true,
+        es_grupo: false,
+      });
+    }
+    if (persistOpen) {
+      limpiarYContinuar();
+    } else {
+      onClose?.();
+    }
+  };
+
+  // Guardar nuevo producto (DB o temporal "desde cero")
   const guardarNuevoProducto = async () => {
     const { nombre, descripcion, precio, stock, categoria, cantidad } = form;
 
-    if (!nombre || !precio || !stock) {
-      alert("Nombre, precio y stock son obligatorios");
+    if (!nombre || !precio || (!temporal && !stock)) {
+      alert("Nombre y precio son obligatorios. Stock es obligatorio si no es temporal.");
       return;
     }
 
+    // Si solo lo quieres para este documento (temporal puro)
     if (temporal) {
-      const productoTemporal = {
+      const itemTemporal = {
         id: uuidv4(),
         nombre,
         precio: parseFloat(precio),
-        cantidad: parseInt(cantidad, 10),
-        temporal: true
+        cantidad: parseInt(cantidad, 10) || 1,
+        subtotal: parseFloat(precio) * (parseInt(cantidad, 10) || 1),
+        temporal: true,
+        es_grupo: false,
       };
-      onAgregarProducto(productoTemporal);
-      onClose();
-    } else {
+      onAgregarProducto?.(itemTemporal);
+      if (persistOpen) {
+        // limpiar form y mantener abierto
+        setForm({
+          nombre: "",
+          descripcion: "",
+          precio: "",
+          stock: "",
+          categoria: "",
+          cantidad: 1,
+        });
+        inputRef.current?.focus();
+      } else {
+        onClose?.();
+      }
+      return;
+    }
+
+    // Guardar en DB y agregar al pedido
+    try {
       const { data, error } = await supabase
         .from("productos")
-        .insert([{ nombre, descripcion, precio, stock, categoria }])
-        .select();
+        .insert([{ nombre, descripcion, precio: Number(precio), stock: Number(stock), categoria }])
+        .select()
+        .single();
 
-      if (!error && data?.length) {
-        const nuevoProducto = {
-          ...data[0],
-          cantidad: parseInt(cantidad, 10),
-          precio: parseFloat(precio),
-          temporal: false
-        };
-        onAgregarProducto(nuevoProducto);
-        onClose();
-      } else {
-        alert("Error al guardar el producto");
+      if (error) {
         console.error(error);
+        alert("Error al guardar el producto.");
+        return;
       }
+
+      const nuevoProducto = {
+        ...data,
+        cantidad: parseInt(cantidad, 10) || 1,
+        precio: Number(precio),
+        subtotal: Number(precio) * (parseInt(cantidad, 10) || 1),
+        temporal: false,
+        es_grupo: false,
+      };
+
+      onAgregarProducto?.(nuevoProducto);
+
+      if (persistOpen) {
+        // limpiar form para seguir agregando
+        setForm({
+          nombre: "",
+          descripcion: "",
+          precio: "",
+          stock: "",
+          categoria: "",
+          cantidad: 1,
+        });
+        inputRef.current?.focus();
+      } else {
+        onClose?.();
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error inesperado al guardar el producto.");
+    }
+  };
+
+  // Enter para seleccionar primer resultado
+  const onKeyDownBuscar = (e) => {
+    if (e.key === "Enter" && resultados.length > 0) {
+      handleAgregarSeleccion(resultados[0]);
     }
   };
 
   return (
-    <div className="modal">
-      <div className="modal-content" style={{ maxHeight: "90vh", overflowY: "auto", padding: "20px" }}>
+     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+    <div className="bg-white rounded shadow-lg w-[min(900px,92vw)] max-h-[90vh] overflow-y-auto p-5">
         <h2>🔍 Buscar producto</h2>
 
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Escribe para buscar..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
+          placeholder="Escribe para buscar…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={onKeyDownBuscar}
+          style={{ width: "100%", marginBottom: 10, padding: 8 }}
         />
 
-        {busqueda && productosFiltrados.length > 0 && (
-          <ul style={{ maxHeight: "250px", overflowY: "auto", padding: 0, listStyle: "none" }}>
-            {productosFiltrados.map((producto) => (
-              <li key={producto.id} style={{ marginBottom: "8px" }}>
-                {producto.nombre} - ${producto.precio?.toLocaleString("es-CO")}
-                <button
-                  style={{ marginLeft: "10px" }}
-                  onClick={() => onSelect(producto)}
-                >
-                  Seleccionar
-                </button>
+        {loading && <div style={{ marginBottom: 8 }}>Cargando…</div>}
+        {error && <div style={{ color: "crimson", marginBottom: 8 }}>{error}</div>}
+
+        {q && resultados.length > 0 && (
+          <ul style={{ maxHeight: 280, overflowY: "auto", padding: 0, listStyle: "none", margin: 0 }}>
+            {resultados.map((p) => (
+              <li
+                key={p.id}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}
+              >
+                <div>
+                  <strong>{p.nombre}</strong>
+                  <br />
+                  <small>Precio: ${Number(p.precio || 0).toLocaleString("es-CO")}</small>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => handleAgregarSeleccion(p)}>Agregar</button>
+                  <button onClick={() => handleAgregarTemporalDesdeInventario(p)} title="Agregar como temporal">
+                    Temp
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
 
         <hr style={{ margin: "20px 0" }} />
+
         <h3>➕ Agregar nuevo producto</h3>
 
         <input
@@ -108,35 +266,35 @@ const BuscarProductoModal = ({ onSelect, onClose, onAgregarProducto }) => {
           placeholder="Nombre"
           value={form.nombre}
           onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-          style={{ width: "100%", marginBottom: "8px", padding: "6px" }}
+          style={{ width: "100%", marginBottom: 8, padding: 6 }}
         />
         <input
           type="text"
           placeholder="Descripción"
           value={form.descripcion}
           onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-          style={{ width: "100%", marginBottom: "8px", padding: "6px" }}
+          style={{ width: "100%", marginBottom: 8, padding: 6 }}
         />
         <input
           type="number"
           placeholder="Precio"
           value={form.precio}
           onChange={(e) => setForm({ ...form, precio: e.target.value })}
-          style={{ width: "100%", marginBottom: "8px", padding: "6px" }}
+          style={{ width: "100%", marginBottom: 8, padding: 6 }}
         />
         <input
           type="number"
           placeholder="Stock"
           value={form.stock}
           onChange={(e) => setForm({ ...form, stock: e.target.value })}
-          style={{ width: "100%", marginBottom: "8px", padding: "6px" }}
+          style={{ width: "100%", marginBottom: 8, padding: 6 }}
         />
         <input
           type="text"
           placeholder="Categoría"
           value={form.categoria}
           onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-          style={{ width: "100%", marginBottom: "8px", padding: "6px" }}
+          style={{ width: "100%", marginBottom: 8, padding: 6 }}
         />
         <input
           type="number"
@@ -144,40 +302,34 @@ const BuscarProductoModal = ({ onSelect, onClose, onAgregarProducto }) => {
           min="1"
           value={form.cantidad}
           onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
-          style={{ width: "100%", marginBottom: "8px", padding: "6px" }}
+          style={{ width: "100%", marginBottom: 8, padding: 6 }}
         />
 
-        <div style={{ marginTop: "10px", marginBottom: "10px" }}>
-  <span style={{ display: "block", marginBottom: "4px" }}>¿Producto temporal?</span>
-  <input
-    type="checkbox"
-    checked={temporal}
-    onChange={(e) => setTemporal(e.target.checked)}
-    style={{
-      display: "inline-block",
-      width: "16px",
-      height: "16px",
-      padding: 0,
-      margin: 0,
-      verticalAlign: "middle"
-    }}
-  />
-</div>
+        <div style={{ marginTop: 10, marginBottom: 10 }}>
+          <span style={{ display: "block", marginBottom: 4 }}>¿Producto temporal?</span>
+          <input
+            type="checkbox"
+            checked={temporal}
+            onChange={(e) => setTemporal(e.target.checked)}
+            style={{ width: 16, height: 16, verticalAlign: "middle" }}
+          />
+        </div>
 
-        <button onClick={guardarNuevoProducto} style={{ marginTop: "10px" }}>
+        <button onClick={guardarNuevoProducto} style={{ marginTop: 10 }}>
           Guardar producto
         </button>
 
         <hr style={{ margin: "20px 0" }} />
-        <button
-          onClick={onClose}
-          style={{ backgroundColor: "#f44336", color: "white", padding: "8px 12px" }}
-        >
+        <button onClick={onClose} style={{ backgroundColor: "#f44336", color: "#fff", padding: "8px 12px" }}>
           ❌ Cerrar
         </button>
+
+        {!persistOpen && (
+          <div style={{ marginTop: 8 }}>
+            <small>Nota: <code>persistOpen=false</code> hará que el modal se cierre al agregar.</small>
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-export default BuscarProductoModal;
+}

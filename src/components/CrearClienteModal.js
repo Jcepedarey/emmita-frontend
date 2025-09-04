@@ -73,8 +73,8 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
   };
 
   return (
-    <div className="modal">
-      <div className="modal-content" style={{ maxHeight: "80vh", overflowY: "auto" }}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+    <div className="bg-white rounded shadow-lg w-[min(600px,92vw)] max-h-[80vh] overflow-y-auto p-5">
         <h2>Nuevo Cliente</h2>
         <input
           type="text"

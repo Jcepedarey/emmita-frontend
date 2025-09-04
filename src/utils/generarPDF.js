@@ -2,6 +2,23 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { generarNombreArchivo } from "./nombrePDF";
 
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+const fmt = (n) => Number(n || 0).toLocaleString("es-CO");
+const num = (n, def = 0) => {
+  const v = Number(n);
+  return Number.isFinite(v) ? v : def;
+};
+const soloFecha = (f) => {
+  if (!f) return "-";
+  try {
+    const d = new Date(f);
+    return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  } catch {
+    return "-";
+  }
+};
+
+// Mantengo tu procesador de imágenes y fondo
 const procesarImagen = (src, width = 150, calidad = 1.0) =>
   new Promise((resolve) => {
     const img = new Image();
@@ -22,9 +39,9 @@ const procesarImagen = (src, width = 150, calidad = 1.0) =>
 export async function generarPDF(documento, tipo = "cotizacion") {
   const doc = new jsPDF();
 
+  // ─── Recursos gráficos ───────────────────────────────────────────────────────
   const logoUrl = "/icons/logo.png";
   const fondoUrl = "/icons/fondo_emmita.png";
-
   const logo = await procesarImagen(logoUrl, 250, 1.0);
   const fondo = await procesarImagen(fondoUrl, 300, 0.9);
 
@@ -36,10 +53,9 @@ export async function generarPDF(documento, tipo = "cotizacion") {
     doc.addImage(fondo, "PNG", centerX, centerY, 150, 150);
     doc.restoreGraphicsState();
   };
-
   insertarFondo();
 
-  // 🧾 Encabezado
+  // ─── Encabezado ──────────────────────────────────────────────────────────────
   doc.addImage(logo, "PNG", 10, 10, 35, 30);
   doc.setFontSize(16);
   doc.text("Alquiler & Eventos Emmita", 50, 20);
@@ -49,18 +65,12 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   doc.setLineWidth(0.5);
   doc.line(10, 42, 200, 42);
 
-  // 📌 Datos del cliente
-  const soloFecha = (f) => {
-  if (!f) return "-";
-  try {
-    const d = new Date(f);
-    return d.toISOString().slice(0, 10); // AAAA-MM-DD
-  } catch {
-    return "-";
-  }
-};
-const fechaCreacion = soloFecha(documento.fecha_creacion);
-const fechaEvento   = soloFecha(documento.fecha_evento);
+  const fechaCreacion = soloFecha(documento.fecha_creacion);
+  // Si no hay fecha_evento, intenta usar la primera de fechas_evento
+  const fechaEvento =
+    soloFecha(documento.fecha_evento) !== "-"
+      ? soloFecha(documento.fecha_evento)
+      : (Array.isArray(documento.fechas_evento) && documento.fechas_evento[0]) ? documento.fechas_evento[0] : "-";
 
   doc.setFontSize(12);
   doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 48);
@@ -72,82 +82,140 @@ const fechaEvento   = soloFecha(documento.fecha_evento);
   doc.text(`Fecha creación: ${fechaCreacion}`, 150, 48);
   doc.text(`Fecha evento: ${fechaEvento}`, 150, 55);
 
-  // 🧾 Tabla de productos
-  const filas = (documento.productos || []).map((p) => [
-    p.cantidad || "-",
-    p.nombre,
-    `$${Number(p.precio).toLocaleString("es-CO")}`,
-    `$${Number(p.subtotal || (p.precio || 0) * (p.cantidad || 1)).toLocaleString("es-CO")}`
-  ]);
+  // ─── Tabla Productos ─────────────────────────────────────────────────────────
+  const esMulti = Boolean(documento.multi_dias);
+  const nd = num(documento.numero_dias, 1);
+
+  const head = esMulti
+    ? [["Cantidad", "Artículo", "Precio", "V. x Días", "Subtotal"]]
+    : [["Cantidad", "Artículo", "Precio", "Subtotal"]];
+
+  const body = (documento.productos || []).map((p) => {
+    const cantidad = num(p.cantidad, 0);
+    const precio = num(p.precio, 0);
+    // Subtotal seguro: usa p.subtotal si viene, si no calcula precio * cantidad * nd
+    const subtotal = num(p.subtotal, precio * cantidad * (esMulti ? nd : 1));
+
+    if (esMulti) {
+      return [
+        cantidad || 0,
+        p.nombre || "",
+        `$${fmt(precio)}`,
+        `$${fmt(precio * nd)}`,    // Precio por días
+        `$${fmt(subtotal)}`,
+      ];
+    }
+    return [cantidad || 0, p.nombre || "", `$${fmt(precio)}`, `$${fmt(subtotal)}`];
+  });
 
   autoTable(doc, {
-  head: [["Cantidad", "Artículo", "Precio", "Subtotal"]],
-  body: filas,
+  head,
+  body,
   startY: 85,
   styles: { font: "helvetica", fontSize: 10 },
-  // Encabezados centrados
   headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: "center", valign: "middle" },
-  // Anchos y alineación por columna
-  // Total: 25 + 105 + 30 + 30 = 190 (con márgenes 10/10 en A4)
-  columnStyles: {
-  0: { cellWidth: 25, halign: "center" }, // Cantidad centrada
-  1: { cellWidth: 105 },                  // Artículo
-  2: { cellWidth: 30, halign: "center" }, // Precio centrado
-  3: { cellWidth: 30, halign: "center" }, // Subtotal centrado
-},
+  columnStyles: esMulti
+    ? {
+        0: { cellWidth: 22, halign: "center" }, // Cantidad (más ancho que antes)
+        1: { cellWidth: 90 },                   // Artículo
+        2: { cellWidth: 26, halign: "center" }, // Precio
+        3: { cellWidth: 26, halign: "center" }, // V. x Días
+        4: { cellWidth: 26, halign: "center" }, // Subtotal
+      }
+    : {
+        0: { cellWidth: 30, halign: "center" }, // Cantidad más cómoda
+        1: { cellWidth: 100 },                  // Artículo
+        2: { cellWidth: 30, halign: "center" }, // Precio
+        3: { cellWidth: 30, halign: "center" }, // Subtotal
+      },
   margin: { left: 10, right: 10 },
   didDrawPage: insertarFondo,
 });
 
   let y = (doc.lastAutoTable?.finalY || 100) + 10;
 
-  // 💰 Garantía
-  if (documento.garantia && documento.garantia !== "0") {
-    let garantiaTexto = `GARANTÍA: $${Number(documento.garantia).toLocaleString("es-CO")}`;
-    if (documento.fecha_garantia) {
-      garantiaTexto += ` - Fecha: ${documento.fecha_garantia}`;
-    }
-    doc.text(garantiaTexto, 10, y);
+// 💰 Garantía (solo la palabra en negrilla, seguido del valor)
+if (documento.garantia && documento.garantia !== "0") {
+  const textoValor = `$${Number(documento.garantia).toLocaleString("es-CO")}` +
+    (documento.fecha_garantia ? ` - Fecha: ${documento.fecha_garantia}` : "");
+
+  // "GARANTÍA:" en negrilla
+  doc.setFont(undefined, "bold");
+  doc.text("GARANTÍA:", 10, y);
+
+  // medir ancho para pegar justo después
+  const ancho = doc.getTextWidth("GARANTÍA: ");
+
+  // valor normal, sin tanto espacio
+  doc.setFont(undefined, "normal");
+  doc.text(textoValor, 10 + ancho, y);
+
+  y += 12;
+}
+
+// 💸 Abonos (ahora justo debajo de Garantía)
+// 💸 Abonos (ahora justo debajo de Garantía)
+let totalAbonos = 0;
+if (Array.isArray(documento.abonos) && documento.abonos.length > 0) {
+  doc.setFont(undefined, "bold");
+  doc.text("ABONOS:", 10, y);
+  doc.setFont(undefined, "normal");
+  y += 8;
+
+  documento.abonos.forEach((abono, i) => {
+    const valor = typeof abono === "object" ? abono.valor : abono;
+    const fecha = typeof abono === "object" ? abono.fecha : "sin fecha";
+    doc.text(`• Abono ${i + 1}: $${fmt(valor)} - Fecha: ${fecha}`, 15, y);
     y += 8;
-  }
+    totalAbonos += num(valor, 0);
+  });
 
-  // 💸 Abonos
-  if (documento.abonos && documento.abonos.length > 0) {
-    doc.setFont(undefined, "bold");
-    doc.text("ABONOS:", 10, y);
-    y += 6;
-    doc.setFont(undefined, "normal");
+  y += 4;
+}
 
-    documento.abonos.forEach((abono, index) => {
-      const valor = typeof abono === "object" ? abono.valor : abono;
-      const fecha = typeof abono === "object" ? abono.fecha : "sin fecha";
-      doc.text(`• Abono ${index + 1}: $${Number(valor).toLocaleString("es-CO")} - Fecha: ${fecha}`, 15, y);
-      y += 6;
-    });
+// ── Línea separadora antes de totales
+doc.setDrawColor(180);       // gris
+doc.setLineWidth(0.5);
+doc.line(10, y, 200, y);
+y += 10;
 
-    const totalAbonos = documento.abonos.reduce(
-      (acc, ab) => acc + parseFloat(typeof ab === "object" ? ab.valor : ab || 0),
-      0
-    );
-    const saldo = documento.total - totalAbonos;
-    doc.setFontSize(12);
-    y += 4;
-    doc.text(`TOTAL: $${Number(documento.total).toLocaleString("es-CO")}`, 150, y);
-    y += 8;
-    doc.text(`SALDO FINAL: $${Number(saldo).toLocaleString("es-CO")}`, 150, y);
-  } else {
-    doc.setFontSize(12);
-    doc.text(`TOTAL: $${Number(documento.total).toLocaleString("es-CO")}`, 150, y);
-  }
+// ── Totales
+const totalBruto = (documento.productos || []).reduce(
+  (acc, p) => acc + num(p.subtotal, num(p.precio) * num(p.cantidad) * (esMulti ? nd : 1)),
+  0
+);
+const descuento = num(documento.descuento, 0);
+const retencion = num(documento.retencion, 0);
+const totalNeto = num(
+  documento.total_neto,
+  Math.max(0, totalBruto - descuento - retencion)
+);
+const saldo = Math.max(0, totalNeto - totalAbonos);
 
-  // 📎 Pie de página
+const xTot = 150;
+doc.setFontSize(12);
+doc.text(`TOTAL BRUTO: $${fmt(totalBruto)}`, xTot, y); y += 8;
+
+if (descuento > 0) { doc.text(`DESCUENTO: -$${fmt(descuento)}`, xTot, y); y += 8; }
+if (retencion > 0) { doc.text(`RETENCIÓN: -$${fmt(retencion)}`, xTot, y); y += 8; }
+
+doc.setFont(undefined, "bold");
+doc.text(`TOTAL NETO: $${fmt(totalNeto)}`, xTot, y); 
+doc.setFont(undefined, "normal");
+y += 10;
+
+if (totalAbonos > 0) {
+  doc.text(`SALDO FINAL: $${fmt(saldo)}`, xTot, y);
+}
+
+  // ─── Pie ────────────────────────────────────────────────────────────────────
   const yFinal = 270;
   doc.setFontSize(10);
   doc.text("Instagram: @alquileryeventosemmita", 10, yFinal);
   doc.text("Facebook: Facebook.com/alquileresemmita", 10, yFinal + 5);
   doc.text("Email: alquileresemmita@hotmail.com", 10, yFinal + 10);
 
-  // 💾 Guardar archivo
+  // ─── Guardar ────────────────────────────────────────────────────────────────
   const fechaSegura = documento.fecha_creacion || new Date();
   const nombreArchivo = generarNombreArchivo(tipo, fechaSegura, documento.nombre_cliente);
   doc.save(nombreArchivo);

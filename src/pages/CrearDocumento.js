@@ -1,5 +1,5 @@
 // CrearDocumento.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import supabase from "../supabaseClient";
 
@@ -12,69 +12,92 @@ import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF } from "../utils/generarRemision";
 
 import Swal from "sweetalert2";
-import Protegido from "../components/Protegido"; // 🔐 Protección
+import Protegido from "../components/Protegido";
 
 const CrearDocumento = () => {
-
   const location = useLocation();
   const { documento, tipo } = location.state || {};
   const esEdicion = documento?.esEdicion || false;
   const idOriginal = documento?.idOriginal || null;
 
-  // 🧠 ESTADOS INICIALES
+  // 🧠 ESTADOS
   const [tipoDocumento, setTipoDocumento] = useState(tipo || "cotizacion");
   const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
-  const [fechaEvento, setFechaEvento] = useState("");
+
+  // --- Multi-día ---
+  const [multiDias, setMultiDias] = useState(false);
+  const [fechaEvento, setFechaEvento] = useState("");         // modo 1 día
+  const [fechasEvento, setFechasEvento] = useState([]);       // modo multi-día
+  const numeroDias = useMemo(() => (multiDias ? fechasEvento.length : 1), [multiDias, fechasEvento]);
 
   const [clientes, setClientes] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [busquedaCliente, setBusquedaCliente] = useState("");
 
   const [productosAgregados, setProductosAgregados] = useState([]);
-  const [garantia, setGarantia] = useState("");
 
-  // Nuevo estado para check de garantía
+  // Garantía
+  const [garantia, setGarantia] = useState("");
   const [garantiaRecibida, setGarantiaRecibida] = useState(false);
+  const [fechaGarantia, setFechaGarantia] = useState("");
 
   // Abonos con fecha
-  const [abonos, setAbonos] = useState([
-    // Cada abono será un objeto: { valor: 0, fecha: "19-06-2025" }
-  ]);
+  const [abonos, setAbonos] = useState([]); // {valor, fecha}
 
-  const agregarAbono = () => {
-    const nuevaFecha = new Date().toLocaleDateString("es-CO", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    });
+  // Totales opcionales
+  const [aplicarDescuento, setAplicarDescuento] = useState(false);
+  const [descuento, setDescuento] = useState(0);
+  const [aplicarRetencion, setAplicarRetencion] = useState(false);
+  const [retencion, setRetencion] = useState(0);
 
-    setAbonos([...abonos, { valor: 0, fecha: nuevaFecha }]);
-  };
-
-// Fecha de entrega de la garantía
-const [fechaGarantia, setFechaGarantia] = useState("");
-
+  // Stock y modales
   const [stock, setStock] = useState({});
   const [modalBuscarProducto, setModalBuscarProducto] = useState(false);
   const [modalCrearCliente, setModalCrearCliente] = useState(false);
   const [modalGrupo, setModalGrupo] = useState(false);
   const [modalProveedor, setModalProveedor] = useState(false);
 
-  // ✅ NUEVOS ESTADOS PARA EDITAR GRUPO
+  // Edición de grupo
   const [grupoEnEdicion, setGrupoEnEdicion] = useState(null);
   const [indiceGrupoEnEdicion, setIndiceGrupoEnEdicion] = useState(null);
 
- // 🔁 PRECARGA DESDE DOCUMENTO (edición)
+  // Input refs (pequeñas mejoras UX)
+  const inputFechaUnDiaRef = useRef(null);
+  // Normalizador de fechas a 'YYYY-MM-DD'
+const norm = (d) => (d ? String(d).slice(0, 10) : "");
+
+// Label + checkbox en una sola línea
+const labelInline = { display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" };
+
+  // 🔁 Precarga desde documento (edición) — multi-día y 1 día
 useEffect(() => {
   const precargarDatos = async () => {
     if (!documento) return;
 
     setTipoDocumento(documento.tipo || tipo || "cotizacion");
-    setFechaEvento(documento.fecha_evento?.split("T")[0] || "");
+
+    // ¿El doc es multi-días?
+    const esMulti = !!documento.multi_dias;
+    setMultiDias(esMulti);
+
+    if (esMulti) {
+      // Normalizar el arreglo de días
+      const arr = Array.isArray(documento.fechas_evento)
+        ? documento.fechas_evento.map(norm).filter(Boolean)
+        : [];
+      setFechasEvento(arr);     // días múltiples
+      setFechaEvento("");       // limpiar fecha 1 día
+    } else {
+      setFechaEvento(norm(documento.fecha_evento)); // 1 día
+      setFechasEvento([]);                          // limpiar múltiples
+    }
+
+    // Resto de campos
     setProductosAgregados(documento.productos || []);
     setGarantia(documento.garantia || "");
-    setAbonos(documento.abonos || [""]);
-    setGarantiaRecibida(!!documento?.garantiaRecibida);
+    setAbonos(Array.isArray(documento.abonos) ? documento.abonos : []);
+    setGarantiaRecibida(!!documento?.garantia_recibida);
+    setFechaGarantia(documento?.fecha_garantia || "");
 
     if (documento.nombre_cliente) {
       setClienteSeleccionado({
@@ -83,7 +106,7 @@ useEffect(() => {
         telefono: documento.telefono,
         direccion: documento.direccion,
         email: documento.email,
-        id: documento.cliente_id || null
+        id: documento.cliente_id || null,
       });
     } else if (documento.cliente_id) {
       const { data: cliente } = await supabase
@@ -91,16 +114,13 @@ useEffect(() => {
         .select("*")
         .eq("id", documento.cliente_id)
         .single();
-
       if (cliente) setClienteSeleccionado(cliente);
     }
   };
-
   precargarDatos();
 }, [documento, tipo]);
 
-
-  // 🧾 CARGAR CLIENTES AL ABRIR
+  // 🧾 Cargar clientes
   useEffect(() => {
     const cargarClientes = async () => {
       const { data } = await supabase.from("clientes").select("*").order("nombre", { ascending: true });
@@ -109,50 +129,103 @@ useEffect(() => {
     cargarClientes();
   }, []);
 
-  // 📦 CALCULAR STOCK DISPONIBLE PARA LA FECHA DEL EVENTO
-  useEffect(() => {
-    const calcularStock = async () => {
-      if (!fechaEvento) return;
+  // 📦 Stock disponible (1 día o varios días) con traslapes
+useEffect(() => {
+  const calcularStock = async () => {
+    const fechasConsulta = multiDias ? fechasEvento : (fechaEvento ? [fechaEvento] : []);
+    if (!fechasConsulta.length) return;
 
-      const { data: productosData } = await supabase.from("productos").select("id, stock");
-      const { data: ordenesData } = await supabase
+    // 1) inventario
+    const { data: productosData } = await supabase.from("productos").select("id, stock");
+
+    // 2) intentamos pedir también fechas_evento; si da 400, reintentamos sin esa columna
+    let ordenesData = [];
+    let res = await supabase
+      .from("ordenes_pedido")
+      .select("productos, fecha_evento, fechas_evento, cerrada")
+      .eq("cerrada", false);
+
+    if (res.error && String(res.error.message || "").includes("fechas_evento")) {
+      res = await supabase
         .from("ordenes_pedido")
-        .select("productos, fecha_evento")
-        .eq("fecha_evento", fechaEvento)
+        .select("productos, fecha_evento, cerrada")
         .eq("cerrada", false);
-
-      const reservas = {};
-      ordenesData?.forEach((orden) => {
-  orden.productos?.forEach((p) => {
-    if (p.es_grupo && Array.isArray(p.productos)) {
-      p.productos.forEach((sub) => {
-        const id = sub.producto_id || sub.id;
-        const cantidadTotal = (sub.cantidad || 0) * (p.cantidad || 1);
-        reservas[id] = (reservas[id] || 0) + cantidadTotal;
-      });
-    } else {
-      const id = p.producto_id || p.id;
-      reservas[id] = (reservas[id] || 0) + (p.cantidad || 0);
     }
-  });
-});
+    if (res.data) ordenesData = res.data;
 
-      const stockCalculado = {};
-      productosData.forEach((producto) => {
-        const stockReal = parseInt(producto.stock ?? 0);
-        const reservado = reservas[producto.id] || 0;
-        stockCalculado[producto.id] = stockReal - reservado;
+    const fechasSel = new Set(fechasConsulta.map((d) => String(d).slice(0, 10)));
+    const reservasPorFecha = {};
+    fechasConsulta.forEach((f) => (reservasPorFecha[f] = {}));
+
+    ordenesData.forEach((orden) => {
+      const diasOrd = new Set([
+        ...(orden.fecha_evento ? [String(orden.fecha_evento).slice(0, 10)] : []),
+        ...((orden.fechas_evento || []).map((d) => String(d).slice(0, 10))),
+      ]);
+      const diasQueAplican = [...fechasSel].filter((d) => diasOrd.has(d));
+      if (diasQueAplican.length === 0) return;
+
+      const acumular = (id, cant) => {
+        diasQueAplican.forEach((f) => {
+          reservasPorFecha[f][id] = (reservasPorFecha[f][id] || 0) + cant;
+        });
+      };
+
+      orden.productos?.forEach((p) => {
+        if (p.es_grupo && Array.isArray(p.productos)) {
+          p.productos.forEach((sub) => {
+            const id = sub.producto_id || sub.id;
+            const cant = (sub.cantidad || 0) * (p.cantidad || 1);
+            acumular(id, cant);
+          });
+        } else {
+          const id = p.producto_id || p.id;
+          acumular(id, (p.cantidad || 0));
+        }
       });
+    });
 
-      setStock(stockCalculado);
-    };
+    const stockCalculado = {};
+    (productosData || []).forEach((prod) => {
+      const stockReal = parseInt(prod.stock ?? 0);
+      const disponiblesPorDia = fechasConsulta.map((f) => {
+        const reservado = reservasPorFecha[f]?.[prod.id] || 0;
+        return stockReal - reservado;
+      });
+      stockCalculado[prod.id] = disponiblesPorDia.length ? Math.min(...disponiblesPorDia) : stockReal;
+    });
 
-    calcularStock();
-  }, [fechaEvento]);
-  // 🧾 Total y saldo
-  const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
-  const sumaAbonos = abonos.reduce((acc, abono) => acc + parseFloat(abono.valor || 0), 0);
-  const saldo = Math.max(0, total - sumaAbonos);
+    setStock(stockCalculado);
+  };
+
+  calcularStock();
+}, [multiDias, fechaEvento, fechasEvento]);
+
+useEffect(() => {
+  if (!multiDias) {
+    setProductosAgregados((prev) => recomputarSubtotales(prev));
+  }
+}, [fechaEvento, multiDias]);
+
+  // 🧮 Helpers de cálculo
+  const calcularSubtotal = (item) => {
+    const precio = Number(item.precio || 0);
+    const cantidad = Number(item.cantidad || 0);
+    const dias = numeroDias || 1;
+    return Math.max(0, precio * cantidad * dias);
+  };
+
+  const recomputarSubtotales = (items) =>
+    items.map((it) => ({ ...it, subtotal: calcularSubtotal(it) }));
+
+  // 🧾 Totales
+  const totalBruto = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
+  const totalNeto = Math.max(
+    0,
+    totalBruto - (aplicarDescuento ? Number(descuento || 0) : 0) - (aplicarRetencion ? Number(retencion || 0) : 0)
+  );
+  const sumaAbonos = abonos.reduce((acc, abono) => acc + Number(abono.valor || 0), 0);
+  const saldo = Math.max(0, totalNeto - sumaAbonos);
 
   // ✅ Seleccionar cliente
   const seleccionarCliente = (cliente) => {
@@ -165,508 +238,659 @@ useEffect(() => {
       .some((campo) => campo?.toLowerCase().includes(busquedaCliente.toLowerCase()))
   );
 
-  // ✅ Agregar producto desde inventario
+  // ✅ Agregar producto desde inventario (NO cerrar modal)
   const agregarProducto = (producto) => {
     const nuevo = {
       id: producto.id,
       nombre: producto.nombre,
       cantidad: 1,
       precio: parseFloat(producto.precio),
-      subtotal: parseFloat(producto.precio),
       es_grupo: false,
       temporal: false
     };
-    setProductosAgregados([...productosAgregados, nuevo]);
-    setModalBuscarProducto(false);
+    const items = [...productosAgregados, nuevo];
+    setProductosAgregados(recomputarSubtotales(items));
+    // no cerrar modal; el propio modal limpiará el buscador
   };
 
-  // ✅ Agregar producto desde proveedor
+  // ✅ Agregar producto desde proveedor (modal proveedor permanece abierto)
   const agregarProductoProveedor = (producto) => {
-    const nuevo = {
-      nombre: producto.nombre,
-      cantidad: 1,
-      precio: parseFloat(producto.precio_venta),
-      subtotal: parseFloat(producto.precio_venta),
-      es_grupo: false,
-      es_proveedor: true,
-      temporal: true
-    };
-    setProductosAgregados([...productosAgregados, nuevo]);
+  const nuevo = {
+    id: `prov-${producto.id ?? producto.proveedor_id ?? (crypto?.randomUUID?.() || Math.random().toString(36).slice(2))}`,
+    nombre: producto.nombre,
+    cantidad: 1,
+    precio: Number(producto.precio_venta || 0),
+    es_grupo: false,
+    es_proveedor: true,
+    temporal: true,
+  };
+  const items = [...productosAgregados, nuevo];
+  setProductosAgregados(recomputarSubtotales(items));
+};
+
+
+  // ✅ Agregar producto creado en el modal (puede ser temporal o no)
+const agregarProductoTemporal = (producto) => {
+  const nuevo = {
+    id: producto.id ?? `tmp-${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`,
+    nombre: producto.nombre,
+    cantidad: Number(producto.cantidad || 1),
+    precio: Number(producto.precio || 0),
+    es_grupo: false,
+    // Respetamos lo que marcó en el modal:
+    temporal: !!producto.temporal,
+    es_proveedor: !!producto.es_proveedor,
+  };
+  const items = [...productosAgregados, nuevo];
+  setProductosAgregados(recomputarSubtotales(items));
+};
+
+  // ✅ Editar grupo
+  const editarGrupo = (index) => {
+    const grupo = productosAgregados[index];
+    if (grupo && grupo.es_grupo) {
+      setGrupoEnEdicion(grupo);
+      setIndiceGrupoEnEdicion(index);
+      setModalGrupo(true);
+    }
   };
 
-  // ✅ Agregar producto temporal (llamado desde BuscarProductoModal)
-const agregarProductoTemporal = (producto) => {
-  setProductosAgregados((prev) => [...prev, producto]);
-  setModalBuscarProducto(false); // opcional: cierra el modal al agregar
-};
-
-// ✅ Editar grupo 
-const editarGrupo = (index) => {
-  const grupo = productosAgregados[index];
-  if (grupo && grupo.es_grupo) {
-    setGrupoEnEdicion(grupo);
-    setIndiceGrupoEnEdicion(index);
-    setModalGrupo(true);
-  }
-};
-
-  // ✅ Actualizar cantidad en tabla
+  // ✅ Actualizar cantidad en tabla (respeta multi-día)
   const actualizarCantidad = (index, cantidad) => {
     const nuevos = [...productosAgregados];
     nuevos[index].cantidad = parseInt(cantidad || 0);
-    nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
+    nuevos[index].subtotal = calcularSubtotal(nuevos[index]);
     setProductosAgregados(nuevos);
   };
 
-  // ✅ Eliminar producto de la tabla
+  // ✅ Actualizar precio (respeta multi-día)
+  const actualizarPrecio = (index, precio) => {
+    const nuevos = [...productosAgregados];
+    nuevos[index].precio = parseFloat(precio || 0);
+    nuevos[index].subtotal = calcularSubtotal(nuevos[index]);
+    setProductosAgregados(nuevos);
+  };
+
+  // ✅ Eliminar producto
   const eliminarProducto = (index) => {
     const nuevos = [...productosAgregados];
     nuevos.splice(index, 1);
     setProductosAgregados(nuevos);
   };
 
-  // ✅ Marcar producto como temporal
-  const marcarTemporal = (index, value) => {
-    const nuevos = [...productosAgregados];
-    nuevos[index].temporal = value;
-    setProductosAgregados(nuevos);
+  // ✅ Abonos
+  const agregarAbono = () => {
+    const nuevaFecha = new Date().toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" });
+    setAbonos([...abonos, { valor: 0, fecha: nuevaFecha }]);
   };
 
   // ✅ Guardar documento
   const guardarDocumento = async () => {
-  if (!clienteSeleccionado || productosAgregados.length === 0) {
-    return Swal.fire("Faltan datos", "Debes seleccionar un cliente y agregar al menos un producto.", "warning");
-  }
+    if (!clienteSeleccionado || productosAgregados.length === 0) {
+      return Swal.fire("Faltan datos", "Debes seleccionar un cliente y agregar al menos un producto.", "warning");
+    }
 
-  const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
-  const prefijo = tipoDocumento === "cotizacion" ? "COT" : "OP";
-  const fecha = new Date().toISOString().slice(0, 10);
-  const fechaNumerica = fecha.replaceAll("-", "");
+    const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const prefijo = tipoDocumento === "cotizacion" ? "COT" : "OP";
+    const fecha = new Date().toISOString().slice(0, 10);
+    const fechaNumerica = fecha.replaceAll("-", "");
 
-  let numeroDocumento = documento?.numero;
-
-if (!esEdicion) {
-  const { data: existentes } = await supabase
-    .from(tabla)
-    .select("id")
-    .like("numero", `${prefijo}-${fechaNumerica}-%`);
-
-  const consecutivo = (existentes?.length || 0) + 1;
-  numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
-}
-
-  const totalPedido = total;
-  const totalAbonos = abonos.reduce((acc, ab) => acc + Number(ab.valor || 0), 0);
-
-  const redondear = (num) => Math.round(num * 100) / 100;
-
-  if (redondear(totalAbonos) > redondear(totalPedido)) {
-    return Swal.fire("Error", "El total de abonos no puede superar el valor del pedido.", "warning");
-  }
-
-  const estadoFinal = redondear(totalAbonos) === redondear(totalPedido) ? "pagado" : "pendiente";
-
-  // 🔍 Mostrar en consola los valores antes de guardar
-console.log("🧾 Total pedido:", totalPedido);
-console.log("💵 Total abonos:", totalAbonos);
-console.log("📦 Estado final:", estadoFinal);
-
-  const dataGuardar = {
-    cliente_id: clienteSeleccionado.id,
-    productos: productosAgregados,
-    total: totalPedido,
-    abonos,
-    garantia: parseFloat(garantia || 0),
-    garantia_recibida: garantiaRecibida,
-    fecha_garantia: fechaGarantia,
-    estado: estadoFinal,
-    tipo: tipoDocumento,
-    numero: numeroDocumento,
-    ...(tipoDocumento === "cotizacion"
-      ? { fecha: fechaCreacion }
-      : { fecha_creacion: fechaCreacion }),
-    fecha_evento: fechaEvento || null
-  };
-
-  let error;
-
-  console.log("📄 Documento original:", documento);
-
-if (esEdicion && idOriginal) {
-  const confirmar = await Swal.fire({
-    title: "¿Actualizar documento?",
-    text: "Este documento ya existe. ¿Deseas actualizarlo?",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Sí, actualizar",
-    cancelButtonText: "Cancelar",
-  });
-
-  if (confirmar.isConfirmed) {
-    const tablaOriginal = documento?.numero?.startsWith("COT")
-  ? "cotizaciones"
-  : "ordenes_pedido";
-
-if (tablaOriginal !== tabla) {
-      // 🗑️ Eliminar documento anterior
-      await supabase.from(tablaOriginal).delete().eq("id", idOriginal);
-
-      // 🆕 Crear nuevo número de documento para la tabla nueva
+    let numeroDocumento = documento?.numero;
+    if (!esEdicion) {
       const { data: existentes } = await supabase
         .from(tabla)
         .select("id")
         .like("numero", `${prefijo}-${fechaNumerica}-%`);
-
       const consecutivo = (existentes?.length || 0) + 1;
       numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
-      dataGuardar.numero = numeroDocumento;
-
-      // 📥 Insertar en nueva tabla
-      const res = await supabase.from(tabla).insert([dataGuardar]);
-      error = res.error;
-    } else {
-      // ✏️ Si el tipo no cambió, actualizar normalmente
-      const res = await supabase.from(tabla).update(dataGuardar).eq("id", idOriginal);
-      error = res.error;
     }
-  } else {
-    return; // Usuario canceló
-  }
-} else {
-  const res = await supabase.from(tabla).insert([dataGuardar]);
-  error = res.error;
-}
 
-if (!error) {
-  Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
-} else {
-  console.error(error);
-  Swal.fire("Error", "No se pudo guardar el documento", "error");
-}
+    const redondear = (num) => Math.round(num * 100) / 100;
+    const totalAbonos = abonos.reduce((acc, ab) => acc + Number(ab.valor || 0), 0);
+    if (redondear(totalAbonos) > redondear(totalNeto)) {
+      return Swal.fire("Error", "El total de abonos no puede superar el valor del pedido.", "warning");
+    }
+    const estadoFinal = redondear(totalAbonos) === redondear(totalNeto) ? "pagado" : "pendiente";
+
+   // Fecha/s del evento — construir payload sin nulls peligrosos
+const dataGuardar = {
+  cliente_id: clienteSeleccionado.id,
+  productos: productosAgregados,
+  total: totalBruto,
+  total_neto: totalNeto,
+  descuento: aplicarDescuento ? Number(descuento || 0) : 0,
+  retencion: aplicarRetencion ? Number(retencion || 0) : 0,
+  abonos,
+  garantia: parseFloat(garantia || 0),
+  garantia_recibida: !!garantiaRecibida,
+  fecha_garantia: fechaGarantia || null,
+  multi_dias: !!multiDias,
+  fechas_evento: multiDias ? (fechasEvento || []) : null,
+  numero_dias: multiDias ? (numeroDias || (fechasEvento?.length || 1)) : 1,
+  estado: estadoFinal,
+  tipo: tipoDocumento,
+  numero: numeroDocumento,
+  ...(tipoDocumento === "cotizacion"
+    ? { fecha: fechaCreacion }
+    : { fecha_creacion: fechaCreacion }),
 };
 
-  // ✅ Obtener datos para PDF o remisión
-const obtenerDatosPDF = () => ({
-  nombre_cliente: clienteSeleccionado?.nombre,
-  identificacion: clienteSeleccionado?.identificacion,
-  telefono: clienteSeleccionado?.telefono,
-  direccion: clienteSeleccionado?.direccion,
-  email: clienteSeleccionado?.email,
-  productos: productosAgregados,
-  total,
-  abonos,
-  garantia,
-  fecha_creacion: fechaCreacion,
-  fecha_evento: fechaEvento
-});
+// 👇 Ajuste especial: NUNCA mandes fecha_evento: null en PATCH/INSERT
+if (multiDias) {
+  const primerDia = fechasEvento?.[0];
+  if (primerDia) {
+    dataGuardar.fecha_evento = primerDia;   // si hay 1er día, úsalo
+  } else {
+    delete dataGuardar.fecha_evento;        // si no, no envíes la clave
+  }
+} else {
+  if (fechaEvento) {
+    dataGuardar.fecha_evento = fechaEvento; // día único
+  } else {
+    delete dataGuardar.fecha_evento;
+  }
+}
 
-// ✅ Calcular stock disponible por producto para la fecha seleccionada
-const stockDisponible = {};
-productosAgregados.forEach((item) => {
-  const disponible = stock[item.producto_id || item.id] ?? "—";
-  stockDisponible[item.id] = disponible;
-});
+    let error;
+    if (esEdicion && idOriginal) {
+      const confirmar = await Swal.fire({
+        title: "¿Actualizar documento?",
+        text: "Este documento ya existe. ¿Deseas actualizarlo?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, actualizar",
+        cancelButtonText: "Cancelar"
+      });
 
-// 👇 Aquí empieza el retorno visual
-return (
-  <Protegido>
-  <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
-    <h2 style={{ textAlign: "center" }}>
-      📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
-    </h2>
+      if (!confirmar.isConfirmed) return;
 
-    <div style={{ marginBottom: "15px" }}>
-      <label>Tipo de documento: </label>
-      <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
-        <option value="cotizacion">Cotización</option>
-        <option value="orden">Orden de Pedido</option>
-      </select>
-    </div>
+      const tablaOriginal = documento?.numero?.startsWith("COT") ? "cotizaciones" : "ordenes_pedido";
+      if (tablaOriginal !== tabla) {
+        await supabase.from(tablaOriginal).delete().eq("id", idOriginal);
+        const { data: existentes } = await supabase
+          .from(tabla)
+          .select("id")
+          .like("numero", `${prefijo}-${fechaNumerica}-%`);
+        const consecutivo = (existentes?.length || 0) + 1;
+        numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
+        dataGuardar.numero = numeroDocumento;
+        const res = await supabase.from(tabla).insert([dataGuardar]);
+        error = res.error;
+      } else {
+        const res = await supabase.from(tabla).update(dataGuardar).eq("id", idOriginal);
+        error = res.error;
+      }
+    } else {
+      const res = await supabase.from(tabla).insert([dataGuardar]);
+      error = res.error;
+    }
 
-    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-      <div style={{ flex: 1 }}>
-        <label>Fecha de creación:</label>
-        <input type="date" value={fechaCreacion} disabled style={{ width: "100%" }} />
-      </div>
-      <div style={{ flex: 1 }}>
-        <label>Fecha del evento:</label>
-        <input
-          type="date"
-          value={fechaEvento}
-          onChange={(e) => setFechaEvento(e.target.value)}
-          style={{ width: "100%" }}
-        />
-      </div>
-    </div>
+    if (!error) {
+      Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
+    } else {
+      console.error(error);
+      Swal.fire("Error", "No se pudo guardar el documento", "error");
+    }
+  };
 
-    <hr style={{ margin: "20px 0" }} />
+  // ✅ Datos PDF (Fase 3 usará estos nuevos campos)
+  const obtenerDatosPDF = () => ({
+    nombre_cliente: clienteSeleccionado?.nombre,
+    identificacion: clienteSeleccionado?.identificacion,
+    telefono: clienteSeleccionado?.telefono,
+    direccion: clienteSeleccionado?.direccion,
+    email: clienteSeleccionado?.email,
+    productos: productosAgregados,
+    total_bruto: totalBruto,
+    total_neto: totalNeto,
+    descuento: aplicarDescuento ? Number(descuento || 0) : 0,
+    retencion: aplicarRetencion ? Number(retencion || 0) : 0,
+    abonos,
+    garantia,
+    garantia_recibida: garantiaRecibida,
+    fecha_garantia: fechaGarantia,
+    fecha_creacion: fechaCreacion,
+    multi_dias: multiDias,
+    fechas_evento: multiDias ? fechasEvento : [],
+    numero_dias: numeroDias,
+    fecha_evento: multiDias ? (fechasEvento[0] || null) : (fechaEvento || null)
+  });
 
-    <label>Buscar cliente:</label>
-    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-      <input
-        type="text"
-        placeholder="Nombre, identificación o teléfono"
-        value={busquedaCliente}
-        onChange={(e) => setBusquedaCliente(e.target.value)}
-        style={{ flex: 1 }}
-      />
-      <button onClick={() => setModalCrearCliente(true)}>➕ Crear cliente</button>
-    </div>
+  // Handlers multi-día
+  const agregarDia = (nuevo) => {
+    if (!nuevo) return;
+    if (fechasEvento.includes(nuevo)) return;
+    setFechasEvento((prev) => [...prev, nuevo].sort());
+    setProductosAgregados((prev) => recomputarSubtotales(prev));
+  };
+  const eliminarDia = (dia) => {
+    setFechasEvento((prev) => prev.filter((d) => d !== dia));
+    setProductosAgregados((prev) => recomputarSubtotales(prev));
+  };
+  
+  // Cuando el usuario activa/desactiva "Alquiler por varios días"
+const onToggleMultiDias = (val) => {
+  setMultiDias(val);
+  if (val) {
+    // Si paso a multi, migro la fecha única al arreglo (si existe)
+    setFechasEvento((prev) => (prev?.length ? prev : (fechaEvento ? [fechaEvento] : [])));
+    setFechaEvento("");
+  } else {
+    // Si vuelvo a 1 día, uso el primer día del arreglo (si existe)
+    const first = (fechasEvento && fechasEvento[0]) || "";
+    setFechaEvento(first || "");
+    setFechasEvento([]);
+    setTimeout(() => inputFechaUnDiaRef.current?.focus(), 0);
+  }
+  // Recalcular subtotales (por cambio de # de días)
+  setProductosAgregados((prev) => recomputarSubtotales(prev));
+};
 
-    {busquedaCliente && clientesFiltrados.length > 0 && (
-      <ul style={{ marginTop: "10px", listStyle: "none", padding: 0 }}>
-        {clientesFiltrados.map((cliente) => (
-          <li key={cliente.id}>
-            <button
-              onClick={() => seleccionarCliente(cliente)}
-              style={{ width: "100%", textAlign: "left" }}
-            >
-              {cliente.nombre} - {cliente.identificacion} - {cliente.telefono}
-            </button>
-          </li>
-        ))}
-      </ul>
-    )}
+  // Recalcular subtotales cuando cambie la fecha en modo 1 día
+useEffect(() => {
+  if (!multiDias) {
+    setProductosAgregados((prev) => recomputarSubtotales(prev));
+  }
+}, [fechaEvento, multiDias]);
 
-    {clienteSeleccionado && (
-      <div style={{ marginTop: "15px", padding: "10px", backgroundColor: "#f1f1f1", borderRadius: "6px" }}>
-  <strong>Cliente seleccionado:</strong><br />
-  🧑 {clienteSeleccionado.nombre || "N/A"}<br />
-  🆔 {clienteSeleccionado.identificacion || "N/A"}<br />
-  📞 {clienteSeleccionado.telefono || "N/A"}<br />
-  📍 {clienteSeleccionado.direccion || "N/A"}<br />
-  ✉️ {clienteSeleccionado.email || "N/A"}
+  return (
+    <Protegido>
+      <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
+        <h2 style={{ textAlign: "center" }}>
+          📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
+        </h2>
+
+        <div style={{ marginBottom: "15px" }}>
+          <label>Tipo de documento: </label>
+          <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+            <option value="cotizacion">Cotización</option>
+            <option value="orden">Orden de Pedido</option>
+          </select>
+        </div>
+
+        {/* Modo de fechas */}
+        <div style={{ margin: "10px 0" }}>
+  <label style={labelInline}>
+    Alquiler por varios días
+    <input
+      type="checkbox"
+      checked={multiDias}
+      onChange={(e) => setMultiDias(e.target.checked)}
+      style={{ marginLeft: 6 }}
+    />
+  </label>
 </div>
-    )}
 
-    <hr style={{ margin: "30px 0" }} />
-    <h3>Productos o Grupos Agregados</h3>
-    {/* TABLA DE PRODUCTOS */}
-    <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
-  <thead>
-    <tr>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
-      <th>Temporal</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {productosAgregados.map((item, index) => {
-      const idProducto = item.producto_id || item.id;
-      const stockDisp = stock?.[idProducto] ?? "—";
-      const sobrepasado = stockDisp !== "—" && item.cantidad > stockDisp;
+        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <label>Fecha de creación:</label>
+            <input type="date" value={fechaCreacion} disabled style={{ width: "100%" }} />
+          </div>
 
-      return (
-        <tr key={index}>
-          <td>
+          {!multiDias ? (
+            <div style={{ flex: 1 }}>
+              <label>Fecha del evento:</label>
+              <input
+                ref={inputFechaUnDiaRef}
+                type="date"
+                value={fechaEvento}
+                onChange={(e) => setFechaEvento(e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+          ) : (
+            <div style={{ flex: 1 }}>
+              <label>Seleccionar día y añadir:</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="date"
+                  onChange={(e) => agregarDia(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+                {/* botón opcional si prefieres control manual */}
+              </div>
+
+              {fechasEvento.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <small>Días seleccionados ({numeroDias}):</small>
+                  <ul style={{ listStyle: "none", padding: 0, margin: "6px 0 0" }}>
+                    {fechasEvento.map((d) => (
+                      <li key={d} style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>{d}</span>
+                        <button onClick={() => eliminarDia(d)} title="Quitar">🗑️</button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <hr style={{ margin: "20px 0" }} />
+
+        {/* Clientes */}
+        <label>Buscar cliente:</label>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="Nombre, identificación o teléfono"
+            value={busquedaCliente}
+            onChange={(e) => setBusquedaCliente(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <button onClick={() => setModalCrearCliente(true)}>➕ Crear cliente</button>
+        </div>
+
+        {busquedaCliente && clientesFiltrados.length > 0 && (
+          <ul style={{ marginTop: "10px", listStyle: "none", padding: 0 }}>
+            {clientesFiltrados.map((cliente) => (
+              <li key={cliente.id}>
+                <button
+                  onClick={() => seleccionarCliente(cliente)}
+                  style={{ width: "100%", textAlign: "left" }}
+                >
+                  {cliente.nombre} - {cliente.identificacion} - {cliente.telefono}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {clienteSeleccionado && (
+          <div style={{ marginTop: "15px", padding: "10px", backgroundColor: "#f1f1f1", borderRadius: "6px" }}>
+            <strong>Cliente seleccionado:</strong><br />
+            🧑 {clienteSeleccionado.nombre || "N/A"}<br />
+            🆔 {clienteSeleccionado.identificacion || "N/A"}<br />
+            📞 {clienteSeleccionado.telefono || "N/A"}<br />
+            📍 {clienteSeleccionado.direccion || "N/A"}<br />
+            ✉️ {clienteSeleccionado.email || "N/A"}
+          </div>
+        )}
+
+        <hr style={{ margin: "30px 0" }} />
+        <h3>Productos o Grupos Agregados</h3>
+
+        {/* Tabla productos */}
+        <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
+              <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
+              <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
+              <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
+              {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>V. x Días</th>}
+              <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {productosAgregados.map((item, index) => {
+              const idProducto = item.producto_id || item.id;
+              const stockDisp = stock?.[idProducto] ?? "—";
+              const sobrepasado = stockDisp !== "—" && Number(item.cantidad || 0) > Number(stockDisp || 0);
+              const valorPorDias = (Number(item.precio || 0) * (numeroDias || 1)) || 0;
+              const isTemporal = !!item.temporal || !!item.es_proveedor;
+const rowStyle = isTemporal ? { background: "rgba(255, 235, 59, 0.15)" } : undefined;
+// Si prefieres subrayado en el nombre en vez de sombrear toda la fila:
+// const nombreStyle = isTemporal ? { textDecoration: "underline dotted" } : undefined;
+
+              return (
+                <tr key={index} style={rowStyle}>
+                  <td>
+                    <input
+                      type="number"
+                      value={item.cantidad}
+                      min="1"
+                      onChange={(e) => actualizarCantidad(index, e.target.value)}
+                      style={{ width: "60px" }}
+                    />
+                  </td>
+                  <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
+                    {stockDisp}
+                  </td>
+                  <td>{item.nombre}</td>
+                  <td>
+                    {item.es_grupo ? (
+                      "$" + Number(item.precio || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })
+                    ) : (
+                      <input
+                        type="number"
+                        value={item.precio}
+                        min="0"
+                        onChange={(e) => actualizarPrecio(index, e.target.value)}
+                        style={{ width: "100px" }}
+                      />
+                    )}
+                  </td>
+
+                  {multiDias && (
+                    <td>
+                      ${valorPorDias.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+                    </td>
+                  )}
+
+                  <td>
+                    ${(item.subtotal ?? 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}
+                  </td>
+                  <td>
+                    {item.es_grupo && (
+                      <button onClick={() => editarGrupo(index)} title="Editar grupo">✏️</button>
+                    )}
+                    <button onClick={() => eliminarProducto(index)}>🗑️</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {/* Botones para agregar */}
+        <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button onClick={() => setModalBuscarProducto(true)} style={{ padding: "8px 12px" }}>
+            🔍 Agregar desde Inventario
+          </button>
+
+          <button onClick={() => { setIndiceGrupoEnEdicion(null); setGrupoEnEdicion(null); setModalGrupo(true); }} style={{ padding: "8px 12px" }}>
+            📦 Crear Grupo de Artículos
+          </button>
+
+          <button onClick={() => setModalProveedor(true)} style={{ padding: "8px 12px" }}>
+            📥 Agregar desde Proveedor
+          </button>
+        </div>
+
+        {/* Garantía y abonos */}
+        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
+          <div style={{ flex: "1" }}>
+            <label>Monto de garantía:</label>
             <input
               type="number"
-              value={item.cantidad}
-              min="1"
-              onChange={(e) => actualizarCantidad(index, e.target.value)}
-              style={{ width: "60px" }}
-              />
-          </td>
-          <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
-            {stockDisp}
-          </td>
-          <td>{item.nombre}</td>
-          <td>
-  {item.es_grupo ? (
-    "$" + item.precio.toLocaleString("es-CO", { maximumFractionDigits: 0 })
-  ) : (
-              <input
-                type="number"
-                value={item.precio}
-                min="0"
-                onChange={(e) => {
-                  const nuevos = [...productosAgregados];
-                  nuevos[index].precio = parseFloat(e.target.value || 0);
-                  nuevos[index].subtotal = nuevos[index].cantidad * nuevos[index].precio;
-                  setProductosAgregados(nuevos);
-                }}
-                style={{ width: "100px" }}
-              />
-            )}
-          </td>
-          <td>
-            ${(item.subtotal ?? 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}
-          </td>
-          <td>
-            {!item.es_grupo && (
-              <input
-                type="checkbox"
-                checked={item.temporal}
-                onChange={(e) => marcarTemporal(index, e.target.checked)}
-                title="¿Producto temporal?"
-              />
-            )}
-          </td>
-          <td>
-            {item.es_grupo && (
-              <button onClick={() => editarGrupo(index)} title="Editar grupo">✏️</button>
-            )}
-            <button onClick={() => eliminarProducto(index)}>🗑️</button>
-          </td>
-        </tr>
-      );
-    })}
-  </tbody>
-</table>
+              min="0"
+              value={garantia}
+              onChange={(e) => {
+                setGarantia(e.target.value);
+              }}
+              style={{ width: "100%" }}
+            />
 
-    {/* BOTONES PARA AGREGAR ARTÍCULOS */}
-    <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-      <button onClick={() => setModalBuscarProducto(true)} style={{ padding: "8px 12px" }}>
-        🔍 Agregar desde Inventario
-      </button>
+            <div style={{ marginTop: "10px" }}>
+  <label style={labelInline}>
+    ¿Cliente ya entregó la garantía?
+    <input
+      type="checkbox"
+      checked={garantiaRecibida}
+      onChange={(e) => {
+        const checked = e.target.checked;
+        setGarantiaRecibida(checked);
+        if (checked) {
+          const hoy = new Date().toLocaleDateString("es-CO", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+          });
+          setFechaGarantia(hoy);
+        } else {
+          setFechaGarantia("");
+        }
+      }}
+      style={{ marginLeft: 6 }}
+    />
+  </label>
 
-      <button onClick={() => setModalGrupo(true)} style={{ padding: "8px 12px" }}>
-        📦 Crear Grupo de Artículos
-      </button>
-
-      <button onClick={() => setModalProveedor(true)} style={{ padding: "8px 12px" }}>
-        📥 Agregar desde Proveedor
-      </button>
+  {garantiaRecibida && fechaGarantia && (
+    <div style={{ marginTop: 6, fontStyle: "italic", color: "gray" }}>
+      Recibida el: {fechaGarantia}
     </div>
-
-    {/* GARANTÍA Y ABONOS */}
-    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
-      <div style={{ flex: "1" }}>
-  <label>Monto de garantía:</label>
-  <input
-    type="number"
-    min="0"
-    value={garantia}
-    onChange={(e) => {
-      setGarantia(e.target.value);
-
-      const hoy = new Date().toLocaleDateString("es-CO", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-      });
-      setFechaGarantia(hoy);
-    }}
-    style={{ width: "100%" }}
-  />
-
-  <div style={{ marginTop: "10px" }}>
-    <label>
-      <input
-        type="checkbox"
-        checked={garantiaRecibida}
-        onChange={(e) => setGarantiaRecibida(e.target.checked)}
-      />
-      ¿Cliente ya entregó la garantía?
-    </label>
-  </div>
+  )}
 </div>
+          </div>
 
-      <div style={{ flex: "2" }}>
-  <label>Abonos ($):</label>
-  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-    {abonos.map((abono, index) => (
-      <div key={index} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <label style={{ minWidth: "80px" }}>Abono {index + 1}:</label>
-        <input
-          type="number"
-          min="0"
-          value={abono.valor}
-          onChange={(e) => {
-            const nuevosAbonos = [...abonos];
-            nuevosAbonos[index].valor = parseFloat(e.target.value || 0);
-            setAbonos(nuevosAbonos);
-          }}
-          style={{ width: "100px" }}
-        />
-        <span style={{ fontStyle: "italic", color: "gray" }}>
-          Fecha: {abono.fecha}
-        </span>
-      </div>
-    ))}
-    <button onClick={agregarAbono}>
-  ➕ Agregar abono
-</button>
-  </div>
-</div>
-</div> {/* ← este cierre faltaba */}
+          <div style={{ flex: "2" }}>
+            <label>Abonos ($):</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {abonos.map((abono, index) => (
+                <div key={index} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <label style={{ minWidth: "80px" }}>Abono {index + 1}:</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={abono.valor}
+                    onChange={(e) => {
+                      const nuevos = [...abonos];
+                      nuevos[index].valor = parseFloat(e.target.value || 0);
+                      setAbonos(nuevos);
+                    }}
+                    style={{ width: "120px" }}
+                  />
+                  <span style={{ fontStyle: "italic", color: "gray" }}>
+                    Fecha: {abono.fecha}
+                  </span>
+                </div>
+              ))}
+              <button onClick={agregarAbono}>➕ Agregar abono</button>
+            </div>
+          </div>
+        </div>
 
-    {/* TOTALES */}
-    <div style={{ marginTop: "20px", textAlign: "right" }}>
-      <p><strong>Total:</strong> ${total.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-      <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-    </div>
+        {/* Ajustes (Descuento/Retención) */}
+        <div style={{ marginTop: 20, padding: 12, background: "#f9fafb", borderRadius: 8 }}>
+          <h4 style={{ marginTop: 0 }}>Ajustes:</h4>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+  <label style={labelInline}>
+    Aplicar descuento
+    <input
+      type="checkbox"
+      checked={aplicarDescuento}
+      onChange={(e) => setAplicarDescuento(e.target.checked)}
+      style={{ marginLeft: 6 }}
+    />
+  </label>
 
-    {/* BOTONES FINALES */}
-   <div style={{
-  marginTop: "30px",
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "10px",
-  justifyContent: "center"
-}}>
-  <button onClick={guardarDocumento} style={{ padding: "10px 20px" }}>
-    💾 Guardar Documento
-  </button>
-
-  <button onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)} style={{ padding: "10px 20px" }}>
-    📄 Descargar PDF
-  </button>
-
-  {tipoDocumento === "orden" && productosAgregados.length > 0 && (
-    <button
-      onClick={() => generarRemisionPDF(obtenerDatosPDF())}
-      style={{ padding: "10px 20px", backgroundColor: "#4CAF50", color: "white" }}
-    >
-      📦 Generar Remisión
-    </button>
+  {aplicarDescuento && (
+    <input
+      type="number"
+      min="0"
+      value={descuento}
+      onChange={(e) => setDescuento(e.target.value)}
+      placeholder="Valor del descuento"
+    />
   )}
 
-  <button
-    onClick={() => {
-      setClienteSeleccionado(null);
-      setProductosAgregados([]);
-      setGarantia("");
-      setAbonos([""]);
-      setBusquedaCliente("");
-      setFechaEvento(""); // <-- Asegúrate de limpiar también la fecha del evento (tema del punto 4)
-    }}
-    style={{
-      padding: "10px 20px",
-      marginLeft: "10px",
-      backgroundColor: "#e53935",
-      color: "white"
-    }}
-  >
-    🧹 Limpiar módulo
-  </button>
-</div>
+  <label style={labelInline}>
+    Aplicar retención
+    <input
+      type="checkbox"
+      checked={aplicarRetencion}
+      onChange={(e) => setAplicarRetencion(e.target.checked)}
+      style={{ marginLeft: 6 }}
+    />
+  </label>
 
-    {/* MODALES */}
-    {modalBuscarProducto && (
+  {aplicarRetencion && (
+    <input
+      type="number"
+      min="0"
+      value={retencion}
+      onChange={(e) => setRetencion(e.target.value)}
+      placeholder="Valor de la retención"
+    />
+  )}
+</div>
+        </div>
+
+        {/* Totales */}
+        <div style={{ marginTop: "20px", textAlign: "right" }}>
+          <p><strong>Total (bruto):</strong> ${totalBruto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+          {aplicarDescuento && <p>Descuento: ${Number(descuento || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>}
+          {aplicarRetencion && <p>Retención: ${Number(retencion || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>}
+          <p><strong>Total (neto):</strong> ${totalNeto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+          <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+        </div>
+
+        {/* Botones finales */}
+        <div style={{ marginTop: "30px", display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+          <button onClick={guardarDocumento} style={{ padding: "10px 20px" }}>
+            💾 Guardar Documento
+          </button>
+
+          <button onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)} style={{ padding: "10px 20px" }}>
+            📄 Descargar PDF
+          </button>
+
+          {tipoDocumento === "orden" && productosAgregados.length > 0 && (
+            <button
+              onClick={() => generarRemisionPDF(obtenerDatosPDF())}
+              style={{ padding: "10px 20px", backgroundColor: "#4CAF50", color: "white" }}
+            >
+              📦 Generar Remisión
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              setClienteSeleccionado(null);
+              setProductosAgregados([]);
+              setGarantia("");
+              setAbonos([]);
+              setBusquedaCliente("");
+              setFechaEvento("");
+              setFechasEvento([]);
+              setMultiDias(false);
+              setAplicarDescuento(false); setDescuento(0);
+              setAplicarRetencion(false); setRetencion(0);
+              setGarantiaRecibida(false); setFechaGarantia("");
+            }}
+            style={{ padding: "10px 20px", marginLeft: "10px", backgroundColor: "#e53935", color: "white" }}
+          >
+            🧹 Limpiar módulo
+          </button>
+        </div>
+
+        {/* MODALES */}
+{modalBuscarProducto && (
   <BuscarProductoModal
-    onSelect={agregarProducto}
+    persistOpen                  // ⬅️ NO se cierra al elegir; solo con “Cerrar”
+    onSelect={agregarProducto}   // agrega desde inventario
+    onAgregarProducto={agregarProductoTemporal} // “Nuevo” o “Temporal”
     onClose={() => setModalBuscarProducto(false)}
-    onAgregarProducto={agregarProductoTemporal} // ✅ agregada
   />
 )}
 
-
-    {modalGrupo && (
+{modalGrupo && (
   <AgregarGrupoModal
+    persistOpen                  // ⬅️ NO se cierra al guardar; solo con “Cerrar”
+    grupoEnEdicion={grupoEnEdicion}
+    stockDisponible={stock}
     onAgregarGrupo={(grupo) => {
       if (indiceGrupoEnEdicion !== null) {
         const nuevos = [...productosAgregados];
-        nuevos[indiceGrupoEnEdicion] = grupo;
-        setProductosAgregados(nuevos);
+        nuevos[indiceGrupoEnEdicion] = { ...grupo };
+        setProductosAgregados(recomputarSubtotales(nuevos));
       } else {
-        setProductosAgregados([...productosAgregados, grupo]);
+        setProductosAgregados((prev) => recomputarSubtotales([...prev, { ...grupo }]));
       }
-      setModalGrupo(false);
+      // limpiamos estado de edición, pero el modal sigue abierto
       setGrupoEnEdicion(null);
       setIndiceGrupoEnEdicion(null);
     }}
@@ -675,33 +899,29 @@ return (
       setGrupoEnEdicion(null);
       setIndiceGrupoEnEdicion(null);
     }}
-    stockDisponible={stock}
-    grupoEnEdicion={grupoEnEdicion}
   />
 )}
 
-    {modalProveedor && (
+{modalProveedor && (
   <BuscarProveedorYProductoModal
-  onSelect={(producto) => {
-    agregarProductoProveedor(producto); // ✅ ejecuta sin cerrar el modal
-    // ❌ No pongas: setModalProveedor(false)
-  }}
-  onClose={() => setModalProveedor(false)} // ✅ Solo este botón cerrará el modal
-/>
+    onSelect={(producto) => agregarProductoProveedor(producto)} // NO cierra
+    onClose={() => setModalProveedor(false)}
+  />
 )}
 
-     {modalCrearCliente && (
-        <CrearClienteModal
-          onClienteCreado={(cliente) => {
-            setClientes([...clientes, cliente]);
-            setClienteSeleccionado(cliente);
-            setModalCrearCliente(false);
-          }}
-          onClose={() => setModalCrearCliente(false)}
-        />
-      )}
-    </div>
-  </Protegido>
-);
+{modalCrearCliente && (
+  <CrearClienteModal
+    onClienteCreado={(cliente) => {
+      setClientes([...clientes, cliente]);
+      setClienteSeleccionado(cliente);
+      setModalCrearCliente(false); // se cierra al guardar
+    }}
+    onClose={() => setModalCrearCliente(false)}
+  />
+)}
+      </div>
+    </Protegido>
+  );
 };
+
 export default CrearDocumento;
