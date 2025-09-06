@@ -4,11 +4,20 @@ import React from "react";
 export default function BotonIAFlotante({ onClick }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="fixed bottom-6 right-6 z-40 bg-purple-600 text-white px-4 py-3 rounded-full shadow-lg hover:bg-purple-700 text-sm sm:text-base"
-      title="Asistente inteligente"
+      title="Asistente IA"
+      aria-label="Asistente IA"
+      className="
+        boton-ia
+        bg-purple-600 text-white hover:bg-purple-700
+        text-sm md:text-base
+        md:fixed md:bottom-6 md:right-6
+        md:px-4 md:py-3 md:rounded-full md:shadow-lg
+        md:z-40
+      "
     >
-      🧠 Asistente IA
+      🧠 IA
     </button>
   );
 }

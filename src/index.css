@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 🎨 Variables y ajustes base */
+:root {
+  --md-surface: #ffffff;
+  --md-bg: #f9fafb;
+  --md-primary: #1d4ed8;   /* azul */
+  --md-secondary: #7c3aed; /* morado */
+  --md-border: #e5e7eb;
+  --md-text: #111827;
+}
+
+html { scroll-behavior: smooth; }
+
 /* ✅ Estilos globales para campos de formulario */
 input, select, textarea {
   @apply border border-gray-300 rounded px-3 py-2 w-full text-black bg-white focus:outline-none focus:ring focus:ring-blue-400;
@@ -11,3 +23,6 @@ input, select, textarea {
 button {
   @apply px-3 py-1.5 bg-gray-200 text-gray-800 border border-gray-300 rounded hover:bg-gray-300 transition text-sm;
 }
+
+/* 👇 Importa los estilos móviles al final para que sobrescriban lo necesario */
+@import "./estilos/mobile.css";

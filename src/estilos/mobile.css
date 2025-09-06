@@ -1,0 +1,153 @@
+/* ⚠️ Importante: aquí NO ponemos @tailwind base/components/utilities para evitar duplicados.
+   Este archivo se procesa por Tailwind, así que puedes usar @apply sin problema. */
+
+/* Solo afecta móviles y tablets */
+@media (max-width: 768px) {
+  /* 🔹 Base tipográfica y fondo */
+  html, body {
+    background: var(--md-bg);
+    color: var(--md-text);
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Espaciado lateral cómodo en vistas de página */
+  .container, .contenedor, .page {
+    @apply px-4;
+  }
+
+  /* 🔹 Escala tipográfica compacta */
+  h1 { font-size: clamp(20px, 5vw, 24px); line-height: 1.2; }
+  h2 { font-size: clamp(18px, 4.5vw, 22px); line-height: 1.25; }
+  h3 { font-size: clamp(16px, 4vw, 20px); line-height: 1.3; }
+  p, li { line-height: 1.45; }
+
+  /* 🔹 Formularios más compactos y legibles */
+  input, select, textarea { @apply text-sm py-2; }
+  label { @apply text-xs text-gray-600; }
+  .form-row { @apply grid grid-cols-1 gap-3; } /* fuerza 1 columna en móvil */
+
+  /* 🔹 Botones con target táctil adecuado */
+  button { @apply text-sm px-3 py-2 rounded-lg; min-height: 40px; }
+
+  /* 🔹 Tarjetas/controles (look Material compacto) */
+  .card, .tarjeta {
+    @apply bg-white rounded-lg border border-gray-200;
+    padding: 12px;
+    gap: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  /* 🔹 Barra superior (app bar) sticky con blur sutil */
+  .toolbar, .appbar, header.sticky, .encabezado {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--md-surface);
+    border-bottom: 1px solid var(--md-border);
+    backdrop-filter: saturate(180%) blur(8px);
+  }
+
+  /* 🔹 Menú inferior tipo app nativa */
+  .menu-inferior {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: env(safe-area-inset-bottom);
+    background: #ffffff;
+    border-top: 1px solid var(--md-border);
+    display: flex;
+    justify-content: space-around;
+    gap: 4px;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+    z-index: 50;
+  }
+
+  .menu-inferior button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #4b5563;
+    background: transparent;
+    border: 0;
+    padding: 6px 0;
+  }
+
+  .menu-inferior button.active { color: var(--md-primary); }
+
+  /* 🔹 Botón flotante (FAB) para IA, por encima del menú inferior */
+  .boton-ia {
+    position: fixed;
+    right: 16px;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    background: var(--md-secondary);
+    color: #ffffff;
+    border: 0;
+    border-radius: 9999px;
+    padding: 10px 14px;
+    font-size: 14px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    z-index: 60;
+  }
+
+  /* 🔹 Ocultar sidebar y ampliar contenido en móvil */
+  .sidebar, .aside, .panel-lateral { display: none !important; }
+  main, .contenido, .main { width: 100% !important; }
+
+  /* 🔹 Grids a 1 columna (si usas utilidades o clases personalizadas) */
+  .grid.cols-2, .grid.cols-3, .grid.cols-4,
+  .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* 🔹 Tablas desplazables horizontalmente */
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    border-spacing: 0;
+  }
+  th, td { padding: 8px 12px; }
+
+  /* 🔹 Modal pantalla completa en móvil */
+  .modal, .dialog {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* 🔹 Helpers */
+  .touch-target { min-height: 44px; min-width: 44px; } /* accesibilidad */
+  .compact-y > * + * { margin-top: 8px; }
+  .desktop-only { display: none !important; }
+  .mobile-only { display: initial !important; }
+}
+
+/* 🌙 Modo oscuro (solo móvil) */
+@media (max-width: 768px) and (prefers-color-scheme: dark) {
+  html, body { background: #0b1220; color: #e5e7eb; }
+  .card, .tarjeta { background: #0f172a; border-color: #1f2937; box-shadow: none; }
+  .toolbar, .appbar, header.sticky, .encabezado {
+    background: rgba(15, 23, 42, 0.85);
+    border-bottom-color: #1f2937;
+    backdrop-filter: saturate(180%) blur(10px);
+  }
+  .menu-inferior { background: #0f172a; border-top-color: #1f2937; }
+  .menu-inferior button { color: #9ca3af; }
+  .menu-inferior button.active { color: #93c5fd; }
+  .boton-ia { background: #7c3aed; color: #fff; }
+  input, select, textarea {
+    @apply bg-slate-900 text-slate-100 border-slate-700 focus:ring-blue-500;
+  }
+  button {
+    @apply bg-slate-800 text-slate-100 border-slate-700 hover:bg-slate-700;
+  }
+}

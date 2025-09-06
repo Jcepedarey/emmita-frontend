@@ -138,7 +138,7 @@ const Inicio = () => {
 
   return (
     <Protegido>
-      <div className="p-6">
+      <div className="p-6 pb-24 md:pb-6">
         <h1 className="text-2xl font-bold mb-6">
           Bienvenido, {usuario?.nombre || "Administrador"}
         </h1>
@@ -296,6 +296,14 @@ const Inicio = () => {
             onClick={() => navigate("/buscar-recepcion")}
           />
           {usuario?.rol === "admin" && <></>}
+        </div>
+
+        {/* Menú inferior (solo móvil) */}
+        <div className="menu-inferior md:hidden">
+          <button onClick={() => navigate("/inicio")}>🏠 Inicio</button>
+          <button onClick={() => navigate("/crear-documento")}>📄 Documento</button>
+          <button onClick={() => navigate("/agenda")}>📅 Agenda</button>
+          <button onClick={() => navigate("/clientes")}>👥 Clientes</button>
         </div>
       </div>
     </Protegido>
