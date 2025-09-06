@@ -208,16 +208,21 @@ useEffect(() => {
 }, [fechaEvento, multiDias]);
 
   // 🧮 Helpers de cálculo
-  const calcularSubtotal = (item) => {
-    const precio = Number(item.precio || 0);
-    const cantidad = Number(item.cantidad || 0);
-    const dias = numeroDias || 1;
-    return Math.max(0, precio * cantidad * dias);
-  };
+const calcularSubtotal = (item) => {
+  const precio = Number(item.precio || 0);
+  const cantidad = Number(item.cantidad || 0);
 
-  const recomputarSubtotales = (items) =>
-    items.map((it) => ({ ...it, subtotal: calcularSubtotal(it) }));
+  // Si NO es multi-día => siempre 1 día
+  // Si SÍ es multi-día => por ítem puedes apagar la multiplicación
+  const diasEfectivos = !multiDias
+    ? 1
+    : (item.multiplicarPorDias === false ? 1 : (numeroDias || 1));
 
+  return Math.max(0, precio * cantidad * diasEfectivos);
+};
+
+const recomputarSubtotales = (items) =>
+  items.map((it) => ({ ...it, subtotal: calcularSubtotal(it) }));
   // 🧾 Totales
   const totalBruto = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
   const totalNeto = Math.max(
@@ -241,13 +246,14 @@ useEffect(() => {
   // ✅ Agregar producto desde inventario (NO cerrar modal)
   const agregarProducto = (producto) => {
     const nuevo = {
-      id: producto.id,
-      nombre: producto.nombre,
-      cantidad: 1,
-      precio: parseFloat(producto.precio),
-      es_grupo: false,
-      temporal: false
-    };
+  id: producto.id,
+  nombre: producto.nombre,
+  cantidad: 1,
+  precio: parseFloat(producto.precio),
+  es_grupo: false,
+  temporal: false,
+  multiplicarPorDias: multiDias ? true : undefined, // 👈 nuevo
+};
     const items = [...productosAgregados, nuevo];
     setProductosAgregados(recomputarSubtotales(items));
     // no cerrar modal; el propio modal limpiará el buscador
@@ -256,14 +262,15 @@ useEffect(() => {
   // ✅ Agregar producto desde proveedor (modal proveedor permanece abierto)
   const agregarProductoProveedor = (producto) => {
   const nuevo = {
-    id: `prov-${producto.id ?? producto.proveedor_id ?? (crypto?.randomUUID?.() || Math.random().toString(36).slice(2))}`,
-    nombre: producto.nombre,
-    cantidad: 1,
-    precio: Number(producto.precio_venta || 0),
-    es_grupo: false,
-    es_proveedor: true,
-    temporal: true,
-  };
+  id: `prov-${producto.id ?? producto.proveedor_id ?? (crypto?.randomUUID?.() || Math.random().toString(36).slice(2))}`,
+  nombre: producto.nombre,
+  cantidad: 1,
+  precio: Number(producto.precio_venta || 0),
+  es_grupo: false,
+  es_proveedor: true,
+  temporal: true,
+  multiplicarPorDias: multiDias ? true : undefined, // 👈 nuevo
+};
   const items = [...productosAgregados, nuevo];
   setProductosAgregados(recomputarSubtotales(items));
 };
@@ -272,15 +279,15 @@ useEffect(() => {
   // ✅ Agregar producto creado en el modal (puede ser temporal o no)
 const agregarProductoTemporal = (producto) => {
   const nuevo = {
-    id: producto.id ?? `tmp-${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`,
-    nombre: producto.nombre,
-    cantidad: Number(producto.cantidad || 1),
-    precio: Number(producto.precio || 0),
-    es_grupo: false,
-    // Respetamos lo que marcó en el modal:
-    temporal: !!producto.temporal,
-    es_proveedor: !!producto.es_proveedor,
-  };
+  id: producto.id ?? `tmp-${crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`,
+  nombre: producto.nombre,
+  cantidad: Number(producto.cantidad || 1),
+  precio: Number(producto.precio || 0),
+  es_grupo: false,
+  temporal: !!producto.temporal,
+  es_proveedor: !!producto.es_proveedor,
+  multiplicarPorDias: multiDias ? true : undefined, // 👈 nuevo
+};
   const items = [...productosAgregados, nuevo];
   setProductosAgregados(recomputarSubtotales(items));
 };
@@ -310,6 +317,15 @@ const agregarProductoTemporal = (producto) => {
     nuevos[index].subtotal = calcularSubtotal(nuevos[index]);
     setProductosAgregados(nuevos);
   };
+
+  const toggleMultiplicarPorDias = (index, checked) => {
+  setProductosAgregados((prev) => {
+    const n = [...prev];
+    n[index] = { ...n[index], multiplicarPorDias: !!(checked) };
+    n[index].subtotal = calcularSubtotal(n[index]);
+    return n;
+  });
+};
 
   // ✅ Eliminar producto
   const eliminarProducto = (index) => {
@@ -471,27 +487,30 @@ if (multiDias) {
   // Cuando el usuario activa/desactiva "Alquiler por varios días"
 const onToggleMultiDias = (val) => {
   setMultiDias(val);
+
   if (val) {
-    // Si paso a multi, migro la fecha única al arreglo (si existe)
     setFechasEvento((prev) => (prev?.length ? prev : (fechaEvento ? [fechaEvento] : [])));
     setFechaEvento("");
+
+    // al entrar a multi-día: por defecto, todos ON (respetamos los que ya estaban en false)
+    setProductosAgregados((prev) =>
+      recomputarSubtotales(
+        prev.map((it) => ({
+          ...it,
+          multiplicarPorDias: (it.multiplicarPorDias === false) ? false : true,
+        }))
+      )
+    );
   } else {
-    // Si vuelvo a 1 día, uso el primer día del arreglo (si existe)
     const first = (fechasEvento && fechasEvento[0]) || "";
     setFechaEvento(first || "");
     setFechasEvento([]);
     setTimeout(() => inputFechaUnDiaRef.current?.focus(), 0);
-  }
-  // Recalcular subtotales (por cambio de # de días)
-  setProductosAgregados((prev) => recomputarSubtotales(prev));
-};
 
-  // Recalcular subtotales cuando cambie la fecha en modo 1 día
-useEffect(() => {
-  if (!multiDias) {
+    // al salir de multi-día: solo recalc (quedará 1 día)
     setProductosAgregados((prev) => recomputarSubtotales(prev));
   }
-}, [fechaEvento, multiDias]);
+};
 
   return (
     <Protegido>
@@ -511,14 +530,14 @@ useEffect(() => {
         {/* Modo de fechas */}
         <div style={{ margin: "10px 0" }}>
   <label style={labelInline}>
-    Alquiler por varios días
-    <input
-      type="checkbox"
-      checked={multiDias}
-      onChange={(e) => setMultiDias(e.target.checked)}
-      style={{ marginLeft: 6 }}
-    />
-  </label>
+  Alquiler por varios días
+  <input
+    type="checkbox"
+    checked={multiDias}
+    onChange={(e) => onToggleMultiDias(e.target.checked)}   // 👈 usar handler
+    style={{ marginLeft: 6 }}
+  />
+</label>
 </div>
 
         <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -612,78 +631,106 @@ useEffect(() => {
         <h3>Productos o Grupos Agregados</h3>
 
         {/* Tabla productos */}
-        <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
-              <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
-              <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
-              <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
-              {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>V. x Días</th>}
-              <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {productosAgregados.map((item, index) => {
-              const idProducto = item.producto_id || item.id;
-              const stockDisp = stock?.[idProducto] ?? "—";
-              const sobrepasado = stockDisp !== "—" && Number(item.cantidad || 0) > Number(stockDisp || 0);
-              const valorPorDias = (Number(item.precio || 0) * (numeroDias || 1)) || 0;
-              const isTemporal = !!item.temporal || !!item.es_proveedor;
-const rowStyle = isTemporal ? { background: "rgba(255, 235, 59, 0.15)" } : undefined;
-// Si prefieres subrayado en el nombre en vez de sombrear toda la fila:
-// const nombreStyle = isTemporal ? { textDecoration: "underline dotted" } : undefined;
+<table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
+  <thead>
+    <tr>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
+      {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>× días</th>}
+      {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>V. x Días</th>}
+      <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {productosAgregados.map((item, index) => {
+      const idProducto = item.producto_id || item.id;
+      const stockDisp = stock?.[idProducto] ?? "—";
+      const sobrepasado =
+        stockDisp !== "—" && Number(item.cantidad || 0) > Number(stockDisp || 0);
 
-              return (
-                <tr key={index} style={rowStyle}>
-                  <td>
-                    <input
-                      type="number"
-                      value={item.cantidad}
-                      min="1"
-                      onChange={(e) => actualizarCantidad(index, e.target.value)}
-                      style={{ width: "60px" }}
-                    />
-                  </td>
-                  <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
-                    {stockDisp}
-                  </td>
-                  <td>{item.nombre}</td>
-                  <td>
-                    {item.es_grupo ? (
-                      "$" + Number(item.precio || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })
-                    ) : (
-                      <input
-                        type="number"
-                        value={item.precio}
-                        min="0"
-                        onChange={(e) => actualizarPrecio(index, e.target.value)}
-                        style={{ width: "100px" }}
-                      />
-                    )}
-                  </td>
+      // control por ítem para multiplicar por días
+      const usaDias = item.multiplicarPorDias !== false; // default: true cuando hay multi-día
+      const valorPorDias = usaDias
+        ? Number(item.precio || 0) * (numeroDias || 1)
+        : null;
 
-                  {multiDias && (
-                    <td>
-                      ${valorPorDias.toLocaleString("es-CO", { maximumFractionDigits: 0 })}
-                    </td>
-                  )}
+      const isTemporal = !!item.temporal || !!item.es_proveedor;
+      const rowStyle = isTemporal ? { background: "rgba(255, 235, 59, 0.15)" } : undefined;
 
-                  <td>
-                    ${(item.subtotal ?? 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}
-                  </td>
-                  <td>
-                    {item.es_grupo && (
-                      <button onClick={() => editarGrupo(index)} title="Editar grupo">✏️</button>
-                    )}
-                    <button onClick={() => eliminarProducto(index)}>🗑️</button>
-                  </td>
-                </tr>
-              );
+      return (
+        <tr key={index} style={rowStyle}>
+          <td>
+            <input
+              type="number"
+              value={item.cantidad}
+              min="1"
+              onChange={(e) => actualizarCantidad(index, e.target.value)}
+              style={{ width: "60px" }}
+            />
+          </td>
+          <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
+            {stockDisp}
+          </td>
+          <td>{item.nombre}</td>
+          <td>
+            {item.es_grupo ? (
+              "$" +
+              Number(item.precio || 0).toLocaleString("es-CO", {
+                maximumFractionDigits: 0
+              })
+            ) : (
+              <input
+                type="number"
+                value={item.precio}
+                min="0"
+                onChange={(e) => actualizarPrecio(index, e.target.value)}
+                style={{ width: "100px" }}
+              />
+            )}
+          </td>
+
+          {multiDias && (
+            <td style={{ textAlign: "center" }}>
+              <input
+                type="checkbox"
+                checked={usaDias}
+                onChange={(e) => toggleMultiplicarPorDias(index, e.target.checked)}
+                title="Multiplicar este ítem por los días seleccionados"
+              />
+            </td>
+          )}
+
+          {multiDias && (
+            <td>
+              {usaDias
+                ? `$${(valorPorDias || 0).toLocaleString("es-CO", {
+                    maximumFractionDigits: 0
+                  })}`
+                : "—"}
+            </td>
+          )}
+
+          <td>
+            ${(item.subtotal ?? 0).toLocaleString("es-CO", {
+              maximumFractionDigits: 0
             })}
-          </tbody>
-        </table>
+          </td>
+          <td>
+            {item.es_grupo && (
+              <button onClick={() => editarGrupo(index)} title="Editar grupo">
+                ✏️
+              </button>
+            )}
+            <button onClick={() => eliminarProducto(index)}>🗑️</button>
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
 
         {/* Botones para agregar */}
         <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -883,22 +930,25 @@ const rowStyle = isTemporal ? { background: "rgba(255, 235, 59, 0.15)" } : undef
     grupoEnEdicion={grupoEnEdicion}
     stockDisponible={stock}
     onAgregarGrupo={(grupo) => {
+  const linea = {
+    ...grupo,
+    multiplicarPorDias: multiDias ? true : undefined, // 👈 grupo decide si se multiplica o no
+  };
       if (indiceGrupoEnEdicion !== null) {
-        const nuevos = [...productosAgregados];
-        nuevos[indiceGrupoEnEdicion] = { ...grupo };
-        setProductosAgregados(recomputarSubtotales(nuevos));
-      } else {
-        setProductosAgregados((prev) => recomputarSubtotales([...prev, { ...grupo }]));
-      }
-      // limpiamos estado de edición, pero el modal sigue abierto
-      setGrupoEnEdicion(null);
-      setIndiceGrupoEnEdicion(null);
-    }}
-    onClose={() => {
-      setModalGrupo(false);
-      setGrupoEnEdicion(null);
-      setIndiceGrupoEnEdicion(null);
-    }}
+    const nuevos = [...productosAgregados];
+    // Conserva el estado anterior si existía (respeta si ya lo apagaste)
+    const prevFlag = nuevos[indiceGrupoEnEdicion]?.multiplicarPorDias;
+    nuevos[indiceGrupoEnEdicion] = {
+      ...linea,
+      ...(prevFlag !== undefined ? { multiplicarPorDias: prevFlag } : {}),
+    };
+    setProductosAgregados(recomputarSubtotales(nuevos));
+  } else {
+    setProductosAgregados((prev) => recomputarSubtotales([...prev, linea]));
+  }
+  setGrupoEnEdicion(null);
+  setIndiceGrupoEnEdicion(null);
+}}
   />
 )}
 

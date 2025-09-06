@@ -91,22 +91,30 @@ export async function generarPDF(documento, tipo = "cotizacion") {
     : [["Cantidad", "Artículo", "Precio", "Subtotal"]];
 
   const body = (documento.productos || []).map((p) => {
-    const cantidad = num(p.cantidad, 0);
-    const precio = num(p.precio, 0);
-    // Subtotal seguro: usa p.subtotal si viene, si no calcula precio * cantidad * nd
-    const subtotal = num(p.subtotal, precio * cantidad * (esMulti ? nd : 1));
+  const cantidad = num(p.cantidad, 0);
+  const precio = num(p.precio, 0);
 
-    if (esMulti) {
-      return [
-        cantidad || 0,
-        p.nombre || "",
-        `$${fmt(precio)}`,
-        `$${fmt(precio * nd)}`,    // Precio por días
-        `$${fmt(subtotal)}`,
-      ];
-    }
-    return [cantidad || 0, p.nombre || "", `$${fmt(precio)}`, `$${fmt(subtotal)}`];
-  });
+  // si el ítem NO se multiplica por días, "V. x Días" debe ser el precio unitario
+  const usaDias = p.multiplicarPorDias !== false;
+  const valorPorDias = usaDias ? (precio * nd) : precio;
+
+  // fallback del subtotal coherente con usaDias
+  const subtotal = num(
+    p.subtotal,
+    precio * cantidad * (esMulti ? (usaDias ? nd : 1) : 1)
+  );
+
+  if (esMulti) {
+    return [
+      cantidad || 0,
+      p.nombre || "",
+      `$${fmt(precio)}`,
+      `$${fmt(valorPorDias)}`,
+      `$${fmt(subtotal)}`,
+    ];
+  }
+  return [cantidad || 0, p.nombre || "", `$${fmt(precio)}`, `$${fmt(subtotal)}`];
+});
 
   autoTable(doc, {
   head,
@@ -181,7 +189,12 @@ y += 10;
 
 // ── Totales
 const totalBruto = (documento.productos || []).reduce(
-  (acc, p) => acc + num(p.subtotal, num(p.precio) * num(p.cantidad) * (esMulti ? nd : 1)),
+  (acc, p) =>
+    acc +
+    num(
+      p.subtotal,
+      num(p.precio) * num(p.cantidad) * (esMulti ? (p.multiplicarPorDias === false ? 1 : nd) : 1)
+    ),
   0
 );
 const descuento = num(documento.descuento, 0);
