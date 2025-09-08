@@ -137,9 +137,7 @@ const Inicio = () => {
   return (
     <Protegido>
       <div className="p-6 pb-24 md:pb-6">
-        <h1 className="text-2xl font-bold mb-6">
-          Bienvenido, {usuario?.nombre || "Administrador"}
-        </h1>
+        <h1 className="text-2xl font-bold mb-6">Bienvenido</h1>
 
         {/* TABLA VISUAL CON SCROLL INTERNO */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
