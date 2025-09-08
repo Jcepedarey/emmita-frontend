@@ -1,6 +1,12 @@
 // src/components/BotonIAFlotante.js
 import React from "react";
 
+/**
+ * FAB de IA
+ * - En móvil (<=768px) la posición/espaciado lo controla el CSS .boton-ia en mobile.css
+ *   (fixed + safe-area + contain/isolation, etc.)
+ * - En escritorio (>=md) aplican las utilidades md:* para esquina inferior derecha.
+ */
 export default function BotonIAFlotante({ onClick }) {
   return (
     <button

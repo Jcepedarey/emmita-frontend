@@ -34,8 +34,6 @@ const Inicio = () => {
   const [ordenesPendientes, setOrdenesPendientes] = useState([]);
 
   useEffect(() => {
-    // Nota: Protegido ya controla el acceso; esta línea es opcional.
-
     const cargarOrdenes = async () => {
       const { data, error } = await supabase
         .from("ordenes_pedido")
@@ -234,77 +232,115 @@ const Inicio = () => {
 
         {/* MENÚ VISUAL DE ÍCONOS */}
         <h2 className="text-xl font-semibold mb-4 text-center">Menú Principal</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 place-items-center">
-          <BotonModulo
-            titulo="Crear documento"
-            imagen={`${process.env.PUBLIC_URL}/icons/contrato.png`}
-            onClick={() => navigate("/crear-documento")}
-          />
-          <BotonModulo
-            titulo="Clientes"
-            imagen={`${process.env.PUBLIC_URL}/icons/buscar_cliente.png`}
-            onClick={() => navigate("/clientes")}
-          />
-          <BotonModulo
-            titulo="Inventario"
-            imagen={`${process.env.PUBLIC_URL}/icons/inventario.png`}
-            onClick={() => navigate("/inventario")}
-          />
-          <BotonModulo
-            titulo="Agenda"
-            imagen={`${process.env.PUBLIC_URL}/icons/agenda.png`}
-            onClick={() => navigate("/agenda")}
-          />
-          <BotonModulo
-            titulo="Proveedores"
-            imagen={`${process.env.PUBLIC_URL}/icons/proveedores.png`}
-            onClick={() => navigate("/proveedores")}
-          />
-          <BotonModulo
-            titulo="Buscar documento"
-            imagen={`${process.env.PUBLIC_URL}/icons/buscar_doc.png`}
-            onClick={() => navigate("/buscar-documento")}
-          />
-          <BotonModulo
-            titulo="Reportes"
-            imagen={`${process.env.PUBLIC_URL}/icons/reportes.png`}
-            onClick={() => navigate("/reportes")}
-          />
-          <BotonModulo
-            titulo="Trazabilidad"
-            imagen={`${process.env.PUBLIC_URL}/icons/trazabilidad.png`}
-            onClick={() => navigate("/trazabilidad")}
-          />
-          <BotonModulo
-            titulo="Usuarios"
-            imagen={`${process.env.PUBLIC_URL}/icons/usuario.png`}
-            onClick={() => navigate("/usuarios")}
-          />
-          <BotonModulo
-            titulo="Recepción"
-            imagen={`${process.env.PUBLIC_URL}/icons/recepcion.png`}
-            onClick={() => navigate("/recepcion")}
-          />
-          <BotonModulo
-            titulo="Contabilidad"
-            imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
-            onClick={() => navigate("/contabilidad")}
-          />
-          <BotonModulo
-            titulo="Buscar recepción"
-            imagen={`${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`}
-            onClick={() => navigate("/buscar-recepcion")}
-          />
+        <div className="menu-grid grid sm:grid-cols-4 gap-6 place-items-center">
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Crear documento"
+              imagen={`${process.env.PUBLIC_URL}/icons/contrato.png`}
+              onClick={() => navigate("/crear-documento")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Clientes"
+              imagen={`${process.env.PUBLIC_URL}/icons/buscar_cliente.png`}
+              onClick={() => navigate("/clientes")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Inventario"
+              imagen={`${process.env.PUBLIC_URL}/icons/inventario.png`}
+              onClick={() => navigate("/inventario")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Agenda"
+              imagen={`${process.env.PUBLIC_URL}/icons/agenda.png`}
+              onClick={() => navigate("/agenda")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Proveedores"
+              imagen={`${process.env.PUBLIC_URL}/icons/proveedores.png`}
+              onClick={() => navigate("/proveedores")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Buscar documento"
+              imagen={`${process.env.PUBLIC_URL}/icons/buscar_doc.png`}
+              onClick={() => navigate("/buscar-documento")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Reportes"
+              imagen={`${process.env.PUBLIC_URL}/icons/reportes.png`}
+              onClick={() => navigate("/reportes")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Trazabilidad"
+              imagen={`${process.env.PUBLIC_URL}/icons/trazabilidad.png`}
+              onClick={() => navigate("/trazabilidad")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Usuarios"
+              imagen={`${process.env.PUBLIC_URL}/icons/usuario.png`}
+              onClick={() => navigate("/usuarios")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Recepción"
+              imagen={`${process.env.PUBLIC_URL}/icons/recepcion.png`}
+              onClick={() => navigate("/recepcion")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Contabilidad"
+              imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
+              onClick={() => navigate("/contabilidad")}
+            />
+          </div>
+
+          <div className="boton-modulo">
+            <BotonModulo
+              titulo="Buscar recepción"
+              imagen={`${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`}
+              onClick={() => navigate("/buscar-recepcion")}
+            />
+          </div>
+
           {usuario?.rol === "admin" && <></>}
         </div>
 
-        {/* Menú inferior (solo móvil) */}
+        {/* 🔻 Eliminado: Menú inferior (solo móvil) */}
+        {/*
         <div className="menu-inferior md:hidden">
           <button onClick={() => navigate("/inicio")}>🏠 Inicio</button>
           <button onClick={() => navigate("/crear-documento")}>📄 Documento</button>
           <button onClick={() => navigate("/agenda")}>📅 Agenda</button>
           <button onClick={() => navigate("/clientes")}>👥 Clientes</button>
         </div>
+        */}
       </div>
     </Protegido>
   );

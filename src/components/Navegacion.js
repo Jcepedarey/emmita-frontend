@@ -8,6 +8,7 @@ const Navegacion = () => {
 
   return (
     <div
+      className="nav-floating" // ✅ se oculta en móvil por CSS (@media max-width: 768px)
       style={{
         position: "fixed",
         top: "10px",
@@ -22,14 +23,16 @@ const Navegacion = () => {
         boxShadow: "0 2px 6px rgba(0, 0, 0, 0.2)",
         alignItems: "center"
       }}
+      role="toolbar"
+      aria-label="Navegación rápida"
     >
-      <button onClick={() => navigate(-1)} title="Atrás" style={botonEstilo}>
+      <button onClick={() => navigate(-1)} title="Atrás" style={botonEstilo} aria-label="Atrás">
         <ArrowBack style={iconoEstilo} />
       </button>
-      <button onClick={() => navigate(1)} title="Adelante" style={botonEstilo}>
+      <button onClick={() => navigate(1)} title="Adelante" style={botonEstilo} aria-label="Adelante">
         <ArrowForward style={iconoEstilo} />
       </button>
-      <button onClick={() => navigate("/inicio")} title="Inicio" style={botonEstilo}>
+      <button onClick={() => navigate("/inicio")} title="Inicio" style={botonEstilo} aria-label="Inicio">
         <Home style={iconoEstilo} />
       </button>
     </div>
