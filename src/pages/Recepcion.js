@@ -247,13 +247,6 @@ if ((retencionManual || 0) > 0) {
     fecha_modificacion: null
   }, "retención");
 }
-// ✅ Registrar ingreso neto limpio para módulo de contabilidad (reportes)
-await supabase.from("reportes").insert([{
-  tipo: "ingreso",
-  monto: utilidadNeta,
-  descripcion: `Ingreso neto por OP ${ordenSeleccionada.numero}`,
-  fecha: new Date().toISOString().split("T")[0]
-}]);
   Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
 
 } catch (error) {
