@@ -1,4 +1,4 @@
-// C:\Users\pc\frontend-emmita\src\pages\Login.js
+// src/pages/Login.js
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -29,8 +29,12 @@ export default function Login() {
         return Swal.fire("Acceso denegado", error?.message || "Email o contraseña incorrectos", "error");
       }
 
-      // Guardar datos de sesión
-      localStorage.setItem("usuario", JSON.stringify(data.user));
+      // ✅ Guarda la sesión COMPLETA (incluye refresh token)
+      localStorage.setItem("sesion", JSON.stringify(data.session));
+
+      // ✅ (Compatibilidad con el resto del frontend)
+      localStorage.setItem("usuario", JSON.stringify(data.session.user));
+
       navigate("/inicio");
     } catch (err) {
       setCargando(false);
