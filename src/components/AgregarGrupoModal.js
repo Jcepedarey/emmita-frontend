@@ -180,6 +180,14 @@ const AgregarGrupoModal = ({
     }
   };
 
+  const handleClose = () => {
+  setNombreGrupo("");
+  setCantidadGrupo(1);
+  setSeleccionados([]);
+  setBusqueda("");
+  onClose?.();
+};
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
     <div className="bg-white rounded shadow-lg w-[min(1000px,95vw)] max-h-[90vh] overflow-y-auto p-5">
@@ -289,9 +297,9 @@ const AgregarGrupoModal = ({
 
         <div style={{ marginTop: 15, textAlign: "center" }}>
           <button onClick={guardarGrupo}>➕ Agregar grupo</button>
-          <button onClick={onClose} style={{ marginLeft: 10 }}>
-            Cerrar
-          </button>
+          <button onClick={handleClose} style={{ marginLeft: 10 }}>
+  Cerrar
+</button>
           {!persistOpen && (
             <div style={{ marginTop: 6 }}>
               <small>Nota: <code>persistOpen=false</code> cerrará la ventana al guardar.</small>

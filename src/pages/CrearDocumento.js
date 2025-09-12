@@ -926,31 +926,43 @@ const onToggleMultiDias = (val) => {
 
 {modalGrupo && (
   <AgregarGrupoModal
-    persistOpen                  // ⬅️ NO se cierra al guardar; solo con “Cerrar”
+    persistOpen                  // NO se cierra al guardar; solo con “Cerrar”
     grupoEnEdicion={grupoEnEdicion}
     stockDisponible={stock}
     onAgregarGrupo={(grupo) => {
-  const linea = {
-    ...grupo,
-    multiplicarPorDias: multiDias ? true : undefined, // 👈 grupo decide si se multiplica o no
-  };
+      const linea = {
+        ...grupo,
+        // El flag se respeta: si multi-día está activo al agregar, el grupo queda marcado
+        multiplicarPorDias: multiDias ? true : undefined,
+      };
+
       if (indiceGrupoEnEdicion !== null) {
-    const nuevos = [...productosAgregados];
-    // Conserva el estado anterior si existía (respeta si ya lo apagaste)
-    const prevFlag = nuevos[indiceGrupoEnEdicion]?.multiplicarPorDias;
-    nuevos[indiceGrupoEnEdicion] = {
-      ...linea,
-      ...(prevFlag !== undefined ? { multiplicarPorDias: prevFlag } : {}),
-    };
-    setProductosAgregados(recomputarSubtotales(nuevos));
-  } else {
-    setProductosAgregados((prev) => recomputarSubtotales([...prev, linea]));
-  }
-  setGrupoEnEdicion(null);
-  setIndiceGrupoEnEdicion(null);
-}}
+        const nuevos = [...productosAgregados];
+        // si el grupo ya tenía una configuración previa de multiplicarPorDias, respétala
+        const prevFlag = nuevos[indiceGrupoEnEdicion]?.multiplicarPorDias;
+        nuevos[indiceGrupoEnEdicion] = {
+          ...linea,
+          ...(prevFlag !== undefined ? { multiplicarPorDias: prevFlag } : {}),
+        };
+        setProductosAgregados(recomputarSubtotales(nuevos));
+      } else {
+        setProductosAgregados((prev) => recomputarSubtotales([...prev, linea]));
+      }
+
+      setGrupoEnEdicion(null);
+      setIndiceGrupoEnEdicion(null);
+      // Nota: no cerramos el modal aquí porque persistOpen está activo;
+      // se cerrará únicamente con el botón "Cerrar".
+    }}
+    onClose={() => {
+      // 👈 ESTA ES LA CLAVE: cerrar el modal y limpiar edición
+      setModalGrupo(false);
+      setGrupoEnEdicion(null);
+      setIndiceGrupoEnEdicion(null);
+    }}
   />
 )}
+
 
 {modalProveedor && (
   <BuscarProveedorYProductoModal

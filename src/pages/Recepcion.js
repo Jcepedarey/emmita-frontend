@@ -6,6 +6,7 @@ import { generarPDFRecepcion } from "../utils/generarPDFRecepcion";
 import { useLocation } from "react-router-dom";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
+
 const Recepcion = () => {
 
   const [ordenes, setOrdenes] = useState([]);
