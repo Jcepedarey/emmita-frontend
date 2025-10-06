@@ -22,7 +22,7 @@ const CrearDocumento = () => {
 
   // 🧠 ESTADOS
   const [tipoDocumento, setTipoDocumento] = useState(tipo || "cotizacion");
-  const [fechaCreacion] = useState(new Date().toISOString().slice(0, 10));
+  const [fechaCreacion, setFechaCreacion] = useState(new Date().toISOString().slice(0, 10));
 
   // --- Multi-día ---
   const [multiDias, setMultiDias] = useState(false);
@@ -75,6 +75,12 @@ useEffect(() => {
     if (!documento) return;
 
     setTipoDocumento(documento.tipo || tipo || "cotizacion");
+
+       // 🔒 Fijar fecha de creación original
+const fc = documento.fecha || documento.fecha_creacion || documento.created_at || null;
+const soloYYYYMMDD = (d) => (d ? String(d).slice(0, 10) : "");
+setFechaCreacion(soloYYYYMMDD(fc) || new Date().toISOString().slice(0, 10));
+
 
     // ¿El doc es multi-días?
     const esMulti = !!documento.multi_dias;
@@ -408,46 +414,99 @@ if (multiDias) {
 }
 
     let error;
-    if (esEdicion && idOriginal) {
-      const confirmar = await Swal.fire({
-        title: "¿Actualizar documento?",
-        text: "Este documento ya existe. ¿Deseas actualizarlo?",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Sí, actualizar",
-        cancelButtonText: "Cancelar"
-      });
 
-      if (!confirmar.isConfirmed) return;
+if (esEdicion && idOriginal) {
+  // Confirmación
+  const confirmar = await Swal.fire({
+    title: "¿Actualizar documento?",
+    text: "Este documento ya existe. ¿Deseas actualizarlo?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Sí, actualizar",
+    cancelButtonText: "Cancelar",
+  });
+  if (!confirmar.isConfirmed) return;
 
-      const tablaOriginal = documento?.numero?.startsWith("COT") ? "cotizaciones" : "ordenes_pedido";
-      if (tablaOriginal !== tabla) {
-        await supabase.from(tablaOriginal).delete().eq("id", idOriginal);
-        const { data: existentes } = await supabase
-          .from(tabla)
-          .select("id")
-          .like("numero", `${prefijo}-${fechaNumerica}-%`);
-        const consecutivo = (existentes?.length || 0) + 1;
-        numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
-        dataGuardar.numero = numeroDocumento;
-        const res = await supabase.from(tabla).insert([dataGuardar]);
-        error = res.error;
-      } else {
-        const res = await supabase.from(tabla).update(dataGuardar).eq("id", idOriginal);
-        error = res.error;
-      }
+  // ¿De qué tabla viene? (COT u OP)
+  const tablaOriginal = documento?.numero?.startsWith("COT") ? "cotizaciones" : "ordenes_pedido";
+
+  if (tablaOriginal !== tabla) {
+    // ↪️ CONVERSIÓN (COT → OP): documento NUEVO con fecha de HOY
+    const fechaHoy = new Date().toISOString().slice(0, 10);
+    const fechaHoyNumerica = fechaHoy.replaceAll("-", "");
+
+    // Nuevo consecutivo para HOY con el prefijo de la tabla destino
+    const { data: existentes } = await supabase
+      .from(tabla)
+      .select("id")
+      .like("numero", `${prefijo}-${fechaHoyNumerica}-%`);
+    const consecutivo = (existentes?.length || 0) + 1;
+
+    numeroDocumento = `${prefijo}-${fechaHoyNumerica}-${consecutivo}`;
+    dataGuardar.numero = numeroDocumento;
+
+    // 🔄 Nueva fecha de creación (HOY) en el tipo destino
+    setFechaCreacion(fechaHoy);
+    if (tabla === "cotizaciones") {
+      dataGuardar.fecha = fechaHoy;
+      delete dataGuardar.fecha_creacion;
     } else {
-      const res = await supabase.from(tabla).insert([dataGuardar]);
-      error = res.error;
+      dataGuardar.fecha_creacion = fechaHoy;
+      delete dataGuardar.fecha;
     }
 
+    // Inserta el nuevo y, si sale bien, elimina el anterior (más seguro)
+    const { error: insertError } = await supabase.from(tabla).insert([dataGuardar]);
+    error = insertError;
     if (!error) {
-      Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
-    } else {
-      console.error(error);
-      Swal.fire("Error", "No se pudo guardar el documento", "error");
+      await supabase.from(tablaOriginal).delete().eq("id", idOriginal);
     }
-  };
+  } else {
+    // 🛠️ MISMA TABLA: solo actualizar (NO tocar número ni fecha creación)
+    const { error: updateError } = await supabase
+      .from(tabla)
+      .update(dataGuardar)
+      .eq("id", idOriginal);
+    error = updateError;
+  }
+} else {
+  // ➕ CREACIÓN: documento nuevo (usa fechaCreacion del estado, por defecto HOY)
+  const fc = fechaCreacion || new Date().toISOString().slice(0, 10);
+  const fcNumerica = fc.replaceAll("-", "");
+
+  // Generar número si aún no existe
+  if (!numeroDocumento) {
+    const { data: existentes } = await supabase
+      .from(tabla)
+      .select("id")
+      .like("numero", `${prefijo}-${fcNumerica}-%`);
+    const consecutivo = (existentes?.length || 0) + 1;
+    numeroDocumento = `${prefijo}-${fcNumerica}-${consecutivo}`;
+  }
+  dataGuardar.numero = numeroDocumento;
+
+  // Poner la fecha de creación en el campo correcto
+  if (tabla === "cotizaciones") {
+    dataGuardar.fecha = fc;
+    delete dataGuardar.fecha_creacion;
+  } else {
+    dataGuardar.fecha_creacion = fc;
+    delete dataGuardar.fecha;
+  }
+
+  const { error: insertError } = await supabase.from(tabla).insert([dataGuardar]);
+  error = insertError;
+}
+
+// ✅ Feedback
+if (!error) {
+  Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
+} else {
+  console.error(error);
+  Swal.fire("Error", "No se pudo guardar el documento", "error");
+}
+}; // 👈 CERRAR guardarDocumento AQUÍ
+
 
   // ✅ Datos PDF (Fase 3 usará estos nuevos campos)
   const obtenerDatosPDF = () => ({
