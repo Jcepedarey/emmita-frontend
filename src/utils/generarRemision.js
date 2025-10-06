@@ -169,15 +169,25 @@ didDrawCell: (data) => {
   margin: { left: 10, right: 10 },
 });
 
-  // ✍️ Firmas
-  const h = doc.internal.pageSize.height;
-  doc.setFontSize(10);
-  doc.text("Firma responsable entrega:", 20, h - 40);
-  doc.line(20, h - 35, 90, h - 35);
-  doc.text("Firma del cliente:", 120, h - 40);
-  doc.line(120, h - 35, 190, h - 35);
+  // ✍️ Firmas: debajo de la tabla (o en nueva página si no caben)
+const pageH = doc.internal.pageSize.height;
+const firmasAlto = 30; // alto estimado del bloque de firmas
+let yFirmas = (doc.lastAutoTable?.finalY || 90) + 16;
 
-  doc.save(nombreArchivo);
+// Si no caben en esta hoja, saltamos de página
+if (yFirmas + firmasAlto > pageH - 10) {
+  doc.addPage();
+  yFirmas = 40; // margen superior en la nueva página
+}
+
+doc.setFontSize(10);
+doc.text("Firma responsable entrega:", 20, yFirmas);
+doc.line(20, yFirmas + 5, 90, yFirmas + 5);
+doc.text("Firma del cliente:", 120, yFirmas);
+doc.line(120, yFirmas + 5, 190, yFirmas + 5);
+
+// (lo que sigue ya lo tenías)
+doc.save(nombreArchivo);
 };
 
 export { generarRemisionPDF as generarRemision };
