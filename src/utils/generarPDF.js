@@ -207,19 +207,38 @@ const saldo = Math.max(0, totalNeto - totalAbonos);
 
 const xTot = 150;
 doc.setFontSize(12);
-doc.text(`TOTAL BRUTO: $${fmt(totalBruto)}`, xTot, y); y += 8;
 
-if (descuento > 0) { doc.text(`DESCUENTO: -$${fmt(descuento)}`, xTot, y); y += 8; }
-if (retencion > 0) { doc.text(`RETENCIÓN: -$${fmt(retencion)}`, xTot, y); y += 8; }
+// Flags que vienen del frontend (fallback a >0 por compatibilidad)
+const flagDesc = Boolean(documento.aplicar_descuento);
+const flagRet = Boolean(documento.aplicar_retencion);
+const hayAjustes = flagDesc || flagRet;
 
-doc.setFont(undefined, "bold");
-doc.text(`TOTAL NETO: $${fmt(totalNeto)}`, xTot, y); 
-doc.setFont(undefined, "normal");
-y += 10;
+if (hayAjustes) {
+  doc.text(`TOTAL BRUTO: $${fmt(totalBruto)}`, xTot, y); 
+  y += 8;
 
-if (totalAbonos > 0) {
-  doc.text(`SALDO FINAL: $${fmt(saldo)}`, xTot, y);
+  if (flagDesc) {
+    doc.text(`DESCUENTO: -$${fmt(descuento)}`, xTot, y);
+    y += 8;
+  }
+  if (flagRet) {
+    doc.text(`RETENCIÓN: -$${fmt(retencion)}`, xTot, y);
+    y += 8;
+  }
+
+  doc.setFont(undefined, "bold");
+  doc.text(`TOTAL NETO: $${fmt(totalNeto)}`, xTot, y);
+  doc.setFont(undefined, "normal");
+  y += 10;
+} else {
+  doc.setFont(undefined, "bold");
+  doc.text(`TOTAL: $${fmt(totalBruto)}`, xTot, y);
+  doc.setFont(undefined, "normal");
+  y += 10;
 }
+
+// Mostrar SIEMPRE el saldo final (aún si no hay abonos)
+doc.text(`SALDO FINAL: $${fmt(saldo)}`, xTot, y);
 
   // ─── Pie ────────────────────────────────────────────────────────────────────
   const yFinal = 270;

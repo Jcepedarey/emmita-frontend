@@ -48,7 +48,7 @@ const AgregarGrupoModal = ({
       try {
         const [{ data: inventario, error: e1 }, { data: proveedores, error: e2 }] = await Promise.all([
           supabase.from("productos").select("id, nombre, descripcion, precio"),
-           supabase.from("productos_proveedores").select("id, nombre, precio_venta"),
+           supabase.from("productos_proveedores")  .select("id, nombre, precio_venta, precio_compra, proveedor_id, proveedores ( id, nombre )"),
         ]);
 
         if (e1 || e2) {
@@ -68,9 +68,14 @@ const AgregarGrupoModal = ({
         const proveedoresNormalizado = (proveedores || []).map((p) => ({
   id: `prov-${p.id}`,
   nombre: p.nombre,
-  descripcion: "",                // ← antes intentaba leer p.descripcion
+  descripcion: "",
+  // 👇 Venta sigue en "precio" (para no romper nada)
   precio: Number(p.precio_venta || 0),
+  // 👇 Nuevo: guardamos compra por separado para mostrarla en la búsqueda
+  precio_compra: Number(p.precio_compra || 0),
   es_proveedor: true,
+  proveedor_id: p.proveedor_id || p.proveedores?.id || null,
+  proveedor_nombre: p.proveedores?.nombre || "",
 }));
 
         if (!cancel) {
@@ -208,7 +213,14 @@ const AgregarGrupoModal = ({
             min="1"
             value={cantidadGrupo}
             onChange={(e) => setCantidadGrupo(Math.max(1, parseInt(e.target.value || 1, 10)))}
-            style={{ width: 90 }}
+            style={{
+  width: 90,
+  padding: "6px 8px",
+  backgroundColor: "#FFF8D1",
+  boxShadow: "inset 0 0 0 2px rgba(255,184,0,.25)",
+  border: "1px solid #E6C766",
+  borderRadius: 6,
+}}
           />
         </div>
 
@@ -232,9 +244,39 @@ const AgregarGrupoModal = ({
                 <div>
                   <strong>{p.nombre}</strong>{" "}
                   <small>
-                    ${Number(p.precio || 0).toLocaleString("es-CO")}
-                    {p.es_proveedor ? " · Proveedor" : ""}
-                  </small>
+  {p.es_proveedor && (
+    <>
+      <span
+        style={{
+          color: "#777",
+          background: "#f7f7f7",
+          padding: "1px 4px",
+          borderRadius: 4,
+          marginRight: 6,
+        }}
+      >
+        ${Number(p.precio_compra || 0).toLocaleString("es-CO")}
+      </span>
+      {" "}
+    </>
+  )}
+  ${Number(p.precio || 0).toLocaleString("es-CO")}
+  {p.es_proveedor && (
+    <>
+      {" · "}
+      <span
+        style={{
+          fontWeight: 600,
+          background: "#eef6ff",
+          padding: "1px 4px",
+          borderRadius: 4,
+        }}
+      >
+        {p.proveedor_nombre || "Proveedor"}
+      </span>
+    </>
+  )}
+</small>
                 </div>
                 <div style={{ fontSize: 12, color: "#666", marginRight: 10 }}>
                   Stock: {stockDisponible?.[p.id] ?? "N/A"}
@@ -253,8 +295,25 @@ const AgregarGrupoModal = ({
                 <div style={{ minWidth: 200 }}>
                   <strong>{item.nombre}</strong>{" "}
                   <small style={{ color: "gray" }}>
-                    {item.es_proveedor ? "· Proveedor" : "· Inventario"} · Stock: {stockDisponible?.[item.id] ?? "N/A"}
-                  </small>
+  {item.es_proveedor ? (
+    <>
+      ·{" "}
+      <span
+        style={{
+          fontWeight: 600,
+          background: "#eef6ff",
+          padding: "1px 4px",
+          borderRadius: 4,
+        }}
+      >
+        {item.proveedor_nombre || "Proveedor"}
+      </span>
+    </>
+  ) : (
+    "· Inventario"
+  )}{" "}
+  · Stock: {stockDisponible?.[item.id] ?? "N/A"}
+</small>
                 </div>
 
                 <div>
@@ -264,7 +323,15 @@ const AgregarGrupoModal = ({
                     min="1"
                     value={item.cantidad}
                     onChange={(e) => actualizarCampo(index, "cantidad", e.target.value)}
-                    style={{ width: 70, marginLeft: 6 }}
+                    style={{
+  width: 70,
+  marginLeft: 6,
+  padding: "6px 8px",
+  backgroundColor: "#FFF8D1",
+  boxShadow: "inset 0 0 0 2px rgba(255,184,0,.25)",
+  border: "1px solid #E6C766",
+  borderRadius: 6,
+}}
                   />
                 </div>
 

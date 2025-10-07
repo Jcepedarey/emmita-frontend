@@ -520,6 +520,8 @@ if (!error) {
     total_neto: totalNeto,
     descuento: aplicarDescuento ? Number(descuento || 0) : 0,
     retencion: aplicarRetencion ? Number(retencion || 0) : 0,
+    aplicar_descuento: aplicarDescuento,
+    aplicar_retencion: aplicarRetencion,
     abonos,
     garantia,
     garantia_recibida: garantiaRecibida,
@@ -926,13 +928,23 @@ const onToggleMultiDias = (val) => {
         </div>
 
         {/* Totales */}
-        <div style={{ marginTop: "20px", textAlign: "right" }}>
-          <p><strong>Total (bruto):</strong> ${totalBruto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-          {aplicarDescuento && <p>Descuento: ${Number(descuento || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>}
-          {aplicarRetencion && <p>Retención: ${Number(retencion || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>}
-          <p><strong>Total (neto):</strong> ${totalNeto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-          <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-        </div>
+<div style={{ marginTop: "20px", textAlign: "right" }}>
+  {(aplicarDescuento || aplicarRetencion) ? (
+    <>
+      <p><strong>Total (bruto):</strong> ${totalBruto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+      {aplicarDescuento && (
+        <p>Descuento: ${Number(descuento || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+      )}
+      {aplicarRetencion && (
+        <p>Retención: ${Number(retencion || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+      )}
+      <p><strong>Total (neto):</strong> ${totalNeto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+    </>
+  ) : (
+    <p><strong>Total:</strong> ${totalBruto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+  )}
+  <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
+</div>
 
         {/* Botones finales */}
         <div style={{ marginTop: "30px", display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
