@@ -20,6 +20,20 @@ const procesarImagenRecepcion = (src, width = 150, calidad = 1.0) =>
     img.src = src;
   });
 
+  // 👉 Formatea SIEMPRE dd/mm/aaaa desde ISO, dd/mm/aaaa o algo parseable
+const soloFecha = (f) => {
+  if (!f) return "-";
+  const s = String(f).trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s; // ya viene D/M/Y
+  const d = new Date(s);
+  if (isNaN(d)) return "-";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = d.getFullYear();
+  return `${dd}/${mm}/${yy}`;
+};
+
+
 export const generarPDFRecepcion = async (revision, clienteInput, productosRecibidos, comentario) => {
   const doc = new jsPDF();
   const logoOptimizado = await procesarImagenRecepcion("/icons/logo.png", 250, 1.0);
@@ -60,7 +74,8 @@ doc.text(`Cliente: ${cliente?.nombre || "N/A"}`, 10, 55);
 doc.text(`Identificación: ${cliente?.identificacion || "N/A"}`, 10, 61);
 doc.text(`Dirección: ${cliente?.direccion || "N/A"}`, 10, 67);
 doc.text(`Teléfono: ${cliente?.telefono || "N/A"}`, 10, 73);
-doc.text(`Fecha revisión: ${new Date().toLocaleDateString("es-CO")}`, 10, 79);
+doc.text(`Fecha revisión: ${soloFecha(new Date())}`, 10, 79);
+
 
   // 📋 Tabla de productos
   autoTable(doc, {

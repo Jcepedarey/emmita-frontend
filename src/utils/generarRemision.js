@@ -19,6 +19,20 @@ const procesarImagen = (src, width = 150, calidad = 1.0) =>
     img.src = src;
   });
 
+  // 👉 Formatea SIEMPRE dd/mm/aaaa desde ISO, dd/mm/aaaa o algo parseable
+const soloFecha = (f) => {
+  if (!f) return "-";
+  const s = String(f).trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s; // ya viene D/M/Y
+  const d = new Date(s);
+  if (isNaN(d)) return "-";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = d.getFullYear();
+  return `${dd}/${mm}/${yy}`;
+};
+
+
 export const generarRemisionPDF = async (documento) => {
   const doc = new jsPDF();
   const logo = await procesarImagen("/icons/logo.png", 250, 1.0);
@@ -40,13 +54,9 @@ export const generarRemisionPDF = async (documento) => {
   const nombreArchivo = generarNombreArchivo("remision", fechaSegura, documento.nombre_cliente);
   const remisionId = nombreArchivo.replace(".pdf", "");
 
-  // Fechas (sin hora)
-  const fechaCreacion = documento.fecha_creacion
-    ? new Date(documento.fecha_creacion).toISOString().slice(0, 10)
-    : "-";
-  const fechaEvento = documento.fecha_evento
-    ? new Date(documento.fecha_evento).toISOString().slice(0, 10)
-    : "-";
+  // Fechas (formato dd/mm/aaaa)
+const fechaCreacion = documento.fecha_creacion ? soloFecha(documento.fecha_creacion) : "-";
+const fechaEvento   = documento.fecha_evento   ? soloFecha(documento.fecha_evento)   : "-";
 
   // 🧾 Encabezado (igual al PDF normal)
   doc.addImage(logo, "PNG", 10, 10, 35, 30);

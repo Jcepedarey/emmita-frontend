@@ -8,14 +8,21 @@ const num = (n, def = 0) => {
   const v = Number(n);
   return Number.isFinite(v) ? v : def;
 };
+// Devuelve siempre dd/mm/aaaa desde ISO, dd/mm/aaaa o algo parseable
 const soloFecha = (f) => {
   if (!f) return "-";
-  try {
-    const d = new Date(f);
-    return d.toISOString().slice(0, 10); // YYYY-MM-DD
-  } catch {
-    return "-";
-  }
+  const s = String(f).trim();
+
+  // Si ya viene dd/mm/aaaa
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+
+  // Si viene ISO (o parseable), lo convertimos a dd/mm/aaaa
+  const d = new Date(s);
+  if (isNaN(d)) return "-";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = d.getFullYear();
+  return `${dd}/${mm}/${yy}`;
 };
 
 // Mantengo tu procesador de imágenes y fondo
@@ -66,11 +73,12 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   doc.line(10, 42, 200, 42);
 
   const fechaCreacion = soloFecha(documento.fecha_creacion);
-  // Si no hay fecha_evento, intenta usar la primera de fechas_evento
-  const fechaEvento =
-    soloFecha(documento.fecha_evento) !== "-"
-      ? soloFecha(documento.fecha_evento)
-      : (Array.isArray(documento.fechas_evento) && documento.fechas_evento[0]) ? documento.fechas_evento[0] : "-";
+const fechaEvento =
+  soloFecha(documento.fecha_evento) !== "-"
+    ? soloFecha(documento.fecha_evento)
+    : (Array.isArray(documento.fechas_evento) && documento.fechas_evento[0])
+      ? soloFecha(documento.fechas_evento[0])
+      : "-";
 
   doc.setFontSize(12);
   doc.text(`Tipo de documento: ${tipo === "cotizacion" ? "Cotización" : "Orden de Pedido"}`, 10, 48);
@@ -144,17 +152,15 @@ export async function generarPDF(documento, tipo = "cotizacion") {
 
 // 💰 Garantía (solo la palabra en negrilla, seguido del valor)
 if (documento.garantia && documento.garantia !== "0") {
+  const fechaG = documento.fecha_garantia ? soloFecha(documento.fecha_garantia) : "";
   const textoValor = `$${Number(documento.garantia).toLocaleString("es-CO")}` +
-    (documento.fecha_garantia ? ` - Fecha: ${documento.fecha_garantia}` : "");
+    (fechaG ? ` - Fecha: ${fechaG}` : "");
 
-  // "GARANTÍA:" en negrilla
   doc.setFont(undefined, "bold");
   doc.text("GARANTÍA:", 10, y);
 
-  // medir ancho para pegar justo después
   const ancho = doc.getTextWidth("GARANTÍA: ");
 
-  // valor normal, sin tanto espacio
   doc.setFont(undefined, "normal");
   doc.text(textoValor, 10 + ancho, y);
 
@@ -171,12 +177,13 @@ if (Array.isArray(documento.abonos) && documento.abonos.length > 0) {
   y += 8;
 
   documento.abonos.forEach((abono, i) => {
-    const valor = typeof abono === "object" ? abono.valor : abono;
-    const fecha = typeof abono === "object" ? abono.fecha : "sin fecha";
-    doc.text(`• Abono ${i + 1}: $${fmt(valor)} - Fecha: ${fecha}`, 15, y);
-    y += 8;
-    totalAbonos += num(valor, 0);
-  });
+  const valor = typeof abono === "object" ? abono.valor : abono;
+  const fechaRaw = typeof abono === "object" ? abono.fecha : "";
+  const fecha = fechaRaw ? soloFecha(fechaRaw) : "sin fecha";
+  doc.text(`• Abono ${i + 1}: $${fmt(valor)} - Fecha: ${fecha}`, 15, y);
+  y += 8;
+  totalAbonos += num(valor, 0);
+});
 
   y += 4;
 }

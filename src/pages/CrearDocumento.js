@@ -44,6 +44,53 @@ const CrearDocumento = () => {
   // Abonos con fecha
   const [abonos, setAbonos] = useState([]); // {valor, fecha}
 
+  // 👉 Helpers de fecha para abonos
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+
+// Convierte "dd/mm/aaaa" → "aaaa-mm-dd" (para <input type="date">).
+// Si ya viene ISO u otra cosa parseable, retorna los 10 primeros (aaaa-mm-dd).
+const toISO = (s) => {
+  if (!s) return "";
+  const str = String(s).trim();
+  const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/; // dd/mm/aaaa
+  const m = str.match(dmy);
+  if (m) {
+    const [_, dd, mm, yy] = m;
+    return `${yy}-${mm}-${dd}`;
+  }
+  return str.slice(0, 10); // si ya es ISO o incluye tiempo
+};
+
+// Convierte ISO o cualquier parseable → "dd/mm/aaaa" (para mostrar).
+// Si no puede formatear, retorna "-".
+const toDMY = (str) => {
+  if (!str) return "-";
+  const s = String(str).trim();
+
+  // d/m/aaaa o dd/mm/aaaa (aceptamos ambos)
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+  const m = s.match(dmy);
+  if (m) {
+    const dd = m[1].padStart(2, "0");
+    const mm = m[2].padStart(2, "0");
+    const yy = m[3];
+    return `${dd}/${mm}/${yy}`;
+  }
+
+  const d = new Date(s);
+  if (isNaN(d)) return "-";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = d.getFullYear();
+  return `${dd}/${mm}/${yy}`;
+};
+
+const eliminarAbono = (i) => {
+  const nuevos = [...abonos];
+  nuevos.splice(i, 1);
+  setAbonos(nuevos);
+};
+
   // Totales opcionales
   const [aplicarDescuento, setAplicarDescuento] = useState(false);
   const [descuento, setDescuento] = useState(0);
@@ -342,9 +389,8 @@ const agregarProductoTemporal = (producto) => {
 
   // ✅ Abonos
   const agregarAbono = () => {
-    const nuevaFecha = new Date().toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" });
-    setAbonos([...abonos, { valor: 0, fecha: nuevaFecha }]);
-  };
+  setAbonos([...abonos, { valor: 0, fecha: hoyISO() }]); // fecha por defecto: hoy (opcionalmente editable)
+};
 
   // ✅ Guardar documento
   const guardarDocumento = async () => {
@@ -858,24 +904,48 @@ const onToggleMultiDias = (val) => {
             <label>Abonos ($):</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {abonos.map((abono, index) => (
-                <div key={index} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <label style={{ minWidth: "80px" }}>Abono {index + 1}:</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={abono.valor}
-                    onChange={(e) => {
-                      const nuevos = [...abonos];
-                      nuevos[index].valor = parseFloat(e.target.value || 0);
-                      setAbonos(nuevos);
-                    }}
-                    style={{ width: "120px" }}
-                  />
-                  <span style={{ fontStyle: "italic", color: "gray" }}>
-                    Fecha: {abono.fecha}
-                  </span>
-                </div>
-              ))}
+  <div
+    key={index}
+    style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
+  >
+    <label style={{ minWidth: 80 }}>Abono {index + 1}:</label>
+
+    {/* Valor del abono */}
+    <input
+      type="number"
+      min="0"
+      value={abono.valor}
+      onChange={(e) => {
+        const nuevos = [...abonos];
+        nuevos[index].valor = parseFloat(e.target.value || 0);
+        setAbonos(nuevos);
+      }}
+      style={{ width: 120 }}
+    />
+
+    {/* Fecha editable (opcional con input date → ISO) */}
+    <input
+      type="date"
+      value={toISO(abono.fecha)}               // el input necesita ISO
+      onChange={(e) => {
+        const nuevos = [...abonos];
+        // guardamos en ISO; si borran la fecha, queda ""
+        nuevos[index].fecha = e.target.value || "";
+        setAbonos(nuevos);
+      }}
+      style={{ width: 150 }}
+      title="Fecha del abono (opcional). Si no la cambias, queda la de hoy."
+    />
+
+    {/* Vista amigable dd/mm/aaaa */}
+    <small style={{ opacity: 0.8 }}>
+      {toDMY(abono.fecha) !== "-" ? `(${toDMY(abono.fecha)})` : ""}
+    </small>
+
+    {/* Eliminar abono */}
+    <button onClick={() => eliminarAbono(index)} title="Eliminar abono">🗑️</button>
+  </div>
+))}
               <button onClick={agregarAbono}>➕ Agregar abono</button>
             </div>
           </div>

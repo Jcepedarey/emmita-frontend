@@ -32,9 +32,9 @@ export default function Agenda() {
       .eq("fecha_evento", fecha);
 
     const { data: cotizacionesData } = await supabase
-      .from("cotizaciones")
-      .select("*")
-      .eq("fecha_evento", fecha);
+  .from("cotizaciones")
+  .select("*, clientes(*)")      // ← traemos el cliente
+  .eq("fecha_evento", fecha);
 
     setNotas(notasData || []);
     setOrdenes(ordenesData || []);
@@ -136,6 +136,43 @@ export default function Agenda() {
 
     await generarRemision(doc);
   };
+
+  const editarCotizacion = (cot) => {
+  const cliente = cot.clientes || {};
+  const documentoCompleto = {
+    ...cot,
+    nombre_cliente: cliente.nombre || "",
+    identificacion: cliente.identificacion || "",
+    telefono: cliente.telefono || "",
+    direccion: cliente.direccion || "",
+    email: cliente.email || "",
+    fecha_creacion: cot.fecha_creacion || cot.fecha || null,
+    abonos: cot.abonos || [],
+    garantia: cot.garantia || "",
+    fechaGarantia: cot.fechaGarantia || "",
+    garantiaRecibida: cot.garantiaRecibida || false,
+    estado: cot.estado || "",
+    numero: cot.numero || "",
+    esEdicion: true,
+    idOriginal: cot.id,
+  };
+
+  navigate("/crear-documento", {
+    state: { documento: documentoCompleto, tipo: "cotizacion" },
+  });
+};
+
+const manejarPDFCotizacion = async (cot) => {
+  const doc = {
+    ...cot,
+    nombre_cliente: cot.clientes?.nombre || "No disponible",
+    identificacion: cot.clientes?.identificacion || "-",
+    telefono: cot.clientes?.telefono || "-",
+    direccion: cot.clientes?.direccion || "-",
+    email: cot.clientes?.email || "-",
+  };
+  await generarPDF(doc, "cotizacion");
+};
 
   const irADocumento = async (tipo, id) => {
     const tabla = tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
@@ -284,19 +321,51 @@ export default function Agenda() {
           </div>
 
           {/* Cotizaciones */}
-          <div style={{ flex: "1", backgroundColor: "#ffebee", padding: "10px", borderRadius: "8px", minHeight: "200px", overflowY: "auto" }}>
-            <h4>📄 Cotizaciones</h4>
-            {cotizaciones.length === 0 && <p>No hay cotizaciones para este día.</p>}
-            {cotizaciones.map((cotizacion) => (
-              <div
-                key={cotizacion.id}
-                onClick={() => irADocumento("cotizacion", cotizacion.id)}
-                style={{ backgroundColor: "#ffcdd2", padding: "8px", margin: "5px 0", borderRadius: "6px", cursor: "pointer" }}
-              >
-                {cotizacion.numero}
-              </div>
-            ))}
-          </div>
+<div style={{ flex: "1", backgroundColor: "#ffebee", padding: "10px", borderRadius: "8px", minHeight: "200px", overflowY: "auto" }}>
+  <h4>📄 Cotizaciones</h4>
+  {cotizaciones.length === 0 && <p>No hay cotizaciones para este día.</p>}
+  {cotizaciones.map((cot) => (
+    <div
+      key={cot.id}
+      style={{
+        backgroundColor: "#fff",               // igual al panel de pedidos
+        padding: "10px",
+        margin: "5px 0",
+        borderRadius: "8px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+      }}
+    >
+      <div>
+        <p style={{ fontWeight: "bold", color: "#c62828", margin: 0 }}>
+          {cot.numero || "COT-???"}
+        </p>
+        <p style={{ margin: 0 }}>{cot.clientes?.nombre || "Cliente"}</p>
+        <p style={{ margin: 0, fontSize: "12px", color: "gray" }}>
+          {cot.fecha_evento ? new Date(cot.fecha_evento).toLocaleDateString() : "Sin fecha"}
+        </p>
+      </div>
+      <div style={{ display: "flex", gap: "8px", fontSize: "18px" }}>
+        <button
+          onClick={() => editarCotizacion(cot)}
+          title="Editar"
+          style={{ border: "none", background: "none", cursor: "pointer" }}
+        >
+          ✏️
+        </button>
+        <button
+          onClick={() => manejarPDFCotizacion(cot)}
+          title="PDF"
+          style={{ border: "none", background: "none", cursor: "pointer" }}
+        >
+          📄
+        </button>
+      </div>
+    </div>
+  ))}
+</div>
         </div>
       </div>
     </Protegido>
