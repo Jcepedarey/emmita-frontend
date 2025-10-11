@@ -8,21 +8,44 @@ const num = (n, def = 0) => {
   const v = Number(n);
   return Number.isFinite(v) ? v : def;
 };
-// Devuelve siempre dd/mm/aaaa desde ISO, dd/mm/aaaa o algo parseable
+// Devuelve dd/mm/aaaa sin desfase por zona horaria.
 const soloFecha = (f) => {
   if (!f) return "-";
+
+  if (f instanceof Date) {
+    const dd = String(f.getDate()).padStart(2, "0");
+    const mm = String(f.getMonth() + 1).padStart(2, "0");
+    const yy = f.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+  }
+
   const s = String(f).trim();
 
-  // Si ya viene dd/mm/aaaa
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+  // ISO con o sin tiempo
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const yy = iso[1], mm = iso[2], dd = iso[3];
+    return `${dd}/${mm}/${yy}`;
+  }
 
-  // Si viene ISO (o parseable), lo convertimos a dd/mm/aaaa
+  // d/m/aaaa o dd/mm/aaaa
+  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    const dd = dmy[1].padStart(2, "0");
+    const mm = dmy[2].padStart(2, "0");
+    const yy = dmy[3];
+    return `${dd}/${mm}/${yy}`;
+  }
+
+  // fallback
   const d = new Date(s);
-  if (isNaN(d)) return "-";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yy = d.getFullYear();
-  return `${dd}/${mm}/${yy}`;
+  if (!isNaN(d)) {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+  }
+  return "-";
 };
 
 // Mantengo tu procesador de imágenes y fondo

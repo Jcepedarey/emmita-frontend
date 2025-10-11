@@ -22,7 +22,13 @@ const CrearDocumento = () => {
 
   // 🧠 ESTADOS
   const [tipoDocumento, setTipoDocumento] = useState(tipo || "cotizacion");
-  const [fechaCreacion, setFechaCreacion] = useState(new Date().toISOString().slice(0, 10));
+  const [fechaCreacion, setFechaCreacion] = useState(() => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`; // YYYY-MM-DD (local)
+});
 
   // --- Multi-día ---
   const [multiDias, setMultiDias] = useState(false);
@@ -45,44 +51,75 @@ const CrearDocumento = () => {
   const [abonos, setAbonos] = useState([]); // {valor, fecha}
 
   // 👉 Helpers de fecha para abonos
-const hoyISO = () => new Date().toISOString().slice(0, 10);
+const hoyISO = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`; // YYYY-MM-DD (local)
+};
 
-// Convierte "dd/mm/aaaa" → "aaaa-mm-dd" (para <input type="date">).
-// Si ya viene ISO u otra cosa parseable, retorna los 10 primeros (aaaa-mm-dd).
+// "dd/mm/aaaa" (con o sin cero) → "aaaa-mm-dd" (para <input type="date">).
+// Si ya viene ISO o ISO con hora, retornamos los 10 primeros (aaaa-mm-dd).
 const toISO = (s) => {
   if (!s) return "";
   const str = String(s).trim();
-  const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/; // dd/mm/aaaa
-  const m = str.match(dmy);
-  if (m) {
-    const [_, dd, mm, yy] = m;
-    return `${yy}-${mm}-${dd}`;
-  }
-  return str.slice(0, 10); // si ya es ISO o incluye tiempo
-};
 
-// Convierte ISO o cualquier parseable → "dd/mm/aaaa" (para mostrar).
-// Si no puede formatear, retorna "-".
-const toDMY = (str) => {
-  if (!str) return "-";
-  const s = String(str).trim();
-
-  // d/m/aaaa o dd/mm/aaaa (aceptamos ambos)
-  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-  const m = s.match(dmy);
+  // d/m/aaaa o dd/mm/aaaa
+  const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) {
     const dd = m[1].padStart(2, "0");
     const mm = m[2].padStart(2, "0");
     const yy = m[3];
+    return `${yy}-${mm}-${dd}`;
+  }
+
+  // ISO puro o ISO con tiempo -> recorta aaaaa-mm-dd
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  return str.slice(0, 10);
+};
+
+// ISO (con o sin tiempo) o Date → "dd/mm/aaaa" (sin tocar zona horaria).
+// También acepta d/m/aaaa o dd/mm/aaaa. Si no puede, retorna "-".
+const toDMY = (input) => {
+  if (!input) return "-";
+
+  if (input instanceof Date) {
+    const dd = String(input.getDate()).padStart(2, "0");
+    const mm = String(input.getMonth() + 1).padStart(2, "0");
+    const yy = input.getFullYear();
     return `${dd}/${mm}/${yy}`;
   }
 
+  const s = String(input).trim();
+
+  // ISO con o sin tiempo
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const yy = iso[1], mm = iso[2], dd = iso[3];
+    return `${dd}/${mm}/${yy}`;
+  }
+
+  // d/m/aaaa o dd/mm/aaaa
+  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    const dd = dmy[1].padStart(2, "0");
+    const mm = dmy[2].padStart(2, "0");
+    const yy = dmy[3];
+    return `${dd}/${mm}/${yy}`;
+  }
+
+  // último recurso (evita off-by-one en la mayoría de casos ISO)
   const d = new Date(s);
-  if (isNaN(d)) return "-";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yy = d.getFullYear();
-  return `${dd}/${mm}/${yy}`;
+  if (!isNaN(d)) {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+  }
+  return "-";
 };
 
 const eliminarAbono = (i) => {
@@ -126,7 +163,13 @@ useEffect(() => {
        // 🔒 Fijar fecha de creación original
 const fc = documento.fecha || documento.fecha_creacion || documento.created_at || null;
 const soloYYYYMMDD = (d) => (d ? String(d).slice(0, 10) : "");
-setFechaCreacion(soloYYYYMMDD(fc) || new Date().toISOString().slice(0, 10));
+setFechaCreacion(
+  soloYYYYMMDD(fc) ||
+  (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })()
+);
 
 
     // ¿El doc es multi-días?
@@ -400,7 +443,8 @@ const agregarProductoTemporal = (producto) => {
 
     const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
     const prefijo = tipoDocumento === "cotizacion" ? "COT" : "OP";
-    const fecha = new Date().toISOString().slice(0, 10);
+    const d1 = new Date();
+const fecha = `${d1.getFullYear()}-${String(d1.getMonth() + 1).padStart(2, "0")}-${String(d1.getDate()).padStart(2, "0")}`;
     const fechaNumerica = fecha.replaceAll("-", "");
 
     let numeroDocumento = documento?.numero;
@@ -478,8 +522,9 @@ if (esEdicion && idOriginal) {
 
   if (tablaOriginal !== tabla) {
     // ↪️ CONVERSIÓN (COT → OP): documento NUEVO con fecha de HOY
-    const fechaHoy = new Date().toISOString().slice(0, 10);
-    const fechaHoyNumerica = fechaHoy.replaceAll("-", "");
+    const d2 = new Date();
+const fechaHoy = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+const fechaHoyNumerica = fechaHoy.replaceAll("-", "");
 
     // Nuevo consecutivo para HOY con el prefijo de la tabla destino
     const { data: existentes } = await supabase
@@ -517,7 +562,10 @@ if (esEdicion && idOriginal) {
   }
 } else {
   // ➕ CREACIÓN: documento nuevo (usa fechaCreacion del estado, por defecto HOY)
-  const fc = fechaCreacion || new Date().toISOString().slice(0, 10);
+  const fc = fechaCreacion || (() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+})();
   const fcNumerica = fc.replaceAll("-", "");
 
   // Generar número si aún no existe
