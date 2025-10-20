@@ -32,13 +32,45 @@ const PALETA = [
   "rgba(196,181,253,0.5)", // lavanda
 ];
 
+// Descompone una lista de items (de una orden) en una lista plana
+// respetando grupos: multiplica cantidades de sub-ítems por la cantidad del grupo.
+function flattenItems(items = []) {
+  const out = [];
+  const walk = (list, factor = 1) => {
+    for (const it of list || []) {
+      // grupo
+      if (it?.es_grupo && Array.isArray(it.productos)) {
+        const grupoCant = Number(it.cantidad || 0) || 0;
+        const nuevoFactor = factor * (grupoCant || 1);
+        walk(it.productos, nuevoFactor);
+      } else {
+        // ítem suelto (propio o proveedor)
+        const cantOriginal = Number(it?.cantidad || 0);
+        const precio = Number(it?.precio || 0);
+        const baseSubtotal = Number(
+          it?.subtotal != null ? it.subtotal : (precio * cantOriginal)
+        );
+        out.push({
+          nombre: it?.nombre || "Artículo",
+          cantidad: isFinite(cantOriginal * factor) ? cantOriginal * factor : 0,
+          recaudo: isFinite(baseSubtotal * factor) ? baseSubtotal * factor : 0,
+          es_proveedor: !!it?.es_proveedor,
+        });
+      }
+    }
+  };
+  walk(items, 1);
+  return out;
+}
+
 export default function Reportes() {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [movs, setMovs] = useState([]);
   const [ordenes, setOrdenes] = useState([]);
   const [clientesMap, setClientesMap] = useState({});
-  const [active, setActive] = useState("ingresos_gastos"); // tabs
+  const [active, setActive] = useState("ingresos_gastos"); // disponibles: ingresos_gastos | top_clientes | top_articulos_propios | top_articulos_proveedor | recaudo_articulos_propios | recaudo_articulos_proveedor
+
 
   // Carga datos filtrados por fecha
   useEffect(() => {
@@ -100,31 +132,52 @@ export default function Reportes() {
       acum[id] = (acum[id] || 0) + Number(o.total_neto || 0);
     }
     const lista = Object.entries(acum).map(([id, valor]) => ({
-      nombre: clientesMap[id] || id.slice(0, 6),
+      nombre: (clientesMap[id] && String(clientesMap[id]).trim()) ? clientesMap[id] : "(Sin nombre)",
       valor,
     }));
     return lista.sort((a, b) => b.valor - a.valor).slice(0, 10);
   }, [ordenes, clientesMap]);
 
-  // Artículos: top por cantidad y por recaudo
-  const resumenArticulos = useMemo(() => {
-    const uso = {};     // nombre -> cantidad
-    const recaudo = {}; // nombre -> $
-    for (const o of ordenes || []) {
-      (o.productos || []).forEach((p) => {
-        const nombre = p.nombre || "Artículo";
-        const cant = Number(p.cantidad || 0);
-        const subtotal = Number(p.subtotal || (p.precio || 0) * cant);
-        uso[nombre] = (uso[nombre] || 0) + cant;
-        recaudo[nombre] = (recaudo[nombre] || 0) + subtotal;
-      });
+  // Artículos: top por cantidad y por recaudo (propios vs proveedor)
+const resumenArticulos = useMemo(() => {
+  const usoPropios = {};     // nombre -> cantidad
+  const usoProveedor = {};   // nombre -> cantidad
+  const recPropios = {};     // nombre -> $
+  const recProveedor = {};   // nombre -> $
+
+  for (const o of ordenes || []) {
+    const flat = flattenItems(o.productos || []);
+    for (const it of flat) {
+      const key = it.nombre;
+      if (!key) continue;
+      if (it.es_proveedor) {
+        usoProveedor[key] = (usoProveedor[key] || 0) + Number(it.cantidad || 0);
+        recProveedor[key] = (recProveedor[key] || 0) + Number(it.recaudo || 0);
+      } else {
+        usoPropios[key] = (usoPropios[key] || 0) + Number(it.cantidad || 0);
+        recPropios[key] = (recPropios[key] || 0) + Number(it.recaudo || 0);
+      }
     }
-    const topUso = Object.entries(uso).map(([nombre, cantidad]) => ({ nombre, cantidad }))
-      .sort((a, b) => b.cantidad - a.cantidad).slice(0, 10);
-    const topRecaudo = Object.entries(recaudo).map(([nombre, valor]) => ({ nombre, valor }))
-      .sort((a, b) => b.valor - a.valor).slice(0, 10);
-    return { topUso, topRecaudo };
-  }, [ordenes]);
+  }
+
+  const toTop = (map, campo) =>
+    Object.entries(map)
+      .map(([nombre, v]) => ({ nombre, [campo]: v }))
+      .sort((a, b) => (b[campo] - a[campo]))
+      .slice(0, 10);
+
+  const topUsoPropios     = toTop(usoPropios, "cantidad");
+  const topUsoProveedor   = toTop(usoProveedor, "cantidad");
+  const topRecaudoPropios = toTop(recPropios, "valor");
+  const topRecaudoProv    = toTop(recProveedor, "valor");
+
+  return {
+    topUsoPropios,
+    topUsoProveedor,
+    topRecaudoPropios,
+    topRecaudoProv,
+  };
+}, [ordenes]);
 
   // Helpers export
   const exportarCSVActual = () => {
@@ -138,60 +191,97 @@ export default function Reportes() {
       exportarCSV(rows, "ingresos_gastos");
     } else if (active === "top_clientes") {
       exportarCSV(topClientesRecaudo.map((t) => ({ Cliente: t.nombre, Recaudo: t.valor })), "top_clientes_recaudo");
-    } else if (active === "top_articulos") {
-      exportarCSV(resumenArticulos.topUso.map((t) => ({ Artículo: t.nombre, Cantidad: t.cantidad })), "top_articulos_cantidad");
-    } else if (active === "recaudo_articulos") {
-      exportarCSV(resumenArticulos.topRecaudo.map((t) => ({ Artículo: t.nombre, Recaudo: t.valor })), "top_articulos_recaudo");
-    }
+    } else if (active === "top_articulos_propios") {
+  exportarCSV(
+    resumenArticulos.topUsoPropios.map((t) => ({ Artículo: t.nombre, Cantidad: t.cantidad })),
+    "top_articulos_propios"
+  );
+} else if (active === "top_articulos_proveedor") {
+  exportarCSV(
+    resumenArticulos.topUsoProveedor.map((t) => ({ Artículo: t.nombre, Cantidad: t.cantidad })),
+    "top_articulos_proveedor"
+  );
+} else if (active === "recaudo_articulos_propios") {
+  exportarCSV(
+    resumenArticulos.topRecaudoPropios.map((t) => ({ Artículo: t.nombre, Recaudo: t.valor })),
+    "recaudo_articulos_propios"
+  );
+} else if (active === "recaudo_articulos_proveedor") {
+  exportarCSV(
+    resumenArticulos.topRecaudoProv.map((t) => ({ Artículo: t.nombre, Recaudo: t.valor })),
+    "recaudo_articulos_proveedor"
+  );
+}
   };
   const exportarPDFActual = () => {
-    let titulo = "";
-    let rows = [];
+  let titulo = "";
+  let rows = [];
+  if (active === "ingresos_gastos") {
+    titulo = "Ingresos vs Gastos por mes";
+    rows = (serieMes.meses || []).map((k, i) => [nombreMes(k), serieMes.ingresos[i], serieMes.gastos[i], serieMes.ingresos[i] - serieMes.gastos[i]]);
+  } else if (active === "top_clientes") {
+    titulo = "Top clientes por recaudo";
+    rows = topClientesRecaudo.map((t) => [t.nombre, t.valor]);
+  } else if (active === "top_articulos_propios") {
+    titulo = "Artículos más alquilados (Propios)";
+    rows = resumenArticulos.topUsoPropios.map((t) => [t.nombre, t.cantidad]);
+  } else if (active === "top_articulos_proveedor") {
+    titulo = "Artículos más alquilados (Proveedor)";
+    rows = resumenArticulos.topUsoProveedor.map((t) => [t.nombre, t.cantidad]);
+  } else if (active === "recaudo_articulos_propios") {
+    titulo = "Recaudo por artículo (Propios)";
+    rows = resumenArticulos.topRecaudoPropios.map((t) => [t.nombre, t.valor]);
+  } else if (active === "recaudo_articulos_proveedor") {
+    titulo = "Recaudo por artículo (Proveedor)";
+    rows = resumenArticulos.topRecaudoProv.map((t) => [t.nombre, t.valor]);
+  }
+
+  // Si no hay filas, poner un placeholder legible por tipo de reporte
+  if (!rows.length) {
     if (active === "ingresos_gastos") {
-      titulo = "Ingresos vs Gastos por mes";
-      rows = (serieMes.meses || []).map((k, i) => [nombreMes(k), serieMes.ingresos[i], serieMes.gastos[i], serieMes.ingresos[i] - serieMes.gastos[i]]);
+      rows = [["Sin datos", "—", "—", "—"]];
     } else if (active === "top_clientes") {
-      titulo = "Top clientes por recaudo";
-      rows = topClientesRecaudo.map((t) => [t.nombre, t.valor]);
-    } else if (active === "top_articulos") {
-      titulo = "Artículos más alquilados";
-      rows = resumenArticulos.topUso.map((t) => [t.nombre, t.cantidad]);
-    } else if (active === "recaudo_articulos") {
-      titulo = "Recaudo por artículo";
-      rows = resumenArticulos.topRecaudo.map((t) => [t.nombre, t.valor]);
+      rows = [["Sin datos", "—"]];
+    } else if (active === "top_articulos_propios" || active === "top_articulos_proveedor") {
+      rows = [["Sin datos", "—"]]; // Artículo | Cantidad
+    } else {
+      // recaudo_articulos_propios | recaudo_articulos_proveedor
+      rows = [["Sin datos", "—"]]; // Artículo | Recaudo ($)
     }
-    const w = window.open("", "print");
-    if (!w) return;
-    w.document.write(`
-      <html><head><title>${titulo}</title>
-      <style>
-        body{font-family:Arial; padding:12px;}
-        h2{margin:0 0 10px 0}
-        table{width:100%; border-collapse:collapse;}
-        th,td{border:1px solid #ddd; padding:6px; text-align:left;}
-        th{background:#eef2ff}
-      </style></head><body>
-      <h2>${titulo}</h2>
-      <div>Rango: ${desde || "—"} a ${hasta || "—"}</div>
-      <table>
-        <thead>${
-          active === "ingresos_gastos"
-            ? "<tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr>"
-            : active === "top_clientes"
-            ? "<tr><th>Cliente</th><th>Recaudo ($)</th></tr>"
-            : active === "top_articulos"
-            ? "<tr><th>Artículo</th><th>Cantidad</th></tr>"
-            : "<tr><th>Artículo</th><th>Recaudo ($)</th></tr>"
-        }</thead>
-        <tbody>
-          ${rows.map((r) => `<tr>${r.map((c) => `<td>${typeof c === "number" ? c.toLocaleString("es-CO") : c}</td>`).join("")}</tr>`).join("")}
-        </tbody>
-      </table>
-      <script>window.print(); setTimeout(()=>window.close(), 300);</script>
-      </body></html>
-    `);
-    w.document.close();
-  };
+  }
+
+  const w = window.open("", "print"); 
+  if (!w) return;
+  w.document.write(`
+    <html><head><title>${titulo}</title>
+    <style>
+      body{font-family:Arial; padding:12px;}
+      h2{margin:0 0 10px 0}
+      table{width:100%; border-collapse:collapse;}
+      th,td{border:1px solid #ddd; padding:6px; text-align:left;}
+      th{background:#eef2ff}
+    </style></head><body>
+    <h2>${titulo}</h2>
+    <div>Rango: ${desde || "—"} a ${hasta || "—"}</div>
+    <table>
+      <thead>${
+        active === "ingresos_gastos"
+          ? "<tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr>"
+          : active === "top_clientes"
+          ? "<tr><th>Cliente</th><th>Recaudo ($)</th></tr>"
+          : (active === "top_articulos_propios" || active === "top_articulos_proveedor")
+          ? "<tr><th>Artículo</th><th>Cantidad</th></tr>"
+          : "<tr><th>Artículo</th><th>Recaudo ($)</th></tr>"
+      }</thead>
+      <tbody>
+        ${rows.map((r) => `<tr>${r.map((c) => `<td>${typeof c === "number" ? c.toLocaleString("es-CO") : c}</td>`).join("")}</tr>`).join("")}
+      </tbody>
+    </table>
+    <script>window.print(); setTimeout(()=>window.close(), 300);</script>
+    </body></html>
+  `);
+  w.document.close();
+};
 
   // datasets por pestaña
   const dataIngresosGastos = {
@@ -205,14 +295,25 @@ export default function Reportes() {
     labels: topClientesRecaudo.map((t) => t.nombre),
     datasets: [{ label: "Recaudo ($)", data: topClientesRecaudo.map((t) => t.valor), backgroundColor: PALETA.slice(0, topClientesRecaudo.length) }],
   };
-  const dataTopUso = {
-    labels: resumenArticulos.topUso.map((t) => t.nombre),
-    datasets: [{ label: "Cantidad", data: resumenArticulos.topUso.map((t) => t.cantidad), backgroundColor: PALETA.slice(0, resumenArticulos.topUso.length) }],
-  };
-  const dataTopRecaudo = {
-    labels: resumenArticulos.topRecaudo.map((t) => t.nombre),
-    datasets: [{ label: "Recaudo ($)", data: resumenArticulos.topRecaudo.map((t) => t.valor), backgroundColor: PALETA.slice(0, resumenArticulos.topRecaudo.length) }],
-  };
+  const dataTopUsoPropios = {
+  labels: resumenArticulos.topUsoPropios.map((t) => t.nombre),
+  datasets: [{ label: "Cantidad (propios)", data: resumenArticulos.topUsoPropios.map((t) => t.cantidad), backgroundColor: PALETA.slice(0, resumenArticulos.topUsoPropios.length) }],
+};
+
+const dataTopUsoProveedor = {
+  labels: resumenArticulos.topUsoProveedor.map((t) => t.nombre),
+  datasets: [{ label: "Cantidad (proveedor)", data: resumenArticulos.topUsoProveedor.map((t) => t.cantidad), backgroundColor: PALETA.slice(0, resumenArticulos.topUsoProveedor.length) }],
+};
+
+const dataTopRecaudoPropios = {
+  labels: resumenArticulos.topRecaudoPropios.map((t) => t.nombre),
+  datasets: [{ label: "Recaudo ($) propios", data: resumenArticulos.topRecaudoPropios.map((t) => t.valor), backgroundColor: PALETA.slice(0, resumenArticulos.topRecaudoPropios.length) }],
+};
+
+const dataTopRecaudoProv = {
+  labels: resumenArticulos.topRecaudoProv.map((t) => t.nombre),
+  datasets: [{ label: "Recaudo ($) proveedor", data: resumenArticulos.topRecaudoProv.map((t) => t.valor), backgroundColor: PALETA.slice(0, resumenArticulos.topRecaudoProv.length) }],
+};
 
   // presets
   const setMesActual = () => {
@@ -235,31 +336,19 @@ export default function Reportes() {
         </div>
 
         {/* Pestañas */}
-        <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[
-            ["ingresos_gastos", "Ingresos vs Gastos"],
-            ["top_clientes", "Top clientes (recaudo)"],
-            ["top_articulos", "Top artículos (cantidad)"],
-            ["recaudo_articulos", "Top artículos (recaudo)"],
-          ].map(([k, t]) => (
-            <button
-              key={k}
-              onClick={() => setActive(k)}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid #ddd",
-                background: active === k ? "#e5e7eb" : "#f9fafb",
-              }}
-            >
-              {t}
-            </button>
-          ))}
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <button onClick={exportarCSVActual}>Exportar CSV</button>
-            <button onClick={exportarPDFActual}>Exportar PDF</button>
-          </div>
-        </div>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:10 }}>
+  <button onClick={() => setActive("ingresos_gastos")}>Ingresos vs Gastos</button>
+  <button onClick={() => setActive("top_clientes")}>Top clientes</button>
+  <button onClick={() => setActive("top_articulos_propios")}>Top artículos (Propios)</button>
+  <button onClick={() => setActive("top_articulos_proveedor")}>Top artículos (Proveedor)</button>
+  <button onClick={() => setActive("recaudo_articulos_propios")}>Recaudo por artículo (Propios)</button>
+  <button onClick={() => setActive("recaudo_articulos_proveedor")}>Recaudo por artículo (Proveedor)</button>
+
+  <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+    <button onClick={exportarCSVActual}>Exportar CSV</button>
+    <button onClick={exportarPDFActual}>Exportar PDF</button>
+  </div>
+</div>
 
         {/* Contenido de pestaña */}
         <div style={{ marginTop: 12, background: "#f8f8f8", padding: 12, borderRadius: 10 }}>
@@ -275,18 +364,11 @@ export default function Reportes() {
               <Bar data={dataTopClientes} options={{ responsive: true, plugins: { legend: { display: false } } }} />
             </>
           )}
-          {active === "top_articulos" && (
-            <>
-              <h3 style={{ textAlign: "center" }}>Artículos más alquilados</h3>
-              <Bar data={dataTopUso} options={{ responsive: true, plugins: { legend: { display: false } } }} />
-            </>
-          )}
-          {active === "recaudo_articulos" && (
-            <>
-              <h3 style={{ textAlign: "center" }}>Recaudo por artículo</h3>
-              <Bar data={dataTopRecaudo} options={{ responsive: true, plugins: { legend: { display: false } } }} />
-            </>
-          )}
+          {active === "top_articulos_propios" && <Bar data={dataTopUsoPropios} options={{ responsive: true, plugins: { legend: { display: false } } }} />}
+{active === "top_articulos_proveedor" && <Bar data={dataTopUsoProveedor} options={{ responsive: true, plugins: { legend: { display: false } } }} />}
+
+{active === "recaudo_articulos_propios" && <Bar data={dataTopRecaudoPropios} options={{ responsive: true, plugins: { legend: { display: false } } }} />}
+{active === "recaudo_articulos_proveedor" && <Bar data={dataTopRecaudoProv} options={{ responsive: true, plugins: { legend: { display: false } } }} />}
         </div>
       </div>
     </Protegido>
