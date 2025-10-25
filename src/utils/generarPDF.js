@@ -173,6 +173,56 @@ const fechaEvento =
 
   let y = (doc.lastAutoTable?.finalY || 100) + 10;
 
+  // ===== Pre-cálculo de espacio para Garantía + Abonos + Totales + Redes =====
+const pageHeight0 = doc.internal.pageSize.getHeight();
+const footerHeight = 15;    // 3 líneas de redes (5px c/u)
+const bottomMargin = 15;    // margen inferior
+const safeBottom0 = pageHeight0 - bottomMargin - footerHeight;
+
+// Flags para totales (las usamos también para calcular altura)
+const flagDesc = Boolean(documento.aplicar_descuento);
+const flagRet  = Boolean(documento.aplicar_retencion);
+
+// Altura estimada del bloque "contenido final"
+let needed = 0;
+
+// Garantía (una línea)
+if (documento.garantia && documento.garantia !== "0") {
+  needed += 12;
+}
+
+// Abonos: título + N líneas
+const abonosCount = Array.isArray(documento.abonos) ? documento.abonos.length : 0;
+if (abonosCount > 0) {
+  needed += 8 + abonosCount * 8;
+}
+
+// Separador (línea horizontal + margen)
+needed += 10;
+
+// Totales
+if (flagDesc || flagRet) {
+  // TOTAL BRUTO
+  needed += 8;
+  if (flagDesc) needed += 8;
+  if (flagRet)  needed += 8;
+  // TOTAL NETO
+  needed += 10;
+} else {
+  // TOTAL
+  needed += 10;
+}
+
+// SALDO FINAL (reservamos línea)
+needed += 10;
+
+// ¿Cabe todo este bloque arriba del pie?
+if (y + needed > safeBottom0) {
+  doc.addPage();
+  insertarFondo(doc);
+  y = 40; // margen superior cómodo en la nueva página
+}
+
 // 💰 Garantía (solo la palabra en negrilla, seguido del valor)
 if (documento.garantia && documento.garantia !== "0") {
   const fechaG = documento.fecha_garantia ? soloFecha(documento.fecha_garantia) : "";
@@ -233,18 +283,17 @@ const totalNeto = num(
   documento.total_neto,
   Math.max(0, totalBruto - descuento - retencion)
 );
+
 const saldo = Math.max(0, totalNeto - totalAbonos);
 
 const xTot = 150;
 doc.setFontSize(12);
 
-// Flags que vienen del frontend (fallback a >0 por compatibilidad)
-const flagDesc = Boolean(documento.aplicar_descuento);
-const flagRet = Boolean(documento.aplicar_retencion);
+// OJO: usamos los flags ya declarados ARRIBA en el pre-chequeo
 const hayAjustes = flagDesc || flagRet;
 
 if (hayAjustes) {
-  doc.text(`TOTAL BRUTO: $${fmt(totalBruto)}`, xTot, y); 
+  doc.text(`TOTAL BRUTO: $${fmt(totalBruto)}`, xTot, y);
   y += 8;
 
   if (flagDesc) {
@@ -269,16 +318,29 @@ if (hayAjustes) {
 
 // Mostrar SIEMPRE el saldo final (aún si no hay abonos)
 doc.text(`SALDO FINAL: $${fmt(saldo)}`, xTot, y);
+y += 6; // pequeño respiro
 
-  // ─── Pie ────────────────────────────────────────────────────────────────────
-  const yFinal = 270;
-  doc.setFontSize(10);
-  doc.text("Instagram: @alquileryeventosemmita", 10, yFinal);
-  doc.text("Facebook: Facebook.com/alquileresemmita", 10, yFinal + 5);
-  doc.text("Email: alquileresemmita@hotmail.com", 10, yFinal + 10);
+// ─── Pie anclado al borde inferior (con guardia anti-encime) ─────────────────
+// Si por cualquier motivo quedamos muy cerca del pie, forzamos nueva página
+const pageHeight = doc.internal.pageSize.getHeight();
+const yFooter    = pageHeight - bottomMargin - footerHeight;
 
-  // ─── Guardar ────────────────────────────────────────────────────────────────
-  const fechaSegura = documento.fecha_creacion || new Date();
-  const nombreArchivo = generarNombreArchivo(tipo, fechaSegura, documento.nombre_cliente);
-  doc.save(nombreArchivo);
+if (y > yFooter - 4) {
+  doc.addPage();
+  insertarFondo();
+}
+
+// Recalcular por si agregamos página
+const pageHeight2 = doc.internal.pageSize.getHeight();
+const yFooter2    = pageHeight2 - bottomMargin - footerHeight;
+
+doc.setFontSize(10);
+doc.text("Instagram: @alquileryeventosemmita", 10, yFooter2);
+doc.text("Facebook: Facebook.com/alquileresemmita", 10, yFooter2 + 5);
+doc.text("Email: alquileresemmita@hotmail.com", 10, yFooter2 + 10);
+
+// ─── Guardar PDF ─────────────────────────────────────────────────────────────
+const fechaSegura = documento.fecha_creacion || new Date();
+const nombreArchivo = generarNombreArchivo(tipo, fechaSegura, documento.nombre_cliente);
+doc.save(nombreArchivo);
 }
