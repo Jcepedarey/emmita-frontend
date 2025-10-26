@@ -30,9 +30,19 @@ const soloFecha = (valor) => {
 const Inicio = () => {
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem("usuario"));
+
   const [ordenesProximas, setOrdenesProximas] = useState([]);
   const [ordenesPendientes, setOrdenesPendientes] = useState([]);
 
+  // 🔎 Consulta rápida de stock
+  const [busqProd, setBusqProd] = useState("");
+  const [sugerencias, setSugerencias] = useState([]);
+  const [prodSel, setProdSel] = useState(null);
+  const [fechaConsulta, setFechaConsulta] = useState("");
+  const [stockConsulta, setStockConsulta] = useState(null);
+  const [cargandoStock, setCargandoStock] = useState(false);
+
+  // ───────────────────── Cargar órdenes (PRÓXIMAS y PENDIENTES) ─────────────────────
   useEffect(() => {
     const cargarOrdenes = async () => {
       const { data, error } = await supabase
@@ -68,8 +78,93 @@ const Inicio = () => {
     };
 
     cargarOrdenes();
-  }, [navigate]);
+  }, []); // ← sin navigate en deps para no re-ejecutar innecesariamente
 
+  // ───────────────────── Sugerencias por nombre (mín. 2 letras) ────────────────────
+  useEffect(() => {
+    const fetch = async () => {
+      if (!busqProd || busqProd.trim().length < 2) {
+        setSugerencias([]);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("productos")
+        .select("id, nombre, stock")
+        .ilike("nombre", `%${busqProd}%`)
+        .limit(10);
+
+      if (error) {
+        console.error("Error buscando productos:", error);
+        setSugerencias([]);
+        return;
+      }
+      setSugerencias(data || []);
+    };
+    fetch();
+  }, [busqProd]);
+
+  // ───────────────────── Calcular stock por fecha ─────────────────────
+  const calcularStockParaFecha = async (productoId, fechaISO) => {
+    setCargandoStock(true);
+    try {
+      // 1) Stock base del producto
+      const { data: prod } = await supabase
+        .from("productos")
+        .select("id, stock")
+        .eq("id", productoId)
+        .single();
+      const stockBase = parseInt(prod?.stock ?? 0, 10);
+
+      // 2) Órdenes abiertas que tocan esa fecha (1 día o multi-días)
+      const { data: ords } = await supabase
+        .from("ordenes_pedido")
+        .select("productos, fecha_evento, fechas_evento, cerrada")
+        .eq("cerrada", false);
+
+      const ordenes = ords || [];
+      const fecha = String(fechaISO).slice(0, 10);
+
+      let reservado = 0;
+      ordenes.forEach((o) => {
+        const dias = new Set([
+          ...(o.fecha_evento ? [String(o.fecha_evento).slice(0, 10)] : []),
+          ...((o.fechas_evento || []).map((d) => String(d).slice(0, 10))),
+        ]);
+        if (!dias.has(fecha)) return;
+
+        (o.productos || []).forEach((p) => {
+          if (p.es_grupo && Array.isArray(p.productos)) {
+            p.productos.forEach((sub) => {
+              const id = sub.producto_id || sub.id;
+              const cant = (sub.cantidad || 0) * (p.cantidad || 1);
+              if (id === productoId) reservado += cant;
+            });
+          } else {
+            const id = p.producto_id || p.id;
+            if (id === productoId) reservado += (p.cantidad || 0);
+          }
+        });
+      });
+
+      setStockConsulta(stockBase - reservado);
+    } catch (e) {
+      console.error("Error calculando stock:", e);
+      setStockConsulta(null);
+    } finally {
+      setCargandoStock(false);
+    }
+  };
+
+  // ───────────────────── Recalcular cuando haya producto y fecha ───────────────────
+  useEffect(() => {
+    if (prodSel?.id && fechaConsulta) {
+      calcularStockParaFecha(prodSel.id, fechaConsulta);
+    } else {
+      setStockConsulta(null);
+    }
+  }, [prodSel, fechaConsulta]);
+
+  // ───────────────────── Acciones UI ─────────────────────
   const editarOrden = (orden) => {
     const cliente = orden.clientes || {};
 
@@ -140,7 +235,7 @@ const Inicio = () => {
         <h1 className="text-2xl font-bold mb-6">Bienvenido</h1>
 
         {/* TABLA VISUAL CON SCROLL INTERNO */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           {/* Columna izquierda - Activos */}
           <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 shadow-sm">
             <h2 className="text-lg font-semibold text-blue-800 mb-3 text-center">
@@ -149,7 +244,7 @@ const Inicio = () => {
             {ordenesProximas.length === 0 ? (
               <p className="text-center text-gray-500">No hay pedidos próximos.</p>
             ) : (
-              <div className="h-60 overflow-y-auto pr-2">
+              <div className="h-48 overflow-y-auto pr-2">
                 <ul className="space-y-3">
                   {ordenesProximas.map((orden) => (
                     <li
@@ -193,7 +288,7 @@ const Inicio = () => {
             {ordenesPendientes.length === 0 ? (
               <p className="text-center text-gray-500">No hay pedidos pendientes.</p>
             ) : (
-              <div className="h-60 overflow-y-auto pr-2">
+              <div className="h-48 overflow-y-auto pr-2">
                 <ul className="space-y-3">
                   {ordenesPendientes.map((orden) => (
                     <li
@@ -226,6 +321,72 @@ const Inicio = () => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* ───────────────── Consulta rápida de stock ───────────────── */}
+        <div className="mb-6">
+          <h3 className="text-base font-semibold mb-2">Consulta rápida de stock</h3>
+
+         <div className="flex flex-col md:flex-row gap-3 items-center">
+  {/* Fecha (izquierda, ancho fijo pequeño) */}
+  <input
+    type="date"
+    value={fechaConsulta}
+    onChange={(e) => setFechaConsulta(e.target.value)}
+    className="border rounded-md px-3 py-2 w-[160px] md:w-[180px] text-base placeholder-gray-400"
+    title="Seleccione la fecha a consultar"
+  />
+
+  {/* Buscador con sugerencias (centro, ocupa el espacio) */}
+  <div className="relative flex-1 min-w-[280px] w-full">
+    <input
+      type="text"
+      value={busqProd}
+      onChange={(e) => {
+        setBusqProd(e.target.value);
+        setProdSel(null);
+        setStockConsulta(null);
+      }}
+      placeholder="Buscar producto del inventario..."
+      className="w-full border rounded-md px-3 py-2 text-base placeholder-gray-400"
+    />
+    {sugerencias.length > 0 && (
+      <ul className="absolute z-30 bg-white border rounded-md mt-1 max-h-56 overflow-y-auto w-full shadow-lg text-lg leading-6">
+        {sugerencias.map((s) => (
+          <li key={s.id}>
+            <button
+              type="button"
+              className="w-full text-left px-3 py-2 hover:bg-gray-100"
+              onClick={() => {
+                setProdSel(s);
+                setBusqProd(s.nombre);
+                setSugerencias([]);
+              }}
+            >
+              {s.nombre}
+            </button>
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+
+  {/* Resultado (derecha, ancho fijo pequeño, “sage” suave) */}
+  <div
+    className="w-[170px] text-base font-semibold text-center px-3 py-2 rounded-md border"
+    style={{
+      backgroundColor: "rgba(168, 181, 162, 0.18)", // sage suave
+      borderColor: "rgba(168, 181, 162, 0.6)",
+      color: "#1f2937", // texto gris oscuro legible (tailwind slate-800 aprox)
+    }}
+    title="Unidades disponibles para la fecha seleccionada"
+  >
+    {prodSel && fechaConsulta
+      ? (cargandoStock ? "Calculando..." : `Disponible: ${stockConsulta ?? "—"}`)
+      : "Disponible:"}
+  </div>
+</div>
+
         </div>
 
         {/* MENÚ VISUAL DE ÍCONOS */}
@@ -330,8 +491,7 @@ const Inicio = () => {
           {usuario?.rol === "admin" && <></>}
         </div>
 
-        {/* 🔻 Eliminado: Menú inferior (solo móvil) */}
-        {/*
+        {/* 🔻 Eliminado: Menú inferior (solo móvil)
         <div className="menu-inferior md:hidden">
           <button onClick={() => navigate("/inicio")}>🏠 Inicio</button>
           <button onClick={() => navigate("/crear-documento")}>📄 Documento</button>
