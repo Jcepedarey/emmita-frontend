@@ -84,8 +84,8 @@ export const generarRemisionPDF = async (documento) => {
 const fechaCreacion = documento.fecha_creacion ? soloFecha(documento.fecha_creacion) : "-";
 const fechaEvento   = documento.fecha_evento   ? soloFecha(documento.fecha_evento)   : "-";
 
-  // 🧾 Encabezado (igual al PDF normal)
-  doc.addImage(logo, "PNG", 10, 10, 35, 30);
+   // ─── Encabezado ──────────────────────────────────────────────────────────────
+  doc.addImage(logo, "PNG", 10, 10, 30, 30); // ancho=alto → círculo perfecto
   doc.setFontSize(16);
   doc.text("Alquiler & Eventos Emmita", 50, 20);
   doc.setFontSize(10);
@@ -149,7 +149,7 @@ autoTable(doc, {
   theme: "plain", // usamos plain y pintamos nosotros
   head: [["Cantidad", "Artículo"]],
   body: filas,
-  startY: 90,
+  startY: 85,
   styles: { fontSize: 10 },
   headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: "center", valign: "middle" },
   columnStyles: {

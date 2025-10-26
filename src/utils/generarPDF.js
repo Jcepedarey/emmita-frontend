@@ -2,6 +2,20 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { generarNombreArchivo } from "./nombrePDF";
 
+ // ─── Paleta de colores por tipo ──────────────────────────────────────────────
+const PALETTE = {
+  azul: [41, 128, 185],
+  sage: [140, 153, 135],
+};
+
+/**
+ * Devuelve el color de encabezado de tabla según el tipo de documento
+ * @param {string} tipo - "cotizacion" o "pedido"
+ */
+function colorHead(tipo) {
+  return tipo === "cotizacion" ? PALETTE.sage : PALETTE.azul;
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (n) => Number(n || 0).toLocaleString("es-CO");
 const num = (n, def = 0) => {
@@ -86,7 +100,7 @@ export async function generarPDF(documento, tipo = "cotizacion") {
   insertarFondo();
 
   // ─── Encabezado ──────────────────────────────────────────────────────────────
-  doc.addImage(logo, "PNG", 10, 10, 35, 30);
+  doc.addImage(logo, "PNG", 10, 10, 30, 30); // ancho=alto → círculo perfecto
   doc.setFontSize(16);
   doc.text("Alquiler & Eventos Emmita", 50, 20);
   doc.setFontSize(10);
@@ -152,7 +166,12 @@ const fechaEvento =
   body,
   startY: 85,
   styles: { font: "helvetica", fontSize: 10 },
-  headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: "center", valign: "middle" },
+  headStyles: { 
+  fillColor: colorHead(tipo), 
+  textColor: 255, 
+  halign: "center", 
+  valign: "middle" 
+},
   columnStyles: esMulti
     ? {
         0: { cellWidth: 22, halign: "center" }, // Cantidad (más ancho que antes)
@@ -219,7 +238,7 @@ needed += 10;
 // ¿Cabe todo este bloque arriba del pie?
 if (y + needed > safeBottom0) {
   doc.addPage();
-  insertarFondo(doc);
+  insertarFondo();
   y = 40; // margen superior cómodo en la nueva página
 }
 

@@ -84,19 +84,19 @@ export const generarPDFRecepcion = async (revision, clienteInput, productosRecib
     cliente = data || {};
   }
 
-  // 🧾 Encabezado estándar
-  doc.addImage(logoOptimizado, "PNG", 10, 10, 35, 30);
+   // ─── Encabezado ──────────────────────────────────────────────────────────────
+  doc.addImage(logoOptimizado, "PNG", 10, 10, 30, 30);
   doc.setFontSize(16);
-  doc.text("ACTA DE RECEPCIÓN DE PEDIDO", 105, 20, { align: "center" });
+  doc.text("Alquiler & Eventos Emmita", 50, 20);
   doc.setFontSize(10);
-  doc.text("Alquiler & Eventos Emmita", 105, 26, { align: "center" });
-  doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio", 105, 31, { align: "center" });
-  doc.text("Cel: 3166534685 - 3118222934", 105, 36, { align: "center" });
-  doc.line(10, 44, 200, 44);
+  doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio, Meta", 50, 26);
+  doc.text("Cel-Whatsapp 3166534685 - 3118222934", 50, 31);
+  doc.setLineWidth(0.5);
+  doc.line(10, 42, 200, 42);
 
  // 🧾 Datos generales
 doc.setFontSize(12);
-doc.text(`Orden de pedido: ${revision.numero || "N/A"}`, 10, 48);
+doc.text(`Acta de recepcion: ${revision.numero || "N/A"}`, 10, 48);
 doc.text(`Cliente: ${cliente?.nombre || "N/A"}`, 10, 55);
 doc.text(`Identificación: ${cliente?.identificacion || "N/A"}`, 10, 61);
 doc.text(`Dirección: ${cliente?.direccion || "N/A"}`, 10, 67);
@@ -106,7 +106,7 @@ doc.text(`Fecha revisión: ${soloFecha(new Date())}`, 10, 79);
 
   // 📋 Tabla de productos
   autoTable(doc, {
-    startY: 90,
+    startY: 85,
     head: [["Descripción", "Esperado", "Recibido", "Observación"]],
     body: (productosRecibidos || []).map((p) => [
       p.descripcion || "Sin nombre",

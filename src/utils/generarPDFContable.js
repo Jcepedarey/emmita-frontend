@@ -68,16 +68,21 @@ export async function generarPDFContable(movimientos) {
   const logoOptimizado = await procesarImagen(logoUrl, 250, 1.0);    // logo nítido
   const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.9);  // fondo más grande
 
-  // 📌 Insertar logo
-  doc.addImage(logoOptimizado, "PNG", 10, 10, 35, 35); // logo más grande
-
-  // 🧾 Encabezado
-  doc.setFontSize(14);
-  doc.text("Informe de movimientos contables - Alquiler y eventos Emmita", 50, 20);
-
-  // 📆 Fecha de generación
+  // ─── Encabezado ──────────────────────────────────────────────────────────────
+  doc.addImage(logo, "PNG", 10, 10, 30, 30); // ancho=alto → círculo perfecto
+  doc.setFontSize(16);
+  doc.text("Alquiler & Eventos Emmita", 50, 20);
   doc.setFontSize(10);
-  doc.text(`Generado el: ${soloFecha(new Date())}`, 50, 28);
+  doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio, Meta", 50, 26);
+  doc.text("Cel-Whatsapp 3166534685 - 3118222934", 50, 31);
+  doc.setLineWidth(0.5);
+  doc.line(10, 42, 200, 42);
+
+// subtítulo del reporte
+doc.setFontSize(12);
+doc.text("Informe de movimientos contables", 10, 48);
+doc.setFontSize(10);
+doc.text(`Generado el: ${soloFecha(new Date())}`, 10, 55);
 
   // 🧮 Construir tabla
   const tabla = movimientos
@@ -96,7 +101,7 @@ export async function generarPDFContable(movimientos) {
 
   // 📄 Insertar tabla y fondo con marca de agua por página
   doc.autoTable({
-    startY: 45,
+    startY: 85,
     head: [[
       "Fecha", "Tipo", "Monto", "Descripción",
       "Categoría", "Estado", "Justificación",
