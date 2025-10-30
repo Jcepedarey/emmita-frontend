@@ -44,7 +44,21 @@ export default function Login() {
 
   return (
     <div style={{ textAlign: "center", marginTop: "100px" }}>
+      {/* Logo grande centrado con sombra suave */}
+<img
+  src="/icons/swalquiler-logo.png"
+  alt="SwAlquiler"
+  className="app-logo-login"
+  style={{
+  width: "145px",  // o prueba con "140px" si aún se ve pequeño
+  display: "block",
+  margin: "0 auto 16px",
+  filter: "drop-shadow(0 2px 6px rgba(0,0,0,.1))"
+}}
+/>
+
       <h2>Iniciar sesión</h2>
+
       <input
         type="email"
         placeholder="Correo"
@@ -52,6 +66,7 @@ export default function Login() {
         onChange={(e) => setEmail(e.target.value)}
         style={{ padding: "10px", marginBottom: "10px", width: "250px" }}
       /><br />
+
       <input
         type="password"
         placeholder="Contraseña"
@@ -59,7 +74,12 @@ export default function Login() {
         onChange={(e) => setPassword(e.target.value)}
         style={{ padding: "10px", marginBottom: "20px", width: "250px" }}
       /><br />
-      <button onClick={handleLogin} disabled={cargando} style={{ padding: "10px 30px" }}>
+
+      <button
+        onClick={handleLogin}
+        disabled={cargando}
+        style={{ padding: "10px 30px" }}
+      >
         {cargando ? "Cargando..." : "Entrar"}
       </button>
     </div>

@@ -29,10 +29,32 @@
 }
 
 @keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* === Logo de la app (login y navbar) === */
+
+/* Grande en Login (realmente pequeño ahora), centrado y con sombra suave */
+.app-logo-login {
+  width: clamp(70px, 9vw, 100px);   /* ← MUCHO más chico */
+  display: block;
+  margin: 0 auto 14px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.1));
+}
+
+/* Pequeño en la barra superior (apenas más alto que el texto) */
+.app-logo-nav {
+  height: 1.1em;         /* ~un 10% más alto que el texto */
+  max-height: 22px;      /* tope duro para pantallas grandes */
+  width: auto;
+  margin-right: 6px;
+  vertical-align: middle;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
+}
+
+/* En móviles muy pequeños, reduce aún más */
+@media (max-width: 400px) {
+  .app-logo-login { width: clamp(60px, 12vw, 85px); }
+  .app-logo-nav   { height: 1em; max-height: 20px; }
 }
