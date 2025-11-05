@@ -10,7 +10,7 @@ const AgregarGrupoModal = ({
   persistOpen = true, // si false, cierra al guardar
 }) => {
   const [nombreGrupo, setNombreGrupo] = useState("");
-  const [cantidadGrupo, setCantidadGrupo] = useState(1);
+const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
   const [productos, setProductos] = useState([]); // inventario + proveedores normalizado
   const [seleccionados, setSeleccionados] = useState([]); // items del grupo
   const [busqueda, setBusqueda] = useState("");
@@ -18,20 +18,29 @@ const AgregarGrupoModal = ({
   const [error, setError] = useState("");
   const buscarRef = useRef(null);
 
-  // Precarga para edición
+   // Precarga para edición
   useEffect(() => {
     if (grupoEnEdicion) {
       setNombreGrupo(grupoEnEdicion.nombre || "");
-      setCantidadGrupo(grupoEnEdicion.cantidad || 1);
+      setCantidadGrupo(
+        grupoEnEdicion.cantidad != null
+          ? String(grupoEnEdicion.cantidad)
+          : ""
+      );
       // Asegurar campos clave en items
       const items = (grupoEnEdicion.productos || []).map((p) => ({
         id: p.id,
         nombre: p.nombre,
         descripcion: p.descripcion || "",
         precio: typeof p.precio === "number" ? p.precio : Number(p.precio || 0),
-        cantidad: typeof p.cantidad === "number" ? p.cantidad : Number(p.cantidad || 1),
+        cantidad:
+          typeof p.cantidad === "number"
+            ? p.cantidad
+            : Number(p.cantidad || 1),
         subtotal:
-          (typeof p.subtotal === "number" ? p.subtotal : Number(p.precio || 0) * Number(p.cantidad || 1)) || 0,
+          (typeof p.subtotal === "number"
+            ? p.subtotal
+            : Number(p.precio || 0) * Number(p.cantidad || 1)) || 0,
         temporal: !!p.temporal,
         es_proveedor: !!p.es_proveedor,
       }));
@@ -113,32 +122,55 @@ const AgregarGrupoModal = ({
   const agregarAlGrupo = (producto) => {
     if (seleccionados.some((p) => p.id === producto.id)) return;
     const nuevo = {
-      ...producto,
-      cantidad: 1,
-      subtotal: producto.precio,
-      temporal: false,
-    };
+  ...producto,
+  cantidad: "",       // sin número por defecto
+  subtotal: 0,        // hasta que elijas cantidad
+  temporal: false,
+};
     setSeleccionados((prev) => [...prev, nuevo]);
     setBusqueda("");
     buscarRef.current?.focus();
   };
 
   const actualizarCampo = (index, campo, valor) => {
-    setSeleccionados((prev) => {
-      const arr = [...prev];
-      if (campo === "temporal") {
-        arr[index][campo] = !!valor;
-      } else if (campo === "cantidad") {
-        const v = Math.max(1, parseInt(valor || 1, 10));
-        arr[index].cantidad = v;
-      } else if (campo === "precio") {
-        const v = Math.max(0, Number(valor || 0));
-        arr[index].precio = v;
+  setSeleccionados((prev) => {
+    const arr = [...prev];
+
+    if (campo === "temporal") {
+      arr[index][campo] = !!valor;
+    } else if (campo === "cantidad") {
+      const raw = valor;
+
+      // Permitir borrar todo
+      if (raw === "") {
+        arr[index].cantidad = "";
+      } else {
+        const n = parseInt(raw, 10);
+        if (isNaN(n) || n <= 0) {
+          arr[index].cantidad = "";
+        } else {
+          arr[index].cantidad = n;
+        }
       }
-      arr[index].subtotal = Number(arr[index].precio || 0) * Number(arr[index].cantidad || 0);
-      return arr;
-    });
-  };
+    } else if (campo === "precio") {
+      const raw = valor;
+
+      // Permitir borrar todo
+      if (raw === "") {
+        arr[index].precio = "";
+      } else {
+        const n = Number(raw);
+        arr[index].precio = !isNaN(n) && n >= 0 ? n : 0;
+      }
+    }
+
+    // Recalcular subtotal siempre
+    arr[index].subtotal =
+      Number(arr[index].precio || 0) * Number(arr[index].cantidad || 0);
+
+    return arr;
+  });
+};
 
   const eliminarDelGrupo = (index) => {
     setSeleccionados((prev) => prev.filter((_, i) => i !== index));
@@ -167,15 +199,15 @@ const AgregarGrupoModal = ({
     onAgregarGrupo?.(grupo);
 
     if (persistOpen) {
-      // Reiniciar para crear otro
-      setNombreGrupo("");
-      setCantidadGrupo(1);
-      setSeleccionados([]);
-      setBusqueda("");
-      buscarRef.current?.focus();
-    } else {
-      onClose?.();
-    }
+  // Reiniciar para crear otro
+  setNombreGrupo("");
+  setCantidadGrupo(""); // ← ahora vacío
+  setSeleccionados([]);
+  setBusqueda("");
+  buscarRef.current?.focus();
+} else {
+  onClose?.();
+}
   };
 
   // Enter para agregar primer filtrado
@@ -187,7 +219,7 @@ const AgregarGrupoModal = ({
 
   const handleClose = () => {
   setNombreGrupo("");
-  setCantidadGrupo(1);
+  setCantidadGrupo(""); // ← también vacío al cerrar
   setSeleccionados([]);
   setBusqueda("");
   onClose?.();
@@ -209,19 +241,32 @@ const AgregarGrupoModal = ({
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
           <label style={{ whiteSpace: "nowrap" }}>Cantidad del grupo:</label>
           <input
-            type="number"
-            min="1"
-            value={cantidadGrupo}
-            onChange={(e) => setCantidadGrupo(Math.max(1, parseInt(e.target.value || 1, 10)))}
-            style={{
-  width: 90,
-  padding: "6px 8px",
-  backgroundColor: "#FFF8D1",
-  boxShadow: "inset 0 0 0 2px rgba(255,184,0,.25)",
-  border: "1px solid #E6C766",
-  borderRadius: 6,
-}}
-          />
+  type="number"
+  min="1"
+  value={cantidadGrupo}
+  onChange={(e) => {
+    const raw = e.target.value;
+
+    // Permitir borrar todo → campo vacío
+    if (raw === "") {
+      setCantidadGrupo("");
+      return;
+    }
+
+    const n = parseInt(raw, 10);
+    if (!isNaN(n) && n > 0) {
+      setCantidadGrupo(String(n));
+    }
+  }}
+  style={{
+    width: 90,
+    padding: "6px 8px",
+    backgroundColor: "#FFF8D1",
+    boxShadow: "inset 0 0 0 2px rgba(255,184,0,0.25)",
+    border: "1px solid #E6C766",
+    borderRadius: 6,
+  }}
+/>
         </div>
 
         <input

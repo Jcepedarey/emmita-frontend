@@ -58,3 +58,79 @@
   .app-logo-login { width: clamp(60px, 12vw, 85px); }
   .app-logo-nav   { height: 1em; max-height: 20px; }
 }
+
+/* ==== Estilos globales para los mensajes Swal (SweetAlert2) ==== */
+
+.swal2-popup {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Título un poquito más marcado */
+.swal2-popup .swal2-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+/* Botón principal (OK / Aceptar) SIEMPRE visible */
+.swal2-popup .swal2-styled.swal2-confirm {
+  background-color: #6366f1 !important;   /* morado */
+  color: #ffffff !important;
+  border-radius: 9999px;
+  padding: 0.6rem 1.6rem;
+  font-weight: 500;
+  border: none;
+  min-width: 110px;
+}
+
+/* Botón cancelar (cuando lo uses) */
+.swal2-popup .swal2-styled.swal2-cancel {
+  background-color: #e5e7eb !important;   /* gris claro */
+  color: #111827 !important;
+  border-radius: 9999px;
+  padding: 0.6rem 1.6rem;
+  font-weight: 500;
+  border: none;
+  min-width: 110px;
+}
+
+/* Hover: un poco más oscuro, pero siempre visible */
+.swal2-popup .swal2-styled.swal2-confirm:hover {
+  background-color: #4f46e5 !important;
+}
+
+.swal2-popup .swal2-styled.swal2-cancel:hover {
+  background-color: #d1d5db !important;
+}
+
+/* === Quitar flechas de los inputs numéricos en todos los módulos === */
+
+/* Chrome, Edge, Safari */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Quitar flechas de los inputs numéricos en todos los navegadores */
+
+/* Chrome, Edge, Safari */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Estándar (por si acaso) */
+input[type="number"] {
+  appearance: textfield;
+}

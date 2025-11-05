@@ -5,6 +5,9 @@ import Navbar from "./components/Navbar";
 import Navegacion from "./components/Navegacion";
 import BotonIAFlotante from "./components/BotonIAFlotante";
 import AsistenteModal from "./components/AsistenteModal";
+import "./swal.css";
+import "./App.css";
+
 
 // 📦 Páginas principales
 import Login from "./pages/Login";

@@ -1,0 +1,36 @@
+/* ==== Estilos globales para SweetAlert2 ==== */
+
+.swal2-popup {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Botones base */
+.swal2-popup .swal2-styled {
+  font-weight: 500;
+  border-radius: 9999px;
+  padding: 0.6rem 1.6rem;
+  min-width: 110px;
+  border: none;
+  box-shadow: none;
+}
+
+/* Botón OK / Aceptar: SIEMPRE visible */
+.swal2-popup .swal2-styled.swal2-confirm {
+  background-color: #6366f1 !important;  /* morado */
+  color: #ffffff !important;
+}
+
+/* Botón Cancelar, cuando exista */
+.swal2-popup .swal2-styled.swal2-cancel {
+  background-color: #e5e7eb !important;  /* gris claro */
+  color: #111827 !important;
+}
+
+/* Hover: solo un poco más oscuro, no aparece de la nada */
+.swal2-popup .swal2-styled.swal2-confirm:hover {
+  background-color: #4f46e5 !important;
+}
+
+.swal2-popup .swal2-styled.swal2-cancel:hover {
+  background-color: #d1d5db !important;
+}
