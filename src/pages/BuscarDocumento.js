@@ -4,6 +4,8 @@
   import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
   import { useNavigate } from "react-router-dom";
   import Protegido from "../components/Protegido"; // 🔐 Protección con sesión
+  import Swal from "sweetalert2";
+
 
   export default function BuscarDocumento() {
     const [tipo, setTipo] = useState("cotizaciones");
@@ -95,10 +97,116 @@
     };
 
     const eliminarDocumento = async (id) => {
-      if (!window.confirm("¿Eliminar este documento?")) return;
-      await supabase.from(tipo).delete().eq("id", id);
-      cargarDocumentos();
-    };
+  try {
+    // 1️⃣ Verificar si tiene movimientos contables asociados
+    const { data: movimientos } = await supabase
+      .from("movimientos_contables")
+      .select("id")
+      .eq("orden_id", id);
+
+    // 2️⃣ Verificar si tiene recepción asociada
+    const { data: recepcion } = await supabase
+      .from("recepcion")
+      .select("id")
+      .eq("orden_id", id);
+
+    const tieneMovimientos = movimientos && movimientos.length > 0;
+    const tieneRecepcion = recepcion && recepcion.length > 0;
+
+    // 3️⃣ Mensaje según el caso
+    let mensaje = "";
+    let listaEliminaciones = "";
+
+    if (tieneMovimientos || tieneRecepcion) {
+      // Advertencia COMPLETA
+      mensaje = "⚠️ Este documento tiene registros asociados:";
+      listaEliminaciones = "<ul style='text-align: left; margin: 10px 0;'>";
+      
+      if (tieneMovimientos) {
+        listaEliminaciones += `<li><strong>${movimientos.length}</strong> movimiento(s) contable(s) (ingresos/gastos)</li>`;
+      }
+      if (tieneRecepcion) {
+        listaEliminaciones += "<li>Una recepción registrada</li>";
+      }
+      
+      listaEliminaciones += "</ul>";
+      listaEliminaciones += "<p style='color: red; font-weight: bold;'>⚠️ TODO será eliminado permanentemente</p>";
+    } else {
+      // Advertencia SIMPLE
+      mensaje = "¿Estás seguro de eliminar este documento?";
+    }
+
+    // 4️⃣ Confirmación
+    const resultado = await Swal.fire({
+      title: mensaje,
+      html: listaEliminaciones,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: tieneMovimientos || tieneRecepcion ? "Sí, eliminar TODO" : "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#d33",
+    });
+
+    if (!resultado.isConfirmed) return;
+
+    // 5️⃣ Borrar en orden correcto
+    if (tieneMovimientos) {
+      const { error: errorMov } = await supabase
+        .from("movimientos_contables")
+        .delete()
+        .eq("orden_id", id);
+
+      if (errorMov) {
+        console.error("Error borrando movimientos:", errorMov);
+        throw new Error("No se pudieron eliminar los movimientos contables");
+      }
+    }
+
+    if (tieneRecepcion) {
+      const { error: errorRec } = await supabase
+        .from("recepcion")
+        .delete()
+        .eq("orden_id", id);
+
+      if (errorRec) {
+        console.error("Error borrando recepción:", errorRec);
+        throw new Error("No se pudo eliminar la recepción");
+      }
+    }
+
+    // 6️⃣ Finalmente, borrar el documento
+    const { error: errorDoc } = await supabase
+      .from(tipo)
+      .delete()
+      .eq("id", id);
+
+    if (errorDoc) {
+      console.error("Error borrando documento:", errorDoc);
+      throw new Error("No se pudo eliminar el documento");
+    }
+
+    // 7️⃣ Éxito
+    Swal.fire({
+      title: "✅ Eliminado",
+      text: tieneMovimientos || tieneRecepcion 
+        ? "El documento y todos sus registros fueron eliminados"
+        : "El documento fue eliminado",
+      icon: "success",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+
+    cargarDocumentos(); // Recargar lista
+
+  } catch (error) {
+    console.error("Error completo:", error);
+    Swal.fire({
+      title: "❌ Error",
+      text: error.message || "No se pudo completar la eliminación",
+      icon: "error",
+    });
+  }
+};
 
     const cargarEnCrear = (doc) => {
       const cliente = clientes.find((c) => c.id === doc.cliente_id);

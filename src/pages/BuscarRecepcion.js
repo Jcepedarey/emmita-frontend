@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import supabase from "../supabase";
 import { useNavigate } from "react-router-dom";
 import DatePicker from "react-datepicker";
@@ -64,31 +64,99 @@ export default function BuscarRecepcion() {
   };
 
   const eliminarRecepcionDefinitiva = async (id) => {
+  try {
+    // 1) Código de seguridad
     const { value: codigo } = await Swal.fire({
-      title: "¿Eliminar definitivamente esta recepción?",
+      title: "🔒 Código de seguridad",
       input: "password",
-      inputLabel: "Escribe el código de seguridad",
+      inputLabel: "Escribe el código para eliminar definitivamente",
       inputPlaceholder: "••••",
       showCancelButton: true,
-      confirmButtonText: "Eliminar",
+      confirmButtonText: "Continuar",
       cancelButtonText: "Cancelar",
     });
 
     if (codigo !== "4860") {
-      Swal.fire("Acceso denegado", "Código incorrecto", "error");
+      if (codigo) Swal.fire("❌ Acceso denegado", "Código incorrecto", "error");
       return;
     }
 
-    const { error } = await supabase.from("ordenes_pedido").delete().eq("id", id);
+    // 2) Consultar movimientos vinculados
+    const { data: movimientos } = await supabase
+      .from("movimientos_contables")
+      .select("id, tipo")
+      .eq("orden_id", id);
 
-    if (error) {
-      console.error("❌ Error al eliminar:", error);
-      Swal.fire("Error", "No se pudo eliminar la recepción", "error");
-    } else {
-      Swal.fire("Éxito", "Recepción eliminada definitivamente", "success");
-      buscarRecepciones(pagina);
+    const tieneMovimientos = Array.isArray(movimientos) && movimientos.length > 0;
+
+    let html = "";
+    if (tieneMovimientos) {
+      const ingresos = movimientos.filter((m) => m.tipo === "ingreso").length;
+      const gastos = movimientos.filter((m) => m.tipo === "gasto").length;
+      html = `
+        <ul style="text-align:left;margin:10px 0">
+          ${ingresos ? `<li><strong>${ingresos}</strong> ingreso(s)</li>` : ""}
+          ${gastos ? `<li><strong>${gastos}</strong> gasto(s)</li>` : ""}
+        </ul>
+        <p style="color:red;font-weight:bold">⚠️ TODO será eliminado de Contabilidad</p>
+      `;
     }
-  };
+
+    // 3) Confirmación final
+    const confirm = await Swal.fire({
+      title: tieneMovimientos ? "⚠️ Esta recepción tiene registros asociados:" : "¿Eliminar esta recepción?",
+      html,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar definitivamente",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#d33",
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    // 4) Borrar movimientos primero (si hay)
+    if (tieneMovimientos) {
+      const { error: errorMov } = await supabase
+        .from("movimientos_contables")
+        .delete()
+        .eq("orden_id", id);
+      if (errorMov) throw new Error("No se pudieron eliminar los movimientos contables");
+    }
+
+    // 5) Borrar recepción (si existe tabla recepcion vinculada por orden_id)
+    const { data: recs } = await supabase.from("recepcion").select("id").eq("orden_id", id);
+    const tieneRecepcion = Array.isArray(recs) && recs.length > 0;
+
+    if (tieneRecepcion) {
+      const { error: errorRec } = await supabase.from("recepcion").delete().eq("orden_id", id);
+      if (errorRec) throw new Error("No se pudo eliminar la recepción asociada");
+    }
+
+    // 6) Borrar la orden revisada
+    const { error: errorOrden } = await supabase.from("ordenes_pedido").delete().eq("id", id);
+    if (errorOrden) throw new Error("No se pudo eliminar la orden/recepción");
+
+    // 7) Éxito
+    await Swal.fire({
+      title: "✅ Eliminado",
+      text: "La recepción y sus registros fueron eliminados",
+      icon: "success",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+
+    // 8) Recargar la página actual del paginador
+    buscarRecepciones(pagina);
+  } catch (e) {
+    console.error("Error completo:", e);
+    Swal.fire({
+      title: "❌ Error",
+      text: e.message || "No se pudo completar la eliminación",
+      icon: "error",
+    });
+  }
+};
 
   return (
     <Protegido>

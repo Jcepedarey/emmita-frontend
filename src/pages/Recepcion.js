@@ -153,19 +153,47 @@ const Recepcion = () => {
   ? garantiaDevueltaManual
   : Math.max(garantiaTotal - sumaDanos, 0);
 
+  // 🆕 CALCULAR COSTOS DE PROVEEDORES
+const calcularCostoProveedor = (productos) => {
+  let total = 0;
+  
+  (productos || []).forEach((p) => {
+    if (p.es_grupo && Array.isArray(p.productos)) {
+      // Si es grupo, multiplicar por la cantidad del grupo
+      const factorGrupo = Number(p.cantidad) || 1;
+      p.productos.forEach((sub) => {
+        if (sub.es_proveedor && sub.precio_compra) {
+          const cantidadTotal = (Number(sub.cantidad) || 0) * factorGrupo;
+          total += cantidadTotal * Number(sub.precio_compra);
+        }
+      });
+    } else if (p.es_proveedor && p.precio_compra) {
+      // Producto suelto de proveedor
+      const cantidad = Number(p.cantidad) || 0;
+      total += cantidad * Number(p.precio_compra);
+    }
+  });
+  
+  return total;
+};
+
+const costosProveedores = calcularCostoProveedor(ordenSeleccionada.productos || []);
+console.log("💰 Costos de proveedores calculados:", costosProveedores); // Para verificar
+
 
     // 3️⃣ Registrar movimientos contables
     await registrarContabilidadPorPedido(
-      ordenSeleccionada,
-      productosRevisados.map((p, i) => ({
-        nombre: p.nombre,
-        monto: parseInt(danos[i]?.monto || 0),
-        tipo: p.tipo_origen,
-      })),
-      garantiaTotal,
-      garantiaDevuelta,
-      usuario
-    );
+  ordenSeleccionada,
+  productosRevisados.map((p, i) => ({
+    nombre: p.nombre,
+    monto: parseInt(danos[i]?.monto || 0),
+    tipo: p.tipo_origen,
+  })),
+  garantiaTotal,
+  garantiaDevuelta,
+  usuario,
+  costosProveedores  // 🆕 AGREGAR ESTE PARÁMETRO
+);
 
 
       // 4️⃣ Marcar orden como revisada
@@ -186,24 +214,6 @@ const ingresos = (ordenSeleccionada.abonos || []).reduce(
 // Evitar doble "OP-"
 const numeroOP = String(ordenSeleccionada.numero || "");
 const numeroLimpio = numeroOP.startsWith("OP-") ? numeroOP : `OP-${numeroOP}`;
-
-// ✅ Registrar ingreso principal (si es > 0; si quieres siempre, quita el if)
-if (ingresos > 0) {
-  await insertMC({
-    orden_id: ordenSeleccionada.id,
-    cliente_id: ordenSeleccionada.cliente_id,
-    fecha: new Date().toISOString().split("T")[0],
-    tipo: "ingreso",
-    monto: ingresos,
-    descripcion:
-      `${numeroLimpio} — ${new Date(ordenSeleccionada.fecha_evento).toISOString().slice(0,10)} — ${ordenSeleccionada?.clientes?.nombre || "N/A"}` +
-      (comentarioGeneral ? ` | ${comentarioGeneral}` : ""),
-    categoria: "Cierre de orden",
-    estado: "activo",
-    usuario: usuario?.nombre || "Administrador",
-    fecha_modificacion: null
-  }, "ingreso principal");
-}
 
   // ✅ Guardar los gastos adicionales ingresados manualmente
 for (const gasto of gastosExtras) {
@@ -256,7 +266,7 @@ if ((retencionManual || 0) > 0) {
 }
 };
 
- const registrarContabilidadPorPedido = async (orden, danos, garantiaOriginal, garantiaDevuelta, usuario) => {
+const registrarContabilidadPorPedido = async (orden, danos, garantiaOriginal, garantiaDevuelta, usuario, costosProveedores) => {
   try {
     const base = {
       orden_id: orden.id,
@@ -267,10 +277,37 @@ if ((retencionManual || 0) > 0) {
       fecha_modificacion: null,
     };
 
-    // Número limpio para evitar "OP-OP-"
     const numeroOP = String(orden.numero || "");
     const numeroLimpio = numeroOP.startsWith("OP-") ? numeroOP : `OP-${numeroOP}`;
 
+    // 🆕 1. GASTOS POR PROVEEDORES (con nombres)
+if (costosProveedores > 0) {
+  // Construir lista de proveedores únicos
+  const proveedoresSet = new Set();
+  (orden.productos || []).forEach((p) => {
+    if (p.es_grupo && Array.isArray(p.productos)) {
+      p.productos.forEach((sub) => {
+        if (sub.es_proveedor && sub.proveedor_nombre) {
+          proveedoresSet.add(sub.proveedor_nombre);
+        }
+      });
+    } else if (p.es_proveedor && p.proveedor_nombre) {
+      proveedoresSet.add(p.proveedor_nombre);
+    }
+  });
+
+  const nombresProveedores = Array.from(proveedoresSet).join(", ") || "Proveedores";
+
+  await insertMC({
+    ...base,
+    tipo: "gasto",
+    monto: costosProveedores,
+    descripcion: `[${numeroLimpio}] Pago a proveedores: ${nombresProveedores}`,
+    categoria: "Costos proveedores",
+  }, "costos proveedores");
+}
+
+    // 2. GASTOS POR DAÑOS
     for (const d of danos) {
       if (d.monto > 0) {
         if (d.tipo === "proveedor") {
@@ -301,6 +338,7 @@ if ((retencionManual || 0) > 0) {
       }
     }
 
+    // 3. GARANTÍA NO DEVUELTA
     const diferencia = garantiaOriginal - garantiaDevuelta;
     if (diferencia > 0) {
       await insertMC({
@@ -311,9 +349,32 @@ if ((retencionManual || 0) > 0) {
         categoria: "Garantías retenidas",
       }, "garantía no devuelta");
     }
+
+    // 🆕 4. DESCUENTOS (como gasto)
+    if (orden.descuento && Number(orden.descuento) > 0) {
+      await insertMC({
+        ...base,
+        tipo: "gasto",
+        monto: Number(orden.descuento),
+        descripcion: `[${numeroLimpio}] Descuento aplicado`,
+        categoria: "Descuentos",
+      }, "descuento");
+    }
+
+    // 🆕 5. RETENCIONES (como gasto)
+if (orden.retencion && Number(orden.retencion) > 0) {
+  await insertMC({
+    ...base,
+    tipo: "gasto",
+    monto: Number(orden.retencion),
+    descripcion: `[${numeroLimpio}] Retención legal`,
+    categoria: "Retenciones",
+  }, "retención");
+}
+
   } catch (error) {
     console.error("❌ Error registrando contabilidad del pedido:", error);
-    throw error; // Propaga para que el catch de guardarRevision muestre el Swal de error
+    throw error;
   }
 };
   return (

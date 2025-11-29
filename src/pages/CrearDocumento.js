@@ -20,6 +20,9 @@
     const esEdicion = documento?.esEdicion || false;
     const idOriginal = documento?.idOriginal || null;
 
+    // 🆕 AGREGAR ESTA LÍNEA AL INICIO (después de los imports)
+const [usuario, setUsuario] = useState({ nombre: "Administrador" });
+
     // 🧠 ESTADOS
     const [tipoDocumento, setTipoDocumento] = useState(tipo || "cotizacion");
     const [fechaCreacion, setFechaCreacion] = useState(() => {
@@ -355,19 +358,22 @@
 
     // ✅ Agregar producto desde proveedor (modal proveedor permanece abierto)
     const agregarProductoProveedor = (producto) => {
-    const nuevo = {
+  const nuevo = {
     id: `prov-${producto.id ?? producto.proveedor_id ?? (crypto?.randomUUID?.() || Math.random().toString(36).slice(2))}`,
     nombre: producto.nombre,
-    cantidad: "",                               // sin 1 por defecto
-    precio: Number(producto.precio_venta || 0), // mantiene el precio sugerido
+    cantidad: "",
+    precio: Number(producto.precio_venta || 0),        // 💰 Precio de venta al cliente
+    precio_compra: Number(producto.precio_compra || 0), // 🆕 Lo que le pagas al proveedor
+    proveedor_id: producto.proveedor_id,                // 🆕 ID del proveedor
+    proveedor_nombre: producto.proveedores?.nombre || producto.proveedor_nombre || "", // 🆕 Nombre del proveedor
     es_grupo: false,
     es_proveedor: true,
     temporal: true,
     multiplicarPorDias: multiDias ? true : undefined,
   };
-    const items = [...productosAgregados, nuevo];
-    setProductosAgregados(recomputarSubtotales(items));
-  };
+  const items = [...productosAgregados, nuevo];
+  setProductosAgregados(recomputarSubtotales(items));
+};
 
 
     // ✅ Agregar producto creado en el modal (puede ser temporal o no)
@@ -432,6 +438,95 @@
     const agregarAbono = () => {
     setAbonos([...abonos, { valor: "", fecha: hoyISO() }]); // valor vacío, fecha hoy
   };
+
+  // 🆕 FUNCIÓN PARA REGISTRAR ABONOS EN CONTABILIDAD
+const registrarAbonosEnContabilidad = async (ordenId, clienteId, abonos, abonosYaRegistrados, numeroOrden, nombreCliente) => {
+  const movimientosCreados = [];
+
+  for (const abono of abonos) {
+    const valorAbono = Number(abono.valor || 0);
+    const fechaAbono = abono.fecha || new Date().toISOString().slice(0, 10);
+
+    // Verificar si este abono ya fue registrado
+    const yaRegistrado = abonosYaRegistrados.find(
+      (reg) => reg.valor === valorAbono && reg.fecha === fechaAbono
+    );
+
+    if (!yaRegistrado && valorAbono > 0) {
+      // Crear movimiento contable
+      const { data, error } = await supabase.from("movimientos_contables").insert([{
+        orden_id: ordenId,
+        cliente_id: clienteId,
+        fecha: fechaAbono,
+        tipo: "ingreso",
+        monto: valorAbono,
+        descripcion: `Abono de ${nombreCliente} - ${numeroOrden}`,
+        categoria: "Abonos",
+        estado: "activo",
+        usuario: usuario?.nombre || "Administrador",
+      }]).select();
+
+      if (error) {
+        console.error("❌ Error registrando abono:", error);
+        throw error;
+      }
+
+      // Guardar el ID del movimiento creado
+      movimientosCreados.push({
+        valor: valorAbono,
+        fecha: fechaAbono,
+        movimiento_id: data[0].id,
+      });
+    }
+  }
+
+  return movimientosCreados;
+};
+
+// 🆕 FUNCIÓN PARA ACTUALIZAR/ELIMINAR ABONOS EN CONTABILIDAD
+const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) => {
+  // 1️⃣ Detectar abonos ELIMINADOS
+  for (const registrado of abonosRegistrados) {
+    const existe = abonosActuales.find(
+      (ab) => ab.valor === registrado.valor && ab.fecha === registrado.fecha
+    );
+
+    if (!existe) {
+      // Este abono fue eliminado → borrar de contabilidad
+      await supabase
+        .from("movimientos_contables")
+        .delete()
+        .eq("id", registrado.movimiento_id);
+    }
+  }
+
+  // 2️⃣ Detectar abonos EDITADOS
+  for (const registrado of abonosRegistrados) {
+    const actual = abonosActuales.find(
+      (ab) => ab.fecha === registrado.fecha
+    );
+
+    if (actual && actual.valor !== registrado.valor) {
+      // El valor cambió → actualizar en contabilidad
+      await supabase
+        .from("movimientos_contables")
+        .update({
+          monto: actual.valor,
+          fecha_modificacion: new Date().toISOString(),
+          estado: "editado",
+        })
+        .eq("id", registrado.movimiento_id);
+
+      // Actualizar también en el registro
+      registrado.valor = actual.valor;
+    }
+  }
+
+  // 3️⃣ Filtrar solo los abonos que siguen existiendo
+  return abonosRegistrados.filter((reg) =>
+    abonosActuales.find((ab) => ab.fecha === reg.fecha)
+  );
+};
 
     // ✅ Guardar documento
     const guardarDocumento = async () => {
@@ -592,11 +687,70 @@
 
   // ✅ Feedback
   if (!error) {
-    Swal.fire("Guardado", `La ${tipoDocumento} fue guardada correctamente.`, "success");
-  } else {
-    console.error(error);
-    Swal.fire("Error", "No se pudo guardar el documento", "error");
+  // 🆕 REGISTRAR/ACTUALIZAR ABONOS EN CONTABILIDAD
+  try {
+    let ordenIdFinal = esEdicion && idOriginal ? idOriginal : null;
+
+    // Si es una inserción nueva, necesitamos el ID de la orden recién creada
+    if (!esEdicion) {
+      const { data: ordenRecienCreada } = await supabase
+        .from(tabla)
+        .select("id")
+        .eq("numero", numeroDocumento)
+        .single();
+      
+      ordenIdFinal = ordenRecienCreada?.id || null;
+    }
+
+    if (ordenIdFinal) {
+      // Si es edición, primero sincronizar cambios
+      if (esEdicion) {
+        const abonosYaRegistrados = documento?.abonos_registrados_contabilidad || [];
+        const abonosActualizados = await sincronizarAbonosContabilidad(
+          abonos,
+          abonosYaRegistrados
+        );
+        
+        // Actualizar el registro
+        await supabase
+          .from(tabla)
+          .update({ abonos_registrados_contabilidad: abonosActualizados })
+          .eq("id", ordenIdFinal);
+      }
+
+      // Registrar abonos NUEVOS
+      const abonosYaRegistrados = esEdicion 
+        ? (documento?.abonos_registrados_contabilidad || [])
+        : [];
+        
+      const movimientosCreados = await registrarAbonosEnContabilidad(
+        ordenIdFinal,
+        clienteSeleccionado.id,
+        abonos,
+        abonosYaRegistrados,
+        numeroDocumento,
+        clienteSeleccionado.nombre
+      );
+
+      // Actualizar la columna abonos_registrados_contabilidad
+      if (movimientosCreados.length > 0) {
+        const nuevosRegistrados = [...abonosYaRegistrados, ...movimientosCreados];
+        await supabase
+          .from(tabla)
+          .update({ abonos_registrados_contabilidad: nuevosRegistrados })
+          .eq("id", ordenIdFinal);
+      }
+    }
+
+    Swal.fire("✅ Guardado", `La ${tipoDocumento} y los abonos fueron registrados en contabilidad.`, "success");
+  } catch (error) {
+    console.error("❌ Error registrando abonos:", error);
+    Swal.fire("⚠️ Advertencia", "El documento se guardó pero hubo un error con los abonos. Revisa la consola.", "warning");
   }
+} else {
+  console.error(error);
+  Swal.fire("Error", "No se pudo guardar el documento", "error");
+}
   }; // 👈 CERRAR guardarDocumento AQUÍ
 
 
