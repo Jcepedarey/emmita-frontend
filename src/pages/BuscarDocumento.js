@@ -113,6 +113,14 @@
     const tieneMovimientos = movimientos && movimientos.length > 0;
     const tieneRecepcion = recepcion && recepcion.length > 0;
 
+    // 🆕 AGREGAR ESTO PARA DEBUG
+console.log("🔍 Debug borrado:", {
+  documentoId: id,
+  tipo,
+  movimientos: movimientos?.length || 0,
+  recepcion: recepcion?.length || 0
+});
+
     // 3️⃣ Mensaje según el caso
     let mensaje = "";
     let listaEliminaciones = "";
