@@ -50,7 +50,7 @@ const procesarImagen = (src, width = 150, calidad = 1.0) =>
   });
 
 // ──────────────── Principal ────────────────
-export async function generarPDFRecepcion(revision, clienteInput, productosRecibidos) {
+export async function generarPDFRecepcion(revision, clienteInput, productosRecibidos, ingresosAdicionales = []) {
   const doc = new jsPDF();
 
   // Recursos gráficos (MISMO tratamiento que Remisión)
@@ -157,19 +157,20 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
     return [`Abono ${i + 1}`, fecha, money(valor)];
   });
 
-  // GARANTÍA NO devuelta
-  const garantiaTotal = Number(revision?.garantia || 0);
-  const garantiaDevuelta = Number(revision?.garantia_devuelta || 0);
-  const garantiaNoDevuelta = Math.max(0, garantiaTotal - garantiaDevuelta);
-  if (garantiaNoDevuelta > 0) {
-    ingresosRows.push([
-      "Compensación por daños (garantía no devuelta)",
-      "—",
-      money(garantiaNoDevuelta),
-    ]);
-    totalIngresos += garantiaNoDevuelta;
-  }
+  // 🆕 Agregar ingresos adicionales (pagos en recepción)
+  ingresosAdicionales.forEach((ing, i) => {
+    const valor = Number(ing.valor || 0);
+    if (valor > 0) {
+      ingresosRows.push([
+        `Pago en recepción ${i + 1}`,
+        ing.fecha ? soloFecha(ing.fecha) : "—",
+        money(valor),
+      ]);
+      totalIngresos += valor;
+    }
+  });
 
+  // ✅ TABLA DE INGRESOS
   zebraIndex = 0;
   autoTable(doc, {
     startY: y,
