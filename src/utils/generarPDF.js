@@ -169,67 +169,120 @@
     const esMulti = Boolean(documento.multi_dias);
     const nd = num(documento.numero_dias, 1);
 
-    const head = esMulti
-      ? [["Cantidad", "Artículo", "Precio", "V. x Días", "Subtotal"]]
-      : [["Cantidad", "Artículo", "Precio", "Subtotal"]];
+    const mostrarNotas = Boolean(documento.mostrar_notas);
+
+const head = (() => {
+  if (esMulti && mostrarNotas) {
+    return [["Cantidad", "Artículo", "Notas", "Precio", "V. x Días", "Subtotal"]];
+  } else if (esMulti && !mostrarNotas) {
+    return [["Cantidad", "Artículo", "Precio", "V. x Días", "Subtotal"]];
+  } else if (!esMulti && mostrarNotas) {
+    return [["Cantidad", "Artículo", "Notas", "Precio", "Subtotal"]];
+  } else {
+    return [["Cantidad", "Artículo", "Precio", "Subtotal"]];
+  }
+})();
 
     const body = (documento.productos || []).map((p) => {
-    const cantidad = num(p.cantidad, 0);
-    const precio = num(p.precio, 0);
+  const cantidad = num(p.cantidad, 0);
+  const precio = num(p.precio, 0);
 
-    // si el ítem NO se multiplica por días, "V. x Días" debe ser el precio unitario
-    const usaDias = p.multiplicarPorDias !== false;
-    const valorPorDias = usaDias ? (precio * nd) : precio;
+  const usaDias = p.multiplicarPorDias !== false;
+  const valorPorDias = usaDias ? (precio * nd) : precio;
 
-    // fallback del subtotal coherente con usaDias
-    const subtotal = num(
-      p.subtotal,
-      precio * cantidad * (esMulti ? (usaDias ? nd : 1) : 1)
-    );
+  const subtotal = num(
+    p.subtotal,
+    precio * cantidad * (esMulti ? (usaDias ? nd : 1) : 1)
+  );
 
-    if (esMulti) {
-      return [
-        cantidad || 0,
-        p.nombre || "",
-        `$${fmt(precio)}`,
-        `$${fmt(valorPorDias)}`,
-        `$${fmt(subtotal)}`,
-      ];
-    }
-    return [cantidad || 0, p.nombre || "", `$${fmt(precio)}`, `$${fmt(subtotal)}`];
-  });
+  const notas = (p.notas || "").trim();
+
+  if (esMulti && mostrarNotas) {
+    return [
+      cantidad || 0,
+      p.nombre || "",
+      notas,
+      `$${fmt(precio)}`,
+      `$${fmt(valorPorDias)}`,
+      `$${fmt(subtotal)}`,
+    ];
+  } else if (esMulti && !mostrarNotas) {
+    return [
+      cantidad || 0,
+      p.nombre || "",
+      `$${fmt(precio)}`,
+      `$${fmt(valorPorDias)}`,
+      `$${fmt(subtotal)}`,
+    ];
+  } else if (!esMulti && mostrarNotas) {
+    return [
+      cantidad || 0,
+      p.nombre || "",
+      notas,
+      `$${fmt(precio)}`,
+      `$${fmt(subtotal)}`,
+    ];
+  } else {
+    return [
+      cantidad || 0,
+      p.nombre || "",
+      `$${fmt(precio)}`,
+      `$${fmt(subtotal)}`,
+    ];
+  }
+});
 
     autoTable(doc, {
-    head,
-    body,
-    startY: 85,
-    styles: { font: "helvetica", fontSize: 10 },
-    headStyles: { 
-    fillColor: colorHead(tipo), 
-    textColor: 255, 
-    halign: "center", 
-    valign: "middle" 
+  head,
+  body,
+  startY: 85,
+  styles: { font: "helvetica", fontSize: 10 },
+  headStyles: {
+    fillColor: colorHead(tipo),
+    textColor: 255,
+    halign: "center",
+    valign: "middle",
   },
-    columnStyles: esMulti
-      ? {
-          0: { cellWidth: 22, halign: "center" }, // Cantidad (más ancho que antes)
-          1: { cellWidth: 90 },                   // Artículo
-          2: { cellWidth: 26, halign: "center" }, // Precio
-          3: { cellWidth: 26, halign: "center" }, // V. x Días
-          4: { cellWidth: 26, halign: "center" }, // Subtotal
-        }
-      : {
-          0: { cellWidth: 30, halign: "center" }, // Cantidad más cómoda
-          1: { cellWidth: 100 },                  // Artículo
-          2: { cellWidth: 30, halign: "center" }, // Precio
-          3: { cellWidth: 30, halign: "center" }, // Subtotal
-        },
-    margin: { left: 10, right: 10 },
-    didDrawPage: insertarFondo,
-  });
+  columnStyles: (() => {
+    if (esMulti && mostrarNotas) {
+      return {
+        0: { cellWidth: 20, halign: "center" },  // Cantidad
+        1: { cellWidth: 65 },                     // Artículo (reducido)
+        2: { cellWidth: 40 },                     // Notas
+        3: { cellWidth: 23, halign: "center" },  // Precio
+        4: { cellWidth: 23, halign: "center" },  // V. x Días
+        5: { cellWidth: 23, halign: "center" },  // Subtotal
+      };
+    } else if (esMulti && !mostrarNotas) {
+      return {
+        0: { cellWidth: 22, halign: "center" },  // Cantidad
+        1: { cellWidth: 90 },                     // Artículo
+        2: { cellWidth: 26, halign: "center" },  // Precio
+        3: { cellWidth: 26, halign: "center" },  // V. x Días
+        4: { cellWidth: 26, halign: "center" },  // Subtotal
+      };
+    } else if (!esMulti && mostrarNotas) {
+      return {
+        0: { cellWidth: 25, halign: "center" },  // Cantidad
+        1: { cellWidth: 70 },                     // Artículo (reducido)
+        2: { cellWidth: 45 },                     // Notas
+        3: { cellWidth: 28, halign: "center" },  // Precio
+        4: { cellWidth: 28, halign: "center" },  // Subtotal
+      };
+    } else {
+      return {
+        0: { cellWidth: 30, halign: "center" },  // Cantidad
+        1: { cellWidth: 100 },                    // Artículo
+        2: { cellWidth: 30, halign: "center" },  // Precio
+        3: { cellWidth: 30, halign: "center" },  // Subtotal
+      };
+    }
+  })(),
+  margin: { left: 10, right: 10 },
+  didDrawPage: insertarFondo,
+});
 
-    let y = (doc.lastAutoTable?.finalY || 100) + 10;
-
+let y = (doc.lastAutoTable?.finalY || 100) + 10;
     // ===== Pre-cálculo de espacio para Garantía + Abonos + Totales + Redes =====
   const pageHeight0 = doc.internal.pageSize.getHeight();
   const footerHeight = 15;    // 3 líneas de redes (5px c/u)

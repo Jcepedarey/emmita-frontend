@@ -120,17 +120,18 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
   }, [productos, busqueda]);
 
   const agregarAlGrupo = (producto) => {
-    if (seleccionados.some((p) => p.id === producto.id)) return;
-    const nuevo = {
-  ...producto,
-  cantidad: "",       // sin número por defecto
-  subtotal: 0,        // hasta que elijas cantidad
-  temporal: false,
-};
-    setSeleccionados((prev) => [...prev, nuevo]);
-    setBusqueda("");
-    buscarRef.current?.focus();
+  if (seleccionados.some((p) => p.id === producto.id)) return;
+  const nuevo = {
+    ...producto,
+    cantidad: "",       // sin número por defecto
+    subtotal: 0,        // hasta que elijas cantidad
+    temporal: false,
+    precio_compra: producto.precio_compra || 0, // ✅ Nuevo campo
   };
+  setSeleccionados((prev) => [...prev, nuevo]);
+  setBusqueda("");
+  buscarRef.current?.focus();
+};
 
   const actualizarCampo = (index, campo, valor) => {
   setSeleccionados((prev) => {
@@ -152,17 +153,17 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
           arr[index].cantidad = n;
         }
       }
-    } else if (campo === "precio") {
-      const raw = valor;
+    } else if (campo === "precio_compra") {
+  const raw = valor;
 
-      // Permitir borrar todo
-      if (raw === "") {
-        arr[index].precio = "";
-      } else {
-        const n = Number(raw);
-        arr[index].precio = !isNaN(n) && n >= 0 ? n : 0;
-      }
-    }
+  // Permitir borrar todo
+  if (raw === "") {
+    arr[index].precio_compra = "";
+  } else {
+    const n = Number(raw);
+    arr[index].precio_compra = !isNaN(n) && n >= 0 ? n : 0;
+  }
+}
 
     // Recalcular subtotal siempre
     arr[index].subtotal =
@@ -283,7 +284,7 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
         {error && <div style={{ color: "crimson", marginBottom: 8 }}>{error}</div>}
 
         {busqueda && filtrados.length > 0 && (
-          <ul style={{ maxHeight: 180, overflowY: "auto", padding: 0 }}>
+  <ul style={{ maxHeight: 240, overflowY: "auto", padding: 0 }}>
             {filtrados.map((p) => (
               <li key={p.id} style={{ listStyle: "none", marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
                 <div>
@@ -336,70 +337,88 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
         <ul style={{ padding: 0 }}>
           {seleccionados.map((item, index) => (
             <li key={`${item.id}-${index}`} style={{ listStyle: "none", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 200 }}>
-                  <strong>{item.nombre}</strong>{" "}
-                  <small style={{ color: "gray" }}>
-  {item.es_proveedor ? (
-    <>
-      ·{" "}
-      <span
+  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+    
+    {/* ✅ CANTIDAD AHORA VA PRIMERO */}
+    <div>
+      Cant:
+      <input
+        type="number"
+        min="1"
+        value={item.cantidad}
+        onChange={(e) => actualizarCampo(index, "cantidad", e.target.value)}
         style={{
-          fontWeight: 600,
-          background: "#eef6ff",
-          padding: "1px 4px",
-          borderRadius: 4,
+          width: 70,
+          marginLeft: 6,
+          padding: "6px 8px",
+          backgroundColor: "#FFF8D1",
+          boxShadow: "inset 0 0 0 2px rgba(255,184,0,.25)",
+          border: "1px solid #E6C766",
+          borderRadius: 6,
         }}
-      >
-        {item.proveedor_nombre || "Proveedor"}
-      </span>
-    </>
-  ) : (
-    "· Inventario"
-  )}{" "}
-  · Stock: {stockDisponible?.[item.id] ?? "N/A"}
-</small>
-                </div>
+      />
+    </div>
 
-                <div>
-                  Cant:
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.cantidad}
-                    onChange={(e) => actualizarCampo(index, "cantidad", e.target.value)}
-                    style={{
-  width: 70,
-  marginLeft: 6,
-  padding: "6px 8px",
-  backgroundColor: "#FFF8D1",
-  boxShadow: "inset 0 0 0 2px rgba(255,184,0,.25)",
-  border: "1px solid #E6C766",
-  borderRadius: 6,
-}}
-                  />
-                </div>
+    {/* ✅ NOMBRE Y PROVEEDOR */}
+    <div style={{ minWidth: 200 }}>
+      <strong>{item.nombre}</strong>{" "}
+      <small style={{ color: "gray" }}>
+        {item.es_proveedor ? (
+          <>
+            ·{" "}
+            <span
+              style={{
+                fontWeight: 600,
+                background: "#eef6ff",
+                padding: "1px 4px",
+                borderRadius: 4,
+              }}
+            >
+              {item.proveedor_nombre || "Proveedor"}
+            </span>
+          </>
+        ) : (
+          "· Inventario"
+        )}{" "}
+        · Stock: {stockDisponible?.[item.id] ?? "N/A"}
+      </small>
+    </div>
 
-                <div>
-                  Precio:
-                  <input
-                    type="number"
-                    min="0"
-                    value={item.precio}
-                    onChange={(e) => actualizarCampo(index, "precio", e.target.value)}
-                    style={{ width: 90, marginLeft: 6 }}
-                  />
-                </div>
+    {/* ✅ PRECIO COMPRA (solo si es proveedor) */}
+    {item.es_proveedor && (
+      <div>
+        Precio compra:
+        <input
+          type="number"
+          min="0"
+          value={item.precio_compra || ""}
+          onChange={(e) => actualizarCampo(index, "precio_compra", e.target.value)}
+          style={{ width: 90, marginLeft: 6 }}
+        />
+      </div>
+    )}
 
-                <strong style={{ marginLeft: "auto" }}>
-                  Subtotal: ${Number(item.subtotal || 0).toLocaleString("es-CO")}
-                </strong>
+    {/* ✅ PRECIO VENTA (ahora dice "Precio venta") */}
+    <div>
+      Precio venta:
+      <input
+        type="number"
+        min="0"
+        value={item.precio}
+        onChange={(e) => actualizarCampo(index, "precio", e.target.value)}
+        style={{ width: 90, marginLeft: 6 }}
+      />
+    </div>
 
-                <button onClick={() => eliminarDelGrupo(index)} style={{ marginLeft: 8 }}>
-                  Quitar
-                </button>
-              </div>
-            </li>
+    <strong style={{ marginLeft: "auto" }}>
+      Subtotal: ${Number(item.subtotal || 0).toLocaleString("es-CO")}
+    </strong>
+
+    <button onClick={() => eliminarDelGrupo(index)} style={{ marginLeft: 8 }}>
+      Quitar
+    </button>
+  </div>
+</li>
           ))}
         </ul>
 

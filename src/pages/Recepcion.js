@@ -479,18 +479,22 @@ const Recepcion = () => {
               )}
 
               {/* Saldo pendiente */}
-              <div className="bg-yellow-100 p-3 rounded">
-                <p className="font-bold text-lg">
-                  Saldo pendiente: $
-                  {(
-                    Number(ordenSeleccionada.total_neto || 0) -
-                    (ordenSeleccionada.abonos || []).reduce(
-                      (sum, a) => sum + Number(a.valor || 0),
-                      0
-                    )
-                  ).toLocaleString("es-CO")}
-                </p>
-              </div>
+<div className="bg-yellow-100 p-3 rounded">
+  <p className="font-bold text-lg">
+    Saldo pendiente: $
+    {(
+      Number(ordenSeleccionada.total_neto || 0) -
+      (ordenSeleccionada.abonos || []).reduce(
+        (sum, a) => sum + Number(a.valor || 0),
+        0
+      ) -
+      ingresosAdicionales.reduce(
+        (sum, ing) => sum + Number(ing.valor || 0),
+        0
+      )
+    ).toLocaleString("es-CO")}
+  </p>
+</div>
             </div>
 
             {/* 💵 INGRESOS ADICIONALES */}

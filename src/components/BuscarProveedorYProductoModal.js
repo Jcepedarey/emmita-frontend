@@ -8,15 +8,15 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   const [busquedaProveedor, setBusquedaProveedor] = useState("");
 
   const [productos, setProductos] = useState([]);
-  const [productosFiltrados, setProductosFiltrados] = useState([]);
-  const [busquedaProducto, setBusquedaProducto] = useState("");
-  const [mostrarTodos, setMostrarTodos] = useState(false);
+  const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
 
-  const [formProv, setFormProv] = useState({ nombre: "", telefono: "", tipo_servicio: "" });
   const [formProd, setFormProd] = useState({ nombre: "", precio_compra: "", precio_venta: "" });
 
   const [productoEditando, setProductoEditando] = useState(null);
   const [productoForm, setProductoForm] = useState({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
+
+  // Sugerencias filtradas en tiempo real
+  const [sugerenciasProveedores, setSugerenciasProveedores] = useState([]);
 
   useEffect(() => {
     const cargarProveedores = async () => {
@@ -26,58 +26,74 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     cargarProveedores();
   }, []);
 
-  const seleccionarProveedor = (proveedorId) => {
-    const proveedor = proveedores.find(p => p.id === proveedorId);
-    setProveedorSeleccionado(proveedor);
-    setBusquedaProducto("");
-    setProductos([]);
-    setProductosFiltrados([]);
-    setMostrarTodos(false);
+  // ✅ Cambio 1: Filtrar automáticamente mientras escribe
+  const manejarCambioProveedor = (e) => {
+    const valor = e.target.value;
+    setBusquedaProveedor(valor);
+    
+    if (valor.trim().length > 0) {
+      const filtrados = proveedores.filter((p) =>
+        p.nombre.toLowerCase().includes(valor.toLowerCase())
+      );
+      setSugerenciasProveedores(filtrados);
+    } else {
+      setSugerenciasProveedores([]);
+    }
   };
 
-  const buscarProductos = async () => {
-    if (!proveedorSeleccionado) return;
+  // ✅ Cambio 2: Al seleccionar proveedor, cargar productos automáticamente
+  const seleccionarProveedor = async (proveedor) => {
+    setProveedorSeleccionado(proveedor);
+    setBusquedaProveedor(proveedor.nombre);
+    setSugerenciasProveedores([]);
+    setMostrarFormNuevo(false);
+
+    // Cargar productos automáticamente
     const { data } = await supabase
       .from("productos_proveedores")
       .select("*")
-      .eq("proveedor_id", proveedorSeleccionado.id);
+      .eq("proveedor_id", proveedor.id);
 
     setProductos(data || []);
-    if (busquedaProducto.trim()) {
-      const texto = busquedaProducto.toLowerCase();
-      const filtrados = data.filter((p) => p.nombre?.toLowerCase().includes(texto));
-      setProductosFiltrados(filtrados);
-    } else {
-      setProductosFiltrados([]);
-    }
   };
 
-  useEffect(() => {
-    if (mostrarTodos && proveedorSeleccionado) buscarProductos();
-  }, [mostrarTodos, proveedorSeleccionado]);
-
-  const guardarProveedor = async () => {
-    if (!formProv.nombre.trim()) {
-      return Swal.fire("Campo requerido", "El nombre del proveedor es obligatorio", "warning");
-    }
-    const { data, error } = await supabase.from("proveedores").insert([formProv]).select();
-    if (error) return Swal.fire("Error", "No se pudo guardar el proveedor", "error");
-    const nuevo = data[0];
-    setProveedores((prev) => [...prev, nuevo]);
-    seleccionarProveedor(nuevo.id);
-    setFormProv({ nombre: "", telefono: "", tipo_servicio: "" });
-    Swal.fire("Guardado", "Proveedor creado correctamente", "success");
-  };
-
+  // ✅ Cambio 3: Guardar nuevo producto
   const guardarProductoProveedor = async () => {
     if (!formProd.nombre || !formProd.precio_compra || !formProd.precio_venta || !proveedorSeleccionado?.id) {
       return Swal.fire("Faltan datos", "Completa todos los campos", "warning");
     }
-    const { error } = await supabase.from("productos_proveedores").insert([{ ...formProd, proveedor_id: proveedorSeleccionado.id }]);
+
+    const { data, error } = await supabase
+      .from("productos_proveedores")
+      .insert([{ ...formProd, proveedor_id: proveedorSeleccionado.id, stock: 0 }])
+      .select();
+
     if (error) return Swal.fire("Error", "No se pudo guardar el producto", "error");
-    Swal.fire("Guardado", "Producto agregado correctamente", "success");
+
+    const productoCreado = data[0];
+    
+    Swal.fire({
+      title: "Producto guardado",
+      text: "¿Deseas agregarlo al pedido ahora?",
+      icon: "success",
+      showCancelButton: true,
+      confirmButtonText: "Sí, agregar",
+      cancelButtonText: "No, solo guardar"
+    }).then((result) => {
+      if (result.isConfirmed) {
+        onSelect(productoCreado);
+      }
+    });
+
     setFormProd({ nombre: "", precio_compra: "", precio_venta: "" });
-    buscarProductos();
+    setMostrarFormNuevo(false);
+
+    // Recargar lista de productos
+    const { data: productosActualizados } = await supabase
+      .from("productos_proveedores")
+      .select("*")
+      .eq("proveedor_id", proveedorSeleccionado.id);
+    setProductos(productosActualizados || []);
   };
 
   const manejarEditar = (prod) => {
@@ -93,14 +109,23 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   const guardarEdicion = async () => {
     const { nombre, precio_compra, precio_venta, stock } = productoForm;
     if (!nombre || !precio_venta || !stock) return Swal.fire("Campos incompletos", "Completa todos los campos", "warning");
-    const { error } = await supabase.from("productos_proveedores")
+    
+    const { error } = await supabase
+      .from("productos_proveedores")
       .update({ nombre, precio_compra, precio_venta, stock })
       .eq("id", productoEditando);
+    
     if (!error) {
       Swal.fire("Producto actualizado", "", "success");
       setProductoEditando(null);
       setProductoForm({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
-      buscarProductos();
+      
+      // Recargar productos
+      const { data } = await supabase
+        .from("productos_proveedores")
+        .select("*")
+        .eq("proveedor_id", proveedorSeleccionado.id);
+      setProductos(data || []);
     }
   };
 
@@ -110,93 +135,180 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   };
 
   const manejarSeleccion = (prod) => {
-  onSelect(prod); // ✅ Esto llama a agregarProductoProveedor sin cerrar el modal
-  // ❌ NO pongas: onClose();
-};
+    onSelect(prod);
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
       <div className="bg-white p-6 rounded w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">📦 Buscar producto por proveedor</h2>
 
+        {/* ✅ Cambio 1: Búsqueda con sugerencias automáticas */}
         <label className="block mb-1 font-medium">Proveedor:</label>
         <input
           type="text"
           value={busquedaProveedor}
-          onChange={(e) => setBusquedaProveedor(e.target.value)}
+          onChange={manejarCambioProveedor}
           className="border p-2 rounded w-full mb-2"
-          placeholder="Buscar proveedor..."
+          placeholder="Escribe el nombre del proveedor..."
         />
-        <select
-          className="border p-2 rounded w-full mb-4"
-          value={proveedorSeleccionado?.id || ""}
-          onChange={(e) => seleccionarProveedor(e.target.value)}
-        >
-          <option value="">Selecciona un proveedor...</option>
-          {proveedores
-            .filter((p) => p.nombre.toLowerCase().includes(busquedaProveedor.toLowerCase()))
-            .map((prov) => (
-              <option key={prov.id} value={prov.id}>{prov.nombre}</option>
-            ))}
-        </select>
 
+        {/* Lista de sugerencias (similar a Trazabilidad) */}
+        {sugerenciasProveedores.length > 0 && (
+          <ul className="border rounded max-h-40 overflow-y-auto mb-4 bg-gray-50">
+            {sugerenciasProveedores.map((prov) => (
+              <li
+                key={prov.id}
+                onClick={() => seleccionarProveedor(prov)}
+                className="p-2 hover:bg-blue-100 cursor-pointer"
+              >
+                {prov.nombre}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* ✅ Cambio 2: Productos se muestran automáticamente al seleccionar proveedor */}
         {proveedorSeleccionado && (
           <div className="mb-4">
-            <h3 className="font-semibold">Proveedor: {proveedorSeleccionado.nombre}</h3>
-            <div className="flex gap-2 mt-2">
-              {!mostrarTodos ? (
-                <button onClick={() => setMostrarTodos(true)} className="bg-blue-600 text-white px-3 py-1 rounded">
-                  🔍 Ver productos
-                </button>
-              ) : (
-                <button onClick={() => { setMostrarTodos(false); setProductosFiltrados([]); }} className="bg-gray-400 text-white px-3 py-1 rounded">
-                  ❌ Ocultar productos
-                </button>
-              )}
-            </div>
+            <h3 className="font-semibold mb-2 text-lg">
+              Proveedor: {proveedorSeleccionado.nombre}
+            </h3>
 
-            {mostrarTodos && productos.map((prod) => (
-              <div key={prod.id} className="border p-2 rounded mt-2 bg-gray-100">
-                {productoEditando === prod.id ? (
-                  <div className="space-y-2">
-                    <input value={productoForm.nombre} onChange={(e) => setProductoForm({ ...productoForm, nombre: e.target.value })} className="border p-1 rounded w-full" />
-                    <input type="number" value={productoForm.precio_compra} onChange={(e) => setProductoForm({ ...productoForm, precio_compra: e.target.value })} className="border p-1 rounded w-full" />
-                    <input type="number" value={productoForm.precio_venta} onChange={(e) => setProductoForm({ ...productoForm, precio_venta: e.target.value })} className="border p-1 rounded w-full" />
-                    <input type="number" value={productoForm.stock} onChange={(e) => setProductoForm({ ...productoForm, stock: e.target.value })} className="border p-1 rounded w-full" />
-                    <div className="flex gap-2">
-                      <button onClick={guardarEdicion} className="bg-green-500 text-white px-2 py-1 rounded">💾</button>
-                      <button onClick={cancelarEdicion} className="bg-gray-400 px-2 py-1 rounded">Cancelar</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-semibold">{prod.nombre}</p>
-                      <p>Compra: ${prod.precio_compra}</p>
-                      <p>Venta: ${prod.precio_venta}</p>
-                      <p>Stock: {prod.stock}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => manejarSeleccion(prod)} className="bg-blue-500 text-white px-2 py-1 rounded">➕</button>
-                      <button onClick={() => manejarEditar(prod)} className="bg-yellow-400 text-white px-2 py-1 rounded">✏️</button>
-                    </div>
-                  </div>
-                )}
+            {/* ✅ Cambio 3: Botón para mostrar formulario de nuevo producto */}
+            {!mostrarFormNuevo && (
+              <button
+                onClick={() => setMostrarFormNuevo(true)}
+                className="bg-green-600 text-white px-4 py-2 rounded mb-3"
+              >
+                ➕ Nuevo producto
+              </button>
+            )}
+
+            {/* Formulario de nuevo producto (solo visible si se activa) */}
+            {mostrarFormNuevo && (
+              <div className="border p-4 rounded mb-4 bg-green-50">
+                <h4 className="font-semibold mb-2">Crear nuevo producto</h4>
+                <input
+                  type="text"
+                  placeholder="Nombre"
+                  value={formProd.nombre}
+                  onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })}
+                  className="border p-2 rounded w-full mb-2"
+                />
+                <input
+                  type="number"
+                  placeholder="Precio compra"
+                  value={formProd.precio_compra}
+                  onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })}
+                  className="border p-2 rounded w-full mb-2"
+                />
+                <input
+                  type="number"
+                  placeholder="Precio venta"
+                  value={formProd.precio_venta}
+                  onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })}
+                  className="border p-2 rounded w-full mb-2"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={guardarProductoProveedor}
+                    className="bg-green-600 text-white px-4 py-2 rounded"
+                  >
+                    💾 Guardar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMostrarFormNuevo(false);
+                      setFormProd({ nombre: "", precio_compra: "", precio_venta: "" });
+                    }}
+                    className="bg-gray-400 text-white px-4 py-2 rounded"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
-            ))}
+            )}
 
-            <div className="mt-6">
-              <h4 className="font-semibold mb-2">➕ Nuevo producto</h4>
-              <input type="text" placeholder="Nombre" value={formProd.nombre} onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })} className="border p-1 rounded w-full mb-2" />
-              <input type="number" placeholder="Precio compra" value={formProd.precio_compra} onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })} className="border p-1 rounded w-full mb-2" />
-              <input type="number" placeholder="Precio venta" value={formProd.precio_venta} onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })} className="border p-1 rounded w-full mb-2" />
-              <button onClick={guardarProductoProveedor} className="bg-green-600 text-white px-4 py-1 rounded">Guardar producto</button>
+            {/* ✅ Cambio 4: Lista de productos (visible automáticamente) */}
+            <div className="space-y-2">
+              {productos.length === 0 ? (
+                <p className="text-gray-500 italic">No hay productos registrados para este proveedor</p>
+              ) : (
+                productos.map((prod) => (
+                  <div key={prod.id} className="border p-3 rounded bg-gray-100">
+                    {productoEditando === prod.id ? (
+                      <div className="space-y-2">
+                        <input
+                          value={productoForm.nombre}
+                          onChange={(e) => setProductoForm({ ...productoForm, nombre: e.target.value })}
+                          className="border p-2 rounded w-full"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Precio compra"
+                          value={productoForm.precio_compra}
+                          onChange={(e) => setProductoForm({ ...productoForm, precio_compra: e.target.value })}
+                          className="border p-2 rounded w-full"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Precio venta"
+                          value={productoForm.precio_venta}
+                          onChange={(e) => setProductoForm({ ...productoForm, precio_venta: e.target.value })}
+                          className="border p-2 rounded w-full"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Stock"
+                          value={productoForm.stock}
+                          onChange={(e) => setProductoForm({ ...productoForm, stock: e.target.value })}
+                          className="border p-2 rounded w-full"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={guardarEdicion} className="bg-green-500 text-white px-3 py-1 rounded">
+                            💾 Guardar
+                          </button>
+                          <button onClick={cancelarEdicion} className="bg-gray-400 text-white px-3 py-1 rounded">
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold">{prod.nombre}</p>
+                          <p className="text-sm">Compra: ${Number(prod.precio_compra || 0).toLocaleString("es-CO")}</p>
+                          <p className="text-sm">Venta: ${Number(prod.precio_venta || 0).toLocaleString("es-CO")}</p>
+                          <p className="text-sm">Stock: {prod.stock || 0}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => manejarSeleccion(prod)}
+                            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                          >
+                            ➕ Agregar
+                          </button>
+                          <button
+                            onClick={() => manejarEditar(prod)}
+                            className="bg-yellow-400 text-white px-3 py-1 rounded hover:bg-yellow-500"
+                          >
+                            ✏️ Editar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
 
         <div className="flex justify-end mt-6">
-          <button onClick={onClose} className="bg-red-500 text-white px-4 py-2 rounded">✖️ Cerrar</button>
+          <button onClick={onClose} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+            ✖️ Cerrar
+          </button>
         </div>
       </div>
     </div>

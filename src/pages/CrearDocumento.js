@@ -38,6 +38,7 @@ const [usuario, setUsuario] = useState({ nombre: "Administrador" });
     const [fechaEvento, setFechaEvento] = useState("");         // modo 1 día
     const [fechasEvento, setFechasEvento] = useState([]);       // modo multi-día
     const numeroDias = useMemo(() => (multiDias ? fechasEvento.length : 1), [multiDias, fechasEvento]);
+    const [mostrarNotas, setMostrarNotas] = useState(false);
 
     const [clientes, setClientes] = useState([]);
     const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
@@ -196,6 +197,7 @@ const [usuario, setUsuario] = useState({ nombre: "Administrador" });
       setAbonos(Array.isArray(documento.abonos) ? documento.abonos : []);
       setGarantiaRecibida(!!documento?.garantia_recibida);
       setFechaGarantia(documento?.fecha_garantia || "");
+      setMostrarNotas(!!documento?.mostrar_notas);
 
       if (documento.nombre_cliente) {
         setClienteSeleccionado({
@@ -575,6 +577,7 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
     estado: estadoFinal,
     tipo: tipoDocumento,
     numero: numeroDocumento,
+    mostrar_notas: mostrarNotas,
     ...(tipoDocumento === "cotizacion"
       ? { fecha: fechaCreacion }
       : { fecha_creacion: fechaCreacion }),
@@ -776,8 +779,9 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
       multi_dias: multiDias,
       fechas_evento: multiDias ? fechasEvento : [],
       numero_dias: numeroDias,
-      fecha_evento: multiDias ? (fechasEvento[0] || null) : (fechaEvento || null)
-    });
+      fecha_evento: multiDias ? (fechasEvento[0] || null) : (fechaEvento || null),
+mostrar_notas: mostrarNotas
+});
 
     // Handlers multi-día
     const agregarDia = (nuevo) => {
@@ -935,109 +939,136 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
           )}
 
           <hr style={{ margin: "30px 0" }} />
-          <h3>Productos o Grupos Agregados</h3>
-
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+  <h3 style={{ margin: 0 }}>Productos o Grupos Agregados</h3>
+  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "13px", whiteSpace: "nowrap" }}>
+    <input
+      type="checkbox"
+      checked={mostrarNotas}
+      onChange={(e) => setMostrarNotas(e.target.checked)}
+    />
+    Añadir nota
+  </label>
+</div>
           {/* Tabla productos */}
   <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
-    <thead>
-      <tr>
-        <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
-        <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
-        <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
-        <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
-        {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>× días</th>}
-        {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>V. x Días</th>}
-        <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {productosAgregados.map((item, index) => {
-        const idProducto = item.producto_id || item.id;
-        const stockDisp = stock?.[idProducto] ?? "—";
-        const sobrepasado =
-          stockDisp !== "—" && Number(item.cantidad || 0) > Number(stockDisp || 0);
+  <thead>
+    <tr>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
+      <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
+      {mostrarNotas && <th style={{ borderBottom: "1px solid #ccc" }}>Notas</th>}
+      <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
+      {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>× días</th>}
+      {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>V. x Días</th>}
+      <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {productosAgregados.map((item, index) => {
+      const idProducto = item.producto_id || item.id;
+      const stockDisp = stock?.[idProducto] ?? "—";
+      const sobrepasado =
+        stockDisp !== "—" && Number(item.cantidad || 0) > Number(stockDisp || 0);
 
-        // control por ítem para multiplicar por días
-        const usaDias = item.multiplicarPorDias !== false; // default: true cuando hay multi-día
-        const valorPorDias = usaDias
-          ? Number(item.precio || 0) * (numeroDias || 1)
-          : null;
+      const usaDias = item.multiplicarPorDias !== false;
+      const valorPorDias = usaDias
+        ? Number(item.precio || 0) * (numeroDias || 1)
+        : null;
 
-        const isTemporal = !!item.temporal || !!item.es_proveedor;
-        const rowStyle = isTemporal ? { background: "rgba(255, 235, 59, 0.15)" } : undefined;
+      const isTemporal = !!item.temporal || !!item.es_proveedor;
+      const rowStyle = isTemporal ? { background: "rgba(255, 235, 59, 0.15)" } : undefined;
 
-        return (
-          <tr key={index} style={rowStyle}>
+      return (
+        <tr key={index} style={rowStyle}>
+          <td>
+            <input
+              type="number"
+              value={item.cantidad}
+              min="1"
+              onChange={(e) => actualizarCantidad(index, e.target.value)}
+              style={{ width: "60px" }}
+            />
+          </td>
+          <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
+            {stockDisp}
+          </td>
+          <td>{item.nombre}</td>
+
+          {/* ✅ NUEVA COLUMNA DE NOTAS */}
+          {mostrarNotas && (
             <td>
               <input
-                type="number"
-                value={item.cantidad}
-                min="1"
-                onChange={(e) => actualizarCantidad(index, e.target.value)}
-                style={{ width: "60px" }}
+                type="text"
+                value={item.notas || ""}
+                onChange={(e) => {
+                  const nuevos = [...productosAgregados];
+                  nuevos[index].notas = e.target.value;
+                  setProductosAgregados(nuevos);
+                }}
+                placeholder="Nota opcional..."
+                style={{ width: "100%", padding: "4px" }}
               />
             </td>
-            <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
-              {stockDisp}
-            </td>
-            <td>{item.nombre}</td>
-            <td>
-              {item.es_grupo ? (
-                "$" +
-                Number(item.precio || 0).toLocaleString("es-CO", {
-                  maximumFractionDigits: 0
-                })
-              ) : (
-                <input
-                  type="number"
-                  value={item.precio}
-                  min="0"
-                  onChange={(e) => actualizarPrecio(index, e.target.value)}
-                  style={{ width: "100px" }}
-                />
-              )}
-            </td>
+          )}
 
-            {multiDias && (
-              <td style={{ textAlign: "center" }}>
-                <input
-                  type="checkbox"
-                  checked={usaDias}
-                  onChange={(e) => toggleMultiplicarPorDias(index, e.target.checked)}
-                  title="Multiplicar este ítem por los días seleccionados"
-                />
-              </td>
-            )}
-
-            {multiDias && (
-              <td>
-                {usaDias
-                  ? `$${(valorPorDias || 0).toLocaleString("es-CO", {
-                      maximumFractionDigits: 0
-                    })}`
-                  : "—"}
-              </td>
-            )}
-
-            <td>
-              ${(item.subtotal ?? 0).toLocaleString("es-CO", {
+          <td>
+            {item.es_grupo ? (
+              "$" +
+              Number(item.precio || 0).toLocaleString("es-CO", {
                 maximumFractionDigits: 0
-              })}
+              })
+            ) : (
+              <input
+                type="number"
+                value={item.precio}
+                min="0"
+                onChange={(e) => actualizarPrecio(index, e.target.value)}
+                style={{ width: "100px" }}
+              />
+            )}
+          </td>
+
+          {multiDias && (
+            <td style={{ textAlign: "center" }}>
+              <input
+                type="checkbox"
+                checked={usaDias}
+                onChange={(e) => toggleMultiplicarPorDias(index, e.target.checked)}
+                title="Multiplicar este ítem por los días seleccionados"
+              />
             </td>
+          )}
+
+          {multiDias && (
             <td>
-              {item.es_grupo && (
-                <button onClick={() => editarGrupo(index)} title="Editar grupo">
-                  ✏️
-                </button>
-              )}
-              <button onClick={() => eliminarProducto(index)}>🗑️</button>
+              {usaDias
+                ? `$${(valorPorDias || 0).toLocaleString("es-CO", {
+                    maximumFractionDigits: 0
+                  })}`
+                : "—"}
             </td>
-          </tr>
-        );
-      })}
-    </tbody>
-  </table>
+          )}
+
+          <td>
+            ${(item.subtotal ?? 0).toLocaleString("es-CO", {
+              maximumFractionDigits: 0
+            })}
+          </td>
+          <td>
+            {item.es_grupo && (
+              <button onClick={() => editarGrupo(index)} title="Editar grupo">
+                ✏️
+              </button>
+            )}
+            <button onClick={() => eliminarProducto(index)}>🗑️</button>
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
 
           {/* Botones para agregar */}
           <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>

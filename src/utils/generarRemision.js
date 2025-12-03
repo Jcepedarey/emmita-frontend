@@ -79,6 +79,7 @@
     const fechaSegura = documento.fecha_creacion || new Date();
     const nombreArchivo = generarNombreArchivo("remision", fechaSegura, documento.nombre_cliente);
     const remisionId = nombreArchivo.replace(".pdf", "");
+    const mostrarNotas = Boolean(documento.mostrar_notas);
 
     // Fechas (formato dd/mm/aaaa)
   const fechaCreacion = documento.fecha_creacion ? soloFecha(documento.fecha_creacion) : "-";
@@ -145,56 +146,77 @@
       doc.text(`${etiquetaFecha2}: ${valorFecha2}`, 150, 62);
     }
 
-    // 📋 Tabla de artículos (con grupos)
-    //  - Si el ítem es grupo: se muestra UNA fila centrada con el nombre del grupo
-    //    y debajo cada artículo con la cantidad TOTAL = cantidad_del_subartículo * cantidad_del_grupo.
-    const filas = [];
-    (documento.productos || []).forEach((p) => {
-      if (p.es_grupo && Array.isArray(p.productos)) {
-        const factorGrupo = Number(p.cantidad) || 1;
+    // 📋 Tabla de artículos (con grupos y soporte de notas)
+const filas = [];
+(documento.productos || []).forEach((p) => {
+  if (p.es_grupo && Array.isArray(p.productos)) {
+    const factorGrupo = Number(p.cantidad) || 1;
 
-        // Título del grupo centrado y sin "Grupo:"
-        filas.push([
-    {
-      content: p.nombre || "Grupo sin nombre",
-      colSpan: 2,
-      _grupo: true, // ← marcador para estilos en el hook
-    },
-  ]);
+    // Título del grupo (centrado). El colSpan depende de si hay columna de Notas.
+    filas.push([
+      {
+        content: p.nombre || "Grupo sin nombre",
+        colSpan: mostrarNotas ? 3 : 2,
+        _grupo: true, // ← marcador para estilos en el hook
+      },
+    ]);
 
-        p.productos.forEach((sub) => {
-          const cantSub = (Number(sub.cantidad) || 0) * factorGrupo; // 👈 MULTIPLICA
-          if (cantSub > 0) {
-            filas.push([
-    cantSub,
-    { content: sub.nombre, _temp: !!sub.temporal || !!sub.es_proveedor },
-  ]);
-          }
-        });
-      } else {
-        // Producto normal
-        filas.push([
-    Number(p.cantidad) || 0,
-    { content: p.nombre, _temp: !!p.temporal || !!p.es_proveedor },
-  ]);
+    // Sub-items del grupo
+    p.productos.forEach((sub) => {
+      const cantSub = (Number(sub.cantidad) || 0) * factorGrupo; // 👈 MULTIPLICA
+      if (cantSub > 0) {
+        if (mostrarNotas) {
+          filas.push([
+            cantSub,
+            { content: sub.nombre, _temp: !!sub.temporal || !!sub.es_proveedor },
+            (sub.notas || "").trim(),
+          ]);
+        } else {
+          filas.push([
+            cantSub,
+            { content: sub.nombre, _temp: !!sub.temporal || !!sub.es_proveedor },
+          ]);
+        }
       }
     });
+  } else {
+    // Producto normal
+    if (mostrarNotas) {
+      filas.push([
+        Number(p.cantidad) || 0,
+        { content: p.nombre, _temp: !!p.temporal || !!p.es_proveedor },
+        (p.notas || "").trim(),
+      ]);
+    } else {
+      filas.push([
+        Number(p.cantidad) || 0,
+        { content: p.nombre, _temp: !!p.temporal || !!p.es_proveedor },
+      ]);
+    }
+  }
+});
 
-    let zebraIndex = 0;
+let zebraIndex = 0;
 
-  autoTable(doc, {
-    theme: "plain", // usamos plain y pintamos nosotros
-    head: [["Cantidad", "Artículo"]],
-    body: filas,
-    startY: 85,
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: "center", valign: "middle" },
-    columnStyles: {
-    0: { cellWidth: 30, halign: "center" }, // ← centra los números de la columna Cantidad
-    1: { cellWidth: 150 },
-  },
-    // Zebra intercalado y reseteo al cambiar de grupo
-    didParseCell: (data) => {
+autoTable(doc, {
+  theme: "plain", // usamos plain y pintamos nosotros
+  head: mostrarNotas ? [["Cantidad", "Artículo", "Notas"]] : [["Cantidad", "Artículo"]],
+  body: filas,
+  startY: 85,
+  styles: { fontSize: 10 },
+  headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: "center", valign: "middle" },
+  columnStyles: mostrarNotas
+  ? {
+      0: { cellWidth: 25, halign: "center" },  // Cantidad
+      1: { cellWidth: 110 },                    // Artículo (reducido)
+      2: { cellWidth: 55 },                     // Notas
+    }
+  : {
+      0: { cellWidth: 30, halign: "center" },
+      1: { cellWidth: 150 },
+    },
+  // Zebra intercalado y reseteo al cambiar de grupo
+  didParseCell: (data) => {
     const { cell, row, column, table, section } = data;
 
     // 👉 Encabezado centrado
@@ -238,9 +260,10 @@
       }
     }
   },
-    didDrawPage: insertarFondo,
-    margin: { left: 10, right: 10 },
-  });
+  didDrawPage: insertarFondo,
+  margin: { left: 10, right: 10 },
+});
+
 
     // ✍️ Firmas: debajo de la tabla (o en nueva página si no caben)
   const pageH = doc.internal.pageSize.height;

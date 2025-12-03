@@ -17,6 +17,7 @@ export default function BuscarProductoModal({
   const [resultados, setResultados] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
 
   // ➕ formulario "nuevo producto"
   const [form, setForm] = useState({
@@ -259,70 +260,131 @@ export default function BuscarProductoModal({
 
         <hr style={{ margin: "20px 0" }} />
 
-        <h3>➕ Agregar nuevo producto</h3>
+{/* ✅ Botón para mostrar/ocultar formulario */}
+{!mostrarFormNuevo ? (
+  <button
+    onClick={() => setMostrarFormNuevo(true)}
+    style={{
+      backgroundColor: "#4CAF50",
+      color: "white",
+      padding: "10px 20px",
+      border: "none",
+      borderRadius: "6px",
+      cursor: "pointer",
+      fontSize: "16px"
+    }}
+  >
+    ➕ Agregar nuevo producto
+  </button>
+) : (
+  <div style={{ border: "1px solid #ddd", padding: "15px", borderRadius: "8px", backgroundColor: "#f9f9f9" }}>
+    <h3 style={{ marginTop: 0 }}>➕ Agregar nuevo producto</h3>
 
-        <input
-          type="text"
-          placeholder="Nombre"
-          value={form.nombre}
-          onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-          style={{ width: "100%", marginBottom: 8, padding: 6 }}
-        />
-        <input
-          type="text"
-          placeholder="Descripción"
-          value={form.descripcion}
-          onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-          style={{ width: "100%", marginBottom: 8, padding: 6 }}
-        />
-        <input
-          type="number"
-          placeholder="Precio"
-          value={form.precio}
-          onChange={(e) => setForm({ ...form, precio: e.target.value })}
-          style={{ width: "100%", marginBottom: 8, padding: 6 }}
-        />
-        <input
-          type="number"
-          placeholder="Stock"
-          value={form.stock}
-          onChange={(e) => setForm({ ...form, stock: e.target.value })}
-          style={{ width: "100%", marginBottom: 8, padding: 6 }}
-        />
-        <input
-          type="text"
-          placeholder="Categoría"
-          value={form.categoria}
-          onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-          style={{ width: "100%", marginBottom: 8, padding: 6 }}
-        />
-        <input
-          type="number"
-          placeholder="Cantidad"
-          min="1"
-          value={form.cantidad}
-          onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
-          style={{ width: "100%", marginBottom: 8, padding: 6 }}
-        />
+    <input
+      type="text"
+      placeholder="Nombre"
+      value={form.nombre}
+      onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+      style={{ width: "100%", marginBottom: 8, padding: 6 }}
+    />
+    <input
+      type="text"
+      placeholder="Descripción"
+      value={form.descripcion}
+      onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+      style={{ width: "100%", marginBottom: 8, padding: 6 }}
+    />
+    <input
+      type="number"
+      placeholder="Precio"
+      value={form.precio}
+      onChange={(e) => setForm({ ...form, precio: e.target.value })}
+      style={{ width: "100%", marginBottom: 8, padding: 6 }}
+    />
+    <input
+      type="number"
+      placeholder="Stock"
+      value={form.stock}
+      onChange={(e) => setForm({ ...form, stock: e.target.value })}
+      style={{ width: "100%", marginBottom: 8, padding: 6 }}
+    />
+    <input
+      type="text"
+      placeholder="Categoría"
+      value={form.categoria}
+      onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+      style={{ width: "100%", marginBottom: 8, padding: 6 }}
+    />
+    <input
+      type="number"
+      placeholder="Cantidad"
+      min="1"
+      value={form.cantidad}
+      onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
+      style={{ width: "100%", marginBottom: 8, padding: 6 }}
+    />
 
-        <div style={{ marginTop: 10, marginBottom: 10 }}>
-          <span style={{ display: "block", marginBottom: 4 }}>¿Producto temporal?</span>
-          <input
-            type="checkbox"
-            checked={temporal}
-            onChange={(e) => setTemporal(e.target.checked)}
-            style={{ width: 16, height: 16, verticalAlign: "middle" }}
-          />
-        </div>
+    <div style={{ marginTop: 10, marginBottom: 10 }}>
+      <span style={{ display: "block", marginBottom: 4 }}>¿Producto temporal?</span>
+      <input
+        type="checkbox"
+        checked={temporal}
+        onChange={(e) => setTemporal(e.target.checked)}
+        style={{ width: 16, height: 16, verticalAlign: "middle" }}
+      />
+    </div>
 
-        <button onClick={guardarNuevoProducto} style={{ marginTop: 10 }}>
-          Guardar producto
-        </button>
+    <div style={{ display: "flex", gap: "10px", marginTop: 10 }}>
+      <button
+        onClick={guardarNuevoProducto}
+        style={{
+          backgroundColor: "#4CAF50",
+          color: "white",
+          padding: "8px 16px",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer"
+        }}
+      >
+        💾 Guardar producto
+      </button>
+      <button
+        onClick={() => {
+          setMostrarFormNuevo(false);
+          setForm({
+            nombre: "",
+            descripcion: "",
+            precio: "",
+            stock: "",
+            categoria: "",
+            cantidad: 1,
+          });
+        }}
+        style={{
+          backgroundColor: "#9e9e9e",
+          color: "white",
+          padding: "8px 16px",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer"
+        }}
+      >
+        Cancelar
+      </button>
+    </div>
+  </div>
+)}
 
         <hr style={{ margin: "20px 0" }} />
-        <button onClick={onClose} style={{ backgroundColor: "#f44336", color: "#fff", padding: "8px 12px" }}>
-          ❌ Cerrar
-        </button>
+        <button
+  onClick={() => {
+    setMostrarFormNuevo(false);
+    onClose();
+  }}
+  style={{ backgroundColor: "#f44336", color: "#fff", padding: "8px 12px" }}
+>
+  ❌ Cerrar
+</button>
 
         {!persistOpen && (
           <div style={{ marginTop: 8 }}>
