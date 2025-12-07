@@ -20,11 +20,9 @@
     const esEdicion = documento?.esEdicion || false;
     const idOriginal = documento?.idOriginal || null;
 
-    // 🆕 AGREGAR ESTA LÍNEA AL INICIO (después de los imports)
-const [usuario, setUsuario] = useState({ nombre: "Administrador" });
-
     // 🧠 ESTADOS
     const [tipoDocumento, setTipoDocumento] = useState(tipo || "cotizacion");
+    const [usuario, setUsuario] = useState(null);
     const [fechaCreacion, setFechaCreacion] = useState(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -156,6 +154,14 @@ const [usuario, setUsuario] = useState({ nombre: "Administrador" });
   // Label + checkbox en una sola línea
   const labelInline = { display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" };
 
+  // ✅ AGREGAR ESTE useEffect
+useEffect(() => {
+  const usuarioLocal = JSON.parse(localStorage.getItem("usuario"));
+  if (usuarioLocal) {
+    setUsuario(usuarioLocal);
+  }
+}, []);
+
     // 🔁 Precarga desde documento (edición) — multi-día y 1 día
   useEffect(() => {
     const precargarDatos = async () => {
@@ -231,75 +237,82 @@ const [usuario, setUsuario] = useState({ nombre: "Administrador" });
 
     // 📦 Stock disponible (1 día o varios días) con traslapes
   useEffect(() => {
-    const calcularStock = async () => {
-      const fechasConsulta = multiDias ? fechasEvento : (fechaEvento ? [fechaEvento] : []);
-      if (!fechasConsulta.length) return;
+  const calcularStock = async () => {
+    const fechasConsulta = multiDias ? fechasEvento : (fechaEvento ? [fechaEvento] : []);
+    if (!fechasConsulta.length) return;
 
-      // 1) inventario
-      const { data: productosData } = await supabase.from("productos").select("id, stock");
+    // 1) Inventario base
+    const { data: productosData } = await supabase.from("productos").select("id, stock");
 
-      // 2) intentamos pedir también fechas_evento; si da 400, reintentamos sin esa columna
-      let ordenesData = [];
-      let res = await supabase
-        .from("ordenes_pedido")
-        .select("productos, fecha_evento, fechas_evento, cerrada")
-        .eq("cerrada", false);
+    // 2) Órdenes abiertas
+    let ordenesData = [];
+    const hoy = new Date();
+hoy.setHours(0, 0, 0, 0);
+const fechaHoy = hoy.toISOString().split('T')[0];
 
-      if (res.error && String(res.error.message || "").includes("fechas_evento")) {
-        res = await supabase
-          .from("ordenes_pedido")
-          .select("productos, fecha_evento, cerrada")
-          .eq("cerrada", false);
-      }
-      if (res.data) ordenesData = res.data;
+let res = await supabase
+  .from("ordenes_pedido")
+  .select("productos, fecha_evento, fechas_evento, cerrada")
+  .eq("cerrada", false)
+  .gte("fecha_evento", fechaHoy);
 
-      const fechasSel = new Set(fechasConsulta.map((d) => String(d).slice(0, 10)));
-      const reservasPorFecha = {};
-      fechasConsulta.forEach((f) => (reservasPorFecha[f] = {}));
+    if (res.error && String(res.error.message || "").includes("fechas_evento")) {
+  res = await supabase
+    .from("ordenes_pedido")
+    .select("productos, fecha_evento, cerrada")
+    .eq("cerrada", false)
+    .gte("fecha_evento", fechaHoy);  // ⬅️ AGREGAR ESTA LÍNEA
+}
+    if (res.data) ordenesData = res.data;
 
-      ordenesData.forEach((orden) => {
-        const diasOrd = new Set([
-          ...(orden.fecha_evento ? [String(orden.fecha_evento).slice(0, 10)] : []),
-          ...((orden.fechas_evento || []).map((d) => String(d).slice(0, 10))),
-        ]);
-        const diasQueAplican = [...fechasSel].filter((d) => diasOrd.has(d));
-        if (diasQueAplican.length === 0) return;
+    const reservasPorFecha = {};
+    fechasConsulta.forEach((f) => (reservasPorFecha[f] = {}));
 
-        const acumular = (id, cant) => {
-          diasQueAplican.forEach((f) => {
+    // ✅ CORRECCIÓN: Evitar contar múltiples veces el mismo pedido
+    ordenesData.forEach((orden) => {
+      const diasOrd = new Set([
+        ...(orden.fecha_evento ? [String(orden.fecha_evento).slice(0, 10)] : []),
+        ...((orden.fechas_evento || []).map((d) => String(d).slice(0, 10))),
+      ]);
+
+      const acumular = (id, cant) => {
+        // ✅ Acumular en TODAS las fechas consultadas que traslapen
+        fechasConsulta.forEach((f) => {
+          if (diasOrd.has(f)) {
             reservasPorFecha[f][id] = (reservasPorFecha[f][id] || 0) + cant;
-          });
-        };
-
-        orden.productos?.forEach((p) => {
-          if (p.es_grupo && Array.isArray(p.productos)) {
-            p.productos.forEach((sub) => {
-              const id = sub.producto_id || sub.id;
-              const cant = (sub.cantidad || 0) * (p.cantidad || 1);
-              acumular(id, cant);
-            });
-          } else {
-            const id = p.producto_id || p.id;
-            acumular(id, (p.cantidad || 0));
           }
         });
+      };
+
+      orden.productos?.forEach((p) => {
+        if (p.es_grupo && Array.isArray(p.productos)) {
+          p.productos.forEach((sub) => {
+            const id = sub.producto_id || sub.id;
+            const cant = (Number(sub.cantidad) || 0) * (Number(p.cantidad) || 1);
+            acumular(id, cant);
+          });
+        } else {
+          const id = p.producto_id || p.id;
+          acumular(id, (Number(p.cantidad) || 0));
+        }
       });
+    });
 
-      const stockCalculado = {};
-      (productosData || []).forEach((prod) => {
-        const stockReal = parseInt(prod.stock ?? 0);
-        const disponiblesPorDia = fechasConsulta.map((f) => {
-          const reservado = reservasPorFecha[f]?.[prod.id] || 0;
-          return stockReal - reservado;
-        });
-        stockCalculado[prod.id] = disponiblesPorDia.length ? Math.min(...disponiblesPorDia) : stockReal;
+    const stockCalculado = {};
+    (productosData || []).forEach((prod) => {
+      const stockReal = parseInt(prod.stock ?? 0);
+      const disponiblesPorDia = fechasConsulta.map((f) => {
+        const reservado = reservasPorFecha[f]?.[prod.id] || 0;
+        return stockReal - reservado;
       });
+      stockCalculado[prod.id] = disponiblesPorDia.length ? Math.min(...disponiblesPorDia) : stockReal;
+    });
 
-      setStock(stockCalculado);
-    };
+    setStock(stockCalculado);
+  };
 
-    calcularStock();
-  }, [multiDias, fechaEvento, fechasEvento]);
+  calcularStock();
+}, [multiDias, fechaEvento, fechasEvento]);
 
   useEffect(() => {
     if (!multiDias) {

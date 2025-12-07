@@ -67,11 +67,33 @@ const Inicio = () => {
       });
 
       const vencidas = (data || []).filter((o) => {
-        const f = new Date(o.fecha_evento);
-        if (isNaN(f.getTime())) return false;
-        // ya pasaron (estrictamente menor a hoy 00:00) y no revisadas
-        return f.getTime() < hoy.getTime() && !o.revisada;
-      });
+  if (o.revisada) return false;
+
+  // ✅ Determinar el ÚLTIMO día del pedido
+  let ultimoDia;
+  
+  if (o.multi_dias && Array.isArray(o.fechas_evento) && o.fechas_evento.length > 0) {
+    // Pedido multi-día: usar el día MÁS TARDE
+    const fechasOrdenadas = [...o.fechas_evento]
+      .map(d => new Date(d))
+      .filter(d => !isNaN(d.getTime()))
+      .sort((a, b) => b - a); // Ordenar descendente
+    
+    if (fechasOrdenadas.length > 0) {
+      ultimoDia = fechasOrdenadas[0];
+    }
+  }
+  
+  // Si no es multi-día o no tiene fechas_evento, usar fecha_evento
+  if (!ultimoDia && o.fecha_evento) {
+    ultimoDia = new Date(o.fecha_evento);
+  }
+
+  if (!ultimoDia || isNaN(ultimoDia.getTime())) return false;
+
+  // ✅ Mostrar solo si el ÚLTIMO día ya pasó
+  return ultimoDia.getTime() < hoy.getTime();
+});
 
       setOrdenesProximas(proximas);
       setOrdenesPendientes(vencidas);
@@ -104,56 +126,97 @@ const Inicio = () => {
   }, [busqProd]);
 
   // ───────────────────── Calcular stock por fecha ─────────────────────
-  const calcularStockParaFecha = async (productoId, fechaISO) => {
-    setCargandoStock(true);
-    try {
-      // 1) Stock base del producto
-      const { data: prod } = await supabase
-        .from("productos")
-        .select("id, stock")
-        .eq("id", productoId)
-        .single();
-      const stockBase = parseInt(prod?.stock ?? 0, 10);
+ const calcularStockParaFecha = async (productoId, fechaISO) => {
+  setCargandoStock(true);
+  try {
+    // 1) Stock base del producto
+    const { data: prod } = await supabase
+      .from("productos")
+      .select("id, stock")
+      .eq("id", productoId)
+      .single();
+    const stockBase = parseInt(prod?.stock ?? 0, 10);
 
-      // 2) Órdenes abiertas que tocan esa fecha (1 día o multi-días)
-      const { data: ords } = await supabase
-        .from("ordenes_pedido")
-        .select("productos, fecha_evento, fechas_evento, cerrada")
-        .eq("cerrada", false);
+    // 2) Órdenes abiertas
+    const hoy = new Date();
+hoy.setHours(0, 0, 0, 0);
+const fechaHoy = hoy.toISOString().split('T')[0];
 
-      const ordenes = ords || [];
-      const fecha = String(fechaISO).slice(0, 10);
+const { data: ords } = await supabase
+  .from("ordenes_pedido")
+  .select("productos, fecha_evento, fechas_evento, cerrada")
+  .eq("cerrada", false)
+  .gte("fecha_evento", fechaHoy);
 
-      let reservado = 0;
-      ordenes.forEach((o) => {
-        const dias = new Set([
-          ...(o.fecha_evento ? [String(o.fecha_evento).slice(0, 10)] : []),
-          ...((o.fechas_evento || []).map((d) => String(d).slice(0, 10))),
-        ]);
-        if (!dias.has(fecha)) return;
+  console.log('📋 Pedidos filtrados:', ords?.length, ords);
 
-        (o.productos || []).forEach((p) => {
-          if (p.es_grupo && Array.isArray(p.productos)) {
-            p.productos.forEach((sub) => {
-              const id = sub.producto_id || sub.id;
-              const cant = (sub.cantidad || 0) * (p.cantidad || 1);
-              if (id === productoId) reservado += cant;
-            });
-          } else {
-            const id = p.producto_id || p.id;
-            if (id === productoId) reservado += (p.cantidad || 0);
-          }
-        });
+    const ordenes = ords || [];
+    const fecha = String(fechaISO).slice(0, 10);
+
+    let reservado = 0;
+    
+    // ✅ CORRECCIÓN: Contar cada pedido UNA SOLA VEZ
+    ordenes.forEach((o) => {
+      const dias = new Set([
+        ...(o.fecha_evento ? [String(o.fecha_evento).slice(0, 10)] : []),
+        ...((o.fechas_evento || []).map((d) => String(d).slice(0, 10))),
+      ]);
+      
+      // 🆕 CONSOLE LOG 1: Ver qué pedido se está procesando
+      console.log('🔄 Procesando orden:', {
+        fecha_evento: o.fecha_evento,
+        tiene_fecha_consultada: dias.has(fecha),
+        fecha_consultada: fecha
       });
+      
+      // ✅ Si el pedido NO incluye esta fecha, ignorarlo
+      if (!dias.has(fecha)) return;
 
-      setStockConsulta(stockBase - reservado);
-    } catch (e) {
-      console.error("Error calculando stock:", e);
-      setStockConsulta(null);
-    } finally {
-      setCargandoStock(false);
-    }
-  };
+      // ✅ Contar los productos UNA VEZ (no multiplicar por días)
+      (o.productos || []).forEach((p) => {
+        if (p.es_grupo && Array.isArray(p.productos)) {
+          p.productos.forEach((sub) => {
+            const id = sub.producto_id || sub.id;
+            const cant = (Number(sub.cantidad) || 0) * (Number(p.cantidad) || 1);
+            if (id === productoId) {
+              // 🆕 CONSOLE LOG 2: Ver grupos encontrados
+              console.log('🔢 Grupo encontrado:', {
+                nombre_grupo: p.nombre,
+                cant_grupo: p.cantidad,
+                producto_dentro: sub.nombre,
+                cant_producto: sub.cantidad,
+                cant_calculada: cant
+              });
+              reservado += cant;
+            }
+          });
+        } else {
+          const id = p.producto_id || p.id;
+          if (id === productoId) {
+            // 🆕 CONSOLE LOG 3: Ver productos encontrados
+            console.log('🔢 Producto encontrado:', {
+              nombre: p.nombre,
+              cantidad: p.cantidad
+            });
+            reservado += (Number(p.cantidad) || 0);
+          }
+        }
+      });
+    });
+
+    // 🆕 CONSOLE LOG 4: Ver el resultado final
+    console.log('📊 TOTAL RESERVADO:', reservado);
+    console.log('📦 STOCK BASE:', stockBase);
+    console.log('✅ DISPONIBLE:', stockBase - reservado);
+
+    setStockConsulta(stockBase - reservado);
+  } catch (e) {
+    console.error("Error calculando stock:", e);
+    setStockConsulta(null);
+  } finally {
+    setCargandoStock(false);
+  }
+};
 
   // ───────────────────── Recalcular cuando haya producto y fecha ───────────────────
   useEffect(() => {

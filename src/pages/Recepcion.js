@@ -119,18 +119,23 @@ const Recepcion = () => {
   };
 
   const guardarRevision = async () => {
-    if (!ordenSeleccionada) {
-      Swal.fire("Error", "No hay una orden cargada para revisar", "error");
-      return;
-    }
+  if (!ordenSeleccionada) {
+    Swal.fire("Error", "No hay una orden cargada para revisar", "error");
+    return;
+  }
 
+  try {
+    // ✅ Cerrar y marcar como revisada EN UNA SOLA OPERACIÓN
     await supabase
       .from("ordenes_pedido")
-      .update({ cerrada: true })
+      .update({ 
+        cerrada: true,
+        revisada: true,
+        comentario_revision: comentarioGeneral 
+      })
       .eq("id", ordenSeleccionada.id);
 
-    try {
-      // 1️⃣ Descontar stock por diferencia esperada vs recibida
+    // 1️⃣ Descontar stock por diferencia esperada vs recibida
       for (const item of productosRevisados) {
         const diferencia = item.esperado - item.recibido;
         if (diferencia > 0 && item.producto_id) {
@@ -176,15 +181,6 @@ const Recepcion = () => {
   usuario,
   costosProveedores
 );
-
-      // 4️⃣ Marcar orden como revisada
-      await supabase
-  .from("ordenes_pedido")
-  .update({
-    revisada: true,
-    comentario_revision: comentarioGeneral,
-  })
-  .match({ id: ordenSeleccionada.id });
 
       // ✅ Calcular ingresos
       const ingresos = (ordenSeleccionada.abonos || []).reduce(

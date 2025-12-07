@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import Protegido from "../components/Protegido"; // 🔐 Protección
+import { fetchAPI } from '../utils/api';
 
 export default function Usuarios() {
   const [usuario, setUsuario] = useState(null);
@@ -31,9 +32,8 @@ export default function Usuarios() {
     }
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/usuarios/cambiar-password`, {
+      const data = await fetchAPI(`${process.env.REACT_APP_API_URL}/api/usuarios/cambiar-password`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
           password_actual: password,
@@ -41,16 +41,10 @@ export default function Usuarios() {
         }),
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        Swal.fire("Actualizado", "Tu contraseña fue actualizada correctamente", "success");
-        localStorage.setItem("usuario", JSON.stringify({ ...usuario, nombre, email }));
-        setUsuario({ ...usuario, nombre, email });
-        setForm({ nombre, email, password: "", nueva_password: "" });
-      } else {
-        Swal.fire("Error", data.error || "No se pudo actualizar la contraseña", "error");
-      }
+      Swal.fire("Actualizado", "Tu contraseña fue actualizada correctamente", "success");
+      localStorage.setItem("usuario", JSON.stringify({ ...usuario, nombre, email }));
+      setUsuario({ ...usuario, nombre, email });
+      setForm({ nombre, email, password: "", nueva_password: "" });
     } catch (err) {
       Swal.fire("Error", "No se pudo conectar al servidor", "error");
     }

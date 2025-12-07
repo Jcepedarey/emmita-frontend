@@ -2,10 +2,14 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config(); // ✅ Carga el .env antes de todo lo demás
 const sequelize = require("./database");
+const rateLimit = require("express-rate-limit"); // ✅ NUEVO
 
 const app = express();
 
-// ✅ Middleware CORS para permitir acceso solo desde Vercel con métodos definidos
+// (Opcional/Recomendado si deployas detrás de proxy: Vercel, Render, Nginx)
+app.set("trust proxy", 1); // ✅ para que el rate-limit identifique bien la IP real
+
+// ✅ Middleware CORS para permitir acceso solo desde tu frontend
 app.use(cors({
   origin: "https://emmita-frontend.vercel.app",
   methods: ["GET", "POST", "PUT", "DELETE"],
@@ -13,6 +17,15 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// ✅ Rate limiter: 100 requests / 15 min por IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: "Demasiadas peticiones, intenta más tarde",
+});
+// Aplicar a todas las rutas de la API (antes de montarlas)
+app.use("/api/", limiter);
 
 // Ruta de prueba
 app.get("/api/test", (req, res) => {
@@ -26,9 +39,7 @@ app.use("/api/productos", require("./routes/productos"));
 app.use("/api/ordenes", require("./routes/ordenes"));
 app.use("/api/proveedores", require("./routes/proveedores"));
 app.use("/api/trazabilidad", require("./routes/trazabilidad"));
-app.use("/api/usuarios", require("./routes/usuarios")); // ✅ ÚNICA RUTA ACTIVA PARA /usuarios
-// app.use("/api/usuarios", require("./routes/registro"));       // ❌ Comentado para evitar conflicto
-// app.use("/api/usuarios", require("./routes/autorizar"));      // ❌ Comentado para evitar conflicto
+app.use("/api/usuarios", require("./routes/usuarios")); // /login queda pública dentro del router
 
 // Ruta 404
 app.use((req, res) => {

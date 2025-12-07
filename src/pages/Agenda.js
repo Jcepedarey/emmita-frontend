@@ -174,48 +174,6 @@ const manejarPDFCotizacion = async (cot) => {
   await generarPDF(doc, "cotizacion");
 };
 
-  const irADocumento = async (tipo, id) => {
-    const tabla = tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
-
-    const { data, error } = await supabase
-      .from(tabla)
-      .select("*, clientes (*)")
-      .eq("id", id)
-      .single();
-
-    if (!error && data) {
-      const cliente = data.clientes || {};
-
-      const documentoCompleto = {
-        ...data,
-        nombre_cliente: cliente.nombre || "",
-        identificacion: cliente.identificacion || "",
-        telefono: cliente.telefono || "",
-        direccion: cliente.direccion || "",
-        email: cliente.email || "",
-        fecha_creacion: data.fecha_creacion || data.fecha || null,
-        abonos: data.abonos || [],
-        garantia: data.garantia || "",
-        fechaGarantia: data.fechaGarantia || "",
-        garantiaRecibida: data.garantiaRecibida || false,
-        estado: data.estado || "",
-        numero: data.numero || "",
-        esEdicion: true,
-        idOriginal: data.id,
-      };
-
-      navigate("/crear-documento", {
-        state: {
-          documento: documentoCompleto,
-          tipo,
-        },
-      });
-    } else {
-      console.error("Error al cargar documento:", error);
-      Swal.fire("Error", "No se pudo cargar el documento", "error");
-    }
-  };
-
   return (
     <Protegido>
       <div style={{ padding: "1rem", maxWidth: "1000px", margin: "auto" }}>

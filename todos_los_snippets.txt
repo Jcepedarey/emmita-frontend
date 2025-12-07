@@ -1,332 +1,182 @@
 ﻿========================================
-SNIPPET: Columna abonos registrados en contabilidad
-ID: eb02b4ea-29a4-4322-96a3-9380d7efdd64
-FECHA: 2025-11-28T19:18:31.608394+00:00
+SNIPPET: Resumen de stock y pedidos abiertos
+ID: dcbc3aa0-e7d7-4f5b-9071-c8daaec3ae83
+FECHA: 2025-12-04T20:41:29.967161+00:00
 ========================================
 
--- Agregar columna para saber si los abonos ya est├ín en contabilidad
-ALTER TABLE ordenes_pedido
-ADD COLUMN IF NOT EXISTS abonos_registrados_contabilidad JSONB DEFAULT '[]'::jsonb;
+-- 1. Stock base
+SELECT stock FROM productos WHERE nombre ILIKE '%silla tiffany%';
 
--- Notificar a la API
-NOTIFY pgrst, 'reload schema';
+-- 2. Total pedidos abiertos
+SELECT COUNT(*) FROM ordenes_pedido WHERE cerrada = false;
 
-
-========================================
-SNIPPET: RLS policies in public schema matching permitir/admin patterns
-ID: 95b1c7df-4707-440f-89f5-ef2dff2b0354
-FECHA: 2025-10-07T01:59:28.87372+00:00
-========================================
-
-select tablename, policyname
-from pg_policies
-where schemaname='public'
-  and (policyname like 'permitir_%'
-       or policyname like 'admin_full_access_%'
-       or policyname = 'acceso_total_recepcion')
-order by tablename, policyname;
-
-
-select policyname, cmd
-from pg_policies
-where schemaname='public' and tablename='movimientos_contables'
-order by policyname;
-
+-- 3. Total sillas en pedidos del 06/12
+SELECT SUM(CAST(p->>'cantidad' AS INTEGER))
+FROM ordenes_pedido, jsonb_array_elements(productos) AS p
+WHERE cerrada = false
+  AND fecha_evento = '2025-12-06'
+  AND p->>'nombre' ILIKE '%silla tiffany%';
 
 
 ========================================
-SNIPPET: Eliminar pol├¡ticas antiguas en movimientos_contables
-ID: d9264c1c-3071-46ed-aa58-d31aa2b07d78
-FECHA: 2025-10-07T01:58:34.308276+00:00
+SNIPPET: Product stock lookup
+ID: c29027fa-b2f0-48fd-bacb-1747f79e91f8
+FECHA: 2025-12-04T18:58:49.814274+00:00
 ========================================
 
--- Quitar pol├¡ticas viejas solo en movimientos_contables
-drop policy if exists "permitir_actualizar_movimientos" on public.movimientos_contables;
-drop policy if exists "permitir_eliminar_movimientos"   on public.movimientos_contables;
-drop policy if exists "permitir_insertar_movimientos"   on public.movimientos_contables;
-drop policy if exists "permitir_leer_movimientos"       on public.movimientos_contables;
-
-notify pgrst, 'reload schema';
-
-
-select policyname, cmd
-from pg_policies
-where schemaname='public' and tablename='movimientos_contables'
-order by policyname;
-
-
+SELECT stock FROM productos WHERE nombre ILIKE '%silla tiffany%';
 
 
 ========================================
-SNIPPET: Eliminar pol├¡ticas p├║blicas demasiado abiertas
-ID: 71949654-dc9e-4e55-9a45-c55a7035960b
-FECHA: 2025-10-07T01:49:38.846679+00:00
+SNIPPET: Detectar n├║meros de pedido duplicados
+ID: 53a7f995-e78e-4ee3-8a63-a16cd96dab92
+FECHA: 2025-12-04T18:35:32.807145+00:00
 ========================================
 
--- === SCRIPT B: Eliminar autom├íticamente pol├¡ticas antiguas muy abiertas ===
-do $$
-declare r record;
-begin
-  for r in
-    select tablename, policyname
-    from pg_policies
-    where schemaname='public'
-      and (
-        policyname like 'permitir_%' or       -- ej: permitir_leer_*, permitir_insertar_*
-        policyname like 'admin_full_access_%' -- ej: admin_full_access_clientes, ...
-        or policyname = 'acceso_total_recepcion'
+-- Debe retornar 0 filas
+SELECT numero, COUNT(*)
+FROM ordenes_pedido
+GROUP BY numero
+HAVING COUNT(*) > 1;
+
+
+========================================
+SNIPPET: Pedidos con n├║mero duplicado
+ID: 6b281fe7-b3f6-474e-8019-906fc42ec088
+FECHA: 2025-12-04T18:32:39.852398+00:00
+========================================
+
+-- Crear ├¡ndice ├║nico en el n├║mero de pedido
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ordenes_pedido_numero_unique 
+ON ordenes_pedido(numero);
+
+
+========================================
+SNIPPET: Sillas Tiffany reservadas el 06/12/2025
+ID: 9ce56ec5-d94a-47cc-90a0-29c748d5ddd9
+FECHA: 2025-12-04T18:12:30.857675+00:00
+========================================
+
+-- Ver pedidos con el mismo n├║mero pero diferentes fechas o IDs
+SELECT 
+  numero,
+  COUNT(*) as veces_aparece,
+  array_agg(DISTINCT fecha_evento) as fechas_diferentes,
+  array_agg(DISTINCT id) as ids_diferentes,
+  array_agg(DISTINCT cerrada) as estados
+FROM ordenes_pedido
+GROUP BY numero
+HAVING COUNT(*) > 1
+ORDER BY veces_aparece DESC;
+
+
+========================================
+SNIPPET: Open orders with 'silla tiffany'
+ID: 187efdfb-522f-4403-aa58-860f1971c323
+FECHA: 2025-12-04T18:07:19.059922+00:00
+========================================
+
+SELECT 
+  numero,
+  fecha_evento,
+  fechas_evento,
+  multi_dias,
+  cerrada,
+  jsonb_array_length(productos) as total_items,
+  productos
+FROM ordenes_pedido
+WHERE cerrada = false
+  AND productos::text ILIKE '%silla tiffany%'
+ORDER BY fecha_evento;
+
+
+========================================
+SNIPPET: Productos: buscar 'Silla Tiffany'
+ID: 67771b3c-f17e-49e0-9d10-759d5c680f7b
+FECHA: 2025-12-04T18:05:57.640545+00:00
+========================================
+
+SELECT id, nombre, stock 
+FROM productos 
+WHERE nombre ILIKE '%silla tiffany%';
+
+
+========================================
+SNIPPET: Reservas de Silla Rimax en pedidos abiertos
+ID: 574af0f8-aec0-46c8-8c08-d1d22898ec17
+FECHA: 2025-12-04T04:59:28.221814+00:00
+========================================
+
+-- Contar TODAS las reservas de "Silla rimax" en pedidos abiertos
+WITH reservas AS (
+  SELECT 
+    numero,
+    fecha_evento,
+    fechas_evento,
+    multi_dias,
+    p->>'nombre' as nombre_producto,
+    CAST(p->>'cantidad' AS INTEGER) as cantidad,
+    CASE 
+      WHEN p->>'es_grupo' = 'true' THEN 'grupo'
+      ELSE 'producto'
+    END as tipo
+  FROM ordenes_pedido,
+  jsonb_array_elements(productos) AS p
+  WHERE cerrada = false
+    AND (
+      p->>'nombre' ILIKE '%silla rimax%'
+      OR EXISTS (
+        SELECT 1 FROM jsonb_array_elements(p->'productos') AS sub
+        WHERE sub->>'nombre' ILIKE '%silla rimax%'
       )
-  loop
-    execute format('drop policy if exists "%s" on public.%I;', r.policyname, r.tablename);
-  end loop;
-
-  perform pg_notify('pgrst','reload schema');
-end$$;
-
-
-select tablename, policyname, cmd
-from pg_policies
-where schemaname='public'
-order by tablename, policyname;
-
+    )
+)
+SELECT 
+  COUNT(*) as pedidos_con_sillas,
+  SUM(cantidad) as total_sillas_reservadas,
+  array_agg(DISTINCT numero) as numeros_pedido
+FROM reservas;
 
 
 ========================================
-SNIPPET: Habilitar Row-Level Security y crear pol├¡ticas mc_*
-ID: 5d6516b3-a883-4fa0-b44d-bc3a7881cdab
-FECHA: 2025-10-07T01:42:13.977685+00:00
+SNIPPET: Stale Open Orders (>30 days)
+ID: f026002d-68d5-4b70-a6c3-955b8809c5f5
+FECHA: 2025-12-04T04:50:26.285796+00:00
 ========================================
 
--- === SCRIPT A: Habilitar RLS y crear pol├¡ticas "mc_*" si no existen ===
-do $$
-declare
-  t text;
-  tablas text[] := array[
-    'clientes','productos','cotizaciones','ordenes_pedido','inventario',
-    'usuarios','reportes','trazabilidad','agenda','proveedores',
-    'productos_proveedores','solicitudes_usuarios','recepcion','movimientos_contables'
-  ];
-begin
-  foreach t in array tablas loop
-    -- Activa RLS (no borra nada)
-    execute format('alter table public.%I enable row level security;', t);
-
-    -- SELECT
-    if not exists (
-      select 1 from pg_policies where schemaname='public' and tablename=t and policyname='mc_select_auth'
-    ) then
-      execute format(
-        'create policy "mc_select_auth" on public.%I for select to authenticated using (true);',
-        t
-      );
-    end if;
-
-    -- INSERT
-    if not exists (
-      select 1 from pg_policies where schemaname='public' and tablename=t and policyname='mc_insert_auth'
-    ) then
-      execute format(
-        'create policy "mc_insert_auth" on public.%I for insert to authenticated with check (true);',
-        t
-      );
-    end if;
-
-    -- UPDATE
-    if not exists (
-      select 1 from pg_policies where schemaname='public' and tablename=t and policyname='mc_update_auth'
-    ) then
-      execute format(
-        'create policy "mc_update_auth" on public.%I for update to authenticated using (true) with check (true);',
-        t
-      );
-    end if;
-
-    -- DELETE
-    if not exists (
-      select 1 from pg_policies where schemaname='public' and tablename=t and policyname='mc_delete_auth'
-    ) then
-      execute format(
-        'create policy "mc_delete_auth" on public.%I for delete to authenticated using (true);',
-        t
-      );
-    end if;
-
-  end loop;
-  perform pg_notify('pgrst','reload schema');
-end$$;
-
-
-select tablename, policyname, cmd
-from pg_policies
-where schemaname='public'
-  and tablename in (
-    'clientes','productos','cotizaciones','ordenes_pedido','inventario',
-    'usuarios','reportes','trazabilidad','agenda','proveedores',
-    'productos_proveedores','solicitudes_usuarios','recepcion','movimientos_contables'
-  )
-order by tablename, policyname;
+-- Pedidos que deber├¡an estar cerrados pero no lo est├ín (CORREGIDO)
+SELECT 
+  numero,
+  fecha_evento,
+  fechas_evento,
+  multi_dias,
+  cerrada,
+  revisada,
+  fecha_creacion,
+  jsonb_array_length(productos) as total_items
+FROM ordenes_pedido
+WHERE cerrada = false
+  AND fecha_evento < CURRENT_DATE - INTERVAL '30 days'
+ORDER BY fecha_evento ASC;
 
 
 ========================================
-SNIPPET: Row-level security policies for movimientos_contables
-ID: 0a962893-3804-47b6-b628-d1079abaa581
-FECHA: 2025-10-07T01:28:41.446657+00:00
+SNIPPET: Detecci├│n de pedidos duplicados abiertos
+ID: 6620de1f-b9a8-48fb-bd17-f6290c15a847
+FECHA: 2025-12-04T04:47:48.758508+00:00
 ========================================
 
-select policyname, using_expr, check_expr
-from pg_policies
-where schemaname = 'public' and tablename = 'movimientos_contables'
-order by policyname;
-
-select
-  policyname,
-  cmd,                -- tipo: SELECT / INSERT / UPDATE / DELETE
-  roles,
-  qual       as using_expr,
-  with_check as check_expr
-from pg_policies
-where schemaname = 'public'
-  and tablename  = 'movimientos_contables'
-order by policyname;
-
-select policyname, cmd
-from pg_policies
-where schemaname='public'
-  and tablename='movimientos_contables'
-  and policyname like 'permitir_%'
-order by policyname;
-
-drop policy if exists "permitir_leer_movimientos"        on public.movimientos_contables;
-drop policy if exists "permitir_insertar_movimientos"    on public.movimientos_contables;
-drop policy if exists "permitir_actualizar_movimientos"  on public.movimientos_contables;
-drop policy if exists "permitir_eliminar_movimientos"    on public.movimientos_contables;
-
-notify pgrst, 'reload schema';
-
-select policyname, cmd
-from pg_policies
-where schemaname='public'
-  and tablename='movimientos_contables'
-order by policyname;
-
-
-
-========================================
-SNIPPET: Remove legacy 'permitir_*' policies from movimientos_contables
-ID: 03fba696-6c05-4947-a0e9-c3b441f8d8fa
-FECHA: 2025-10-07T01:27:33.530206+00:00
-========================================
-
--- ­ƒöÆ Fase C: eliminar pol├¡ticas viejas "permitir_*" en movimientos_contables
-drop policy if exists "permitir_leer_movimientos"      on public.movimientos_contables;
-drop policy if exists "permitir_insertar_movimientos"  on public.movimientos_contables;
-drop policy if exists "permitir_actualizar_movimientos" on public.movimientos_contables;
-drop policy if exists "permitir_eliminar_movimientos"  on public.movimientos_contables;
-
--- hace que el API recargue las pol├¡ticas al instante
-notify pgrst, 'reload schema';
-
-select policyname, using_expr, check_expr
-from pg_policies
-where schemaname = 'public' and tablename = 'movimientos_contables'
-order by policyname;
-
-
-========================================
-SNIPPET: Row-Level Security Policies for movimientos_contables
-ID: 91011728-4f43-4a16-b0b6-bf36da8c3e19
-FECHA: 2025-10-07T01:15:11.04017+00:00
-========================================
-
-select policyname, cmd, roles, qual as using_expr, with_check as check_expr
-from pg_policies
-where schemaname='public' and tablename='movimientos_contables'
-order by policyname;
-select polname as policyname, pg_get_expr(polqual, polrelid) as using_expr, pg_get_expr(polwithcheck, polrelid) as check_expr
-from pg_policy
-where polrelid = 'public.movimientos_contables'::regclass;
-
-
-========================================
-SNIPPET: Activar RLS y pol├¡ticas de acceso en movimientos_contables
-ID: 86eb4ad7-07fb-4606-b163-0acac00a6967
-FECHA: 2025-10-07T01:11:06.140937+00:00
-========================================
-
--- 1) Asegura RLS activa en la tabla
-alter table public.movimientos_contables enable row level security;
-
--- 2) CREA nuevas pol├¡ticas RESTRICTIVAS (no quitan las que ya tengas)
-do $$
-begin
-  -- SELECT solo para usuarios autenticados
-  if not exists (
-    select 1 from pg_policies 
-    where schemaname='public' and tablename='movimientos_contables' and policyname='mc_select_auth'
-  ) then
-    create policy "mc_select_auth" on public.movimientos_contables
-    for select
-    to authenticated
-    using (true);
-  end if;
-
-  -- INSERT solo para usuarios autenticados
-  if not exists (
-    select 1 from pg_policies 
-    where schemaname='public' and tablename='movimientos_contables' and policyname='mc_insert_auth'
-  ) then
-    create policy "mc_insert_auth" on public.movimientos_contables
-    for insert
-    to authenticated
-    with check (true);
-  end if;
-
-  -- UPDATE solo para usuarios autenticados
-  if not exists (
-    select 1 from pg_policies 
-    where schemaname='public' and tablename='movimientos_contables' and policyname='mc_update_auth'
-  ) then
-    create policy "mc_update_auth" on public.movimientos_contables
-    for update
-    to authenticated
-    using (true) with check (true);
-  end if;
-
-  -- DELETE solo para usuarios autenticados
-  if not exists (
-    select 1 from pg_policies 
-    where schemaname='public' and tablename='movimientos_contables' and policyname='mc_delete_auth'
-  ) then
-    create policy "mc_delete_auth" on public.movimientos_contables
-    for delete
-    to authenticated
-    using (true);
-  end if;
-end$$;
-
--- 3) Recargar esquema de la API REST
-notify pgrst, 'reload schema';
-
-
-========================================
-SNIPPET: Descontar stock de producto
-ID: 6f057362-949b-4c61-ac1a-eacbbafdd97c
-FECHA: 2025-09-09T21:43:41.289261+00:00
-========================================
-
--- Ejemplo simple: resta del campo stock
-CREATE OR REPLACE FUNCTION public.descontar_stock(producto_id uuid, cantidad int)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  UPDATE public.productos
-  SET stock = GREATEST((stock::int - cantidad), 0)
-  WHERE id = producto_id;
-END;
-$$;
-
-NOTIFY pgrst, 'reload schema';
-
+-- Detectar posibles duplicados
+SELECT 
+  cliente_id,
+  fecha_evento,
+  total,
+  COUNT(*) as veces_duplicado,
+  array_agg(numero) as numeros_pedido
+FROM ordenes_pedido
+WHERE cerrada = false
+GROUP BY cliente_id, fecha_evento, total
+HAVING COUNT(*) > 1
+ORDER BY veces_duplicado DESC;
 
 

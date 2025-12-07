@@ -57,7 +57,8 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
       try {
         const [{ data: inventario, error: e1 }, { data: proveedores, error: e2 }] = await Promise.all([
           supabase.from("productos").select("id, nombre, descripcion, precio"),
-           supabase.from("productos_proveedores")  .select("id, nombre, precio_venta, precio_compra, proveedor_id, proveedores ( id, nombre )"),
+           supabase.from("productos_proveedores")  
+          .select("id, nombre, precio_venta, precio_compra, proveedor_id, proveedores ( id, nombre )"),
         ]);
 
         if (e1 || e2) {
@@ -162,6 +163,17 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
   } else {
     const n = Number(raw);
     arr[index].precio_compra = !isNaN(n) && n >= 0 ? n : 0;
+  }
+} else if (campo === "precio") {
+  // ✅ AGREGAR ESTE CASO PARA EDITAR PRECIO DE VENTA
+  const raw = valor;
+
+  // Permitir borrar todo
+  if (raw === "") {
+    arr[index].precio = "";
+  } else {
+    const n = Number(raw);
+    arr[index].precio = !isNaN(n) && n >= 0 ? n : 0;
   }
 }
 
