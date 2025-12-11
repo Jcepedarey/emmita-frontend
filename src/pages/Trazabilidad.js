@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
@@ -11,11 +12,19 @@ export default function Trazabilidad() {
   const [fechaHasta, setFechaHasta] = useState("");
   const [resultados, setResultados] = useState([]);
 
+  // ✅ NUEVOS ESTADOS
+  const [ordenDescendente, setOrdenDescendente] = useState(true);
+  const [tipoDocumento, setTipoDocumento] = useState("todos"); // "todos", "cotizacion", "orden"
+  const [usarFechaEvento, setUsarFechaEvento] = useState(true); // true = fecha_evento, false = fecha_creacion
+
   const [productosLista, setProductosLista] = useState([]);
   const [clientesLista, setClientesLista] = useState([]);
 
   const [sugerenciasProductos, setSugerenciasProductos] = useState([]);
   const [sugerenciasClientes, setSugerenciasClientes] = useState([]);
+
+  // ✅ HOOK DE NAVEGACIÓN
+  const navigate = useNavigate();
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -27,6 +36,14 @@ export default function Trazabilidad() {
     };
     cargarDatos();
   }, []);
+
+  // ✅ FUNCIÓN PARA NORMALIZAR FECHAS (sin horas)
+  const normalizarFecha = (fecha) => {
+    if (!fecha) return null;
+    const d = new Date(fecha);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
 
   const buscarDocumentos = async () => {
     if (!productoBuscar.trim()) {
@@ -49,55 +66,70 @@ export default function Trazabilidad() {
     }
 
     // 🔎 Devuelve true si el documento contiene el producto buscado
-const coincideEnDoc = (doc, idsCoinciden, nombreBuscado) => {
-  const productos = doc.productos || [];
-  for (const p of productos) {
-    // Coincidencia por nombre o por ID (nivel 1)
-    const pId = p.producto_id || p.id;
-    const matchNivel1 =
-      ((p.nombre || "").toLowerCase().includes(nombreBuscado)) ||
-      (pId && idsCoinciden.has(pId));
-    if (matchNivel1) return true;
+    const coincideEnDoc = (doc, idsCoinciden, nombreBuscado) => {
+      const productos = doc.productos || [];
+      for (const p of productos) {
+        // Coincidencia por nombre o por ID (nivel 1)
+        const pId = p.producto_id || p.id;
+        const matchNivel1 =
+          ((p.nombre || "").toLowerCase().includes(nombreBuscado)) ||
+          (pId && idsCoinciden.has(pId));
+        if (matchNivel1) return true;
 
-    // Si es grupo, abrir sub-ítems
-    if (p.es_grupo && Array.isArray(p.productos)) {
-      for (const sub of p.productos) {
-        const subId = sub.producto_id || sub.id;
-        const matchSub =
-          ((sub.nombre || "").toLowerCase().includes(nombreBuscado)) ||
-          (subId && idsCoinciden.has(subId));
-        if (matchSub) return true;
+        // Si es grupo, abrir sub-ítems
+        if (p.es_grupo && Array.isArray(p.productos)) {
+          for (const sub of p.productos) {
+            const subId = sub.producto_id || sub.id;
+            const matchSub =
+              ((sub.nombre || "").toLowerCase().includes(nombreBuscado)) ||
+              (subId && idsCoinciden.has(subId));
+            if (matchSub) return true;
+          }
+        }
       }
-    }
-  }
-  return false;
-};
+      return false;
+    };
 
-// 🧮 Precomputar IDs de productos cuyo nombre coincide con la búsqueda
-const nombreBuscado = productoBuscar.trim().toLowerCase();
-const idsCoinciden = new Set(
-  (productosLista || [])
-    .filter((p) => (p.nombre || "").toLowerCase().includes(nombreBuscado))
-    .map((p) => p.id)
-);
+    // 🧮 Precomputar IDs de productos cuyo nombre coincide con la búsqueda
+    const nombreBuscado = productoBuscar.trim().toLowerCase();
+    const idsCoinciden = new Set(
+      (productosLista || [])
+        .filter((p) => (p.nombre || "").toLowerCase().includes(nombreBuscado))
+        .map((p) => p.id)
+    );
 
-const resultadosFiltrados = todos.filter((doc) => {
-  // ✅ Reemplazo: usar coincideEnDoc para revisar productos y sub-items de grupos
-  const contieneProducto = coincideEnDoc(doc, idsCoinciden, nombreBuscado);
-  if (!contieneProducto) return false;
+    const resultadosFiltrados = todos.filter((doc) => {
+      // ✅ FILTRO POR TIPO DE DOCUMENTO
+      if (tipoDocumento !== "todos") {
+        const esCotizacion = doc.numero?.startsWith("COT");
+        if (tipoDocumento === "cotizacion" && !esCotizacion) return false;
+        if (tipoDocumento === "orden" && esCotizacion) return false;
+      }
 
-  // ✅ Filtrar por fechas
-  const fechaBase = doc.fecha_evento || doc.fecha || doc.fecha_creacion;
-  if (fechaDesde && fechaBase < fechaDesde) return false;
-  if (fechaHasta && fechaBase > fechaHasta) return false;
+      // ✅ Reemplazo: usar coincideEnDoc para revisar productos y sub-items de grupos
+      const contieneProducto = coincideEnDoc(doc, idsCoinciden, nombreBuscado);
+      if (!contieneProducto) return false;
 
-  // ✅ Filtrar por cliente (si aplica)
-  if (clienteFiltro && clienteIdsFiltrados.length > 0) {
-    return clienteIdsFiltrados.includes(doc.cliente_id);
-  }
+      // ✅ FILTRAR POR FECHAS - Usar tipo de fecha seleccionado
+      const fechaBase = usarFechaEvento 
+        ? (doc.fecha_evento || doc.fecha)
+        : (doc.fecha_creacion || doc.fecha);
 
-  return true;
-});
+      // ✅ NORMALIZAR FECHAS PARA COMPARACIÓN PRECISA
+      const fechaDocNormalizada = normalizarFecha(fechaBase);
+      const fechaDesdeLimite = normalizarFecha(fechaDesde);
+      const fechaHastaLimite = normalizarFecha(fechaHasta);
+
+      if (fechaDesdeLimite && fechaDocNormalizada < fechaDesdeLimite) return false;
+      if (fechaHastaLimite && fechaDocNormalizada > fechaHastaLimite) return false;
+
+      // ✅ Filtrar por cliente (si aplica)
+      if (clienteFiltro && clienteIdsFiltrados.length > 0) {
+        return clienteIdsFiltrados.includes(doc.cliente_id);
+      }
+
+      return true;
+    });
 
     resultadosFiltrados.forEach((doc) => {
       const cliente = clientesLista.find((c) => c.id === doc.cliente_id);
@@ -110,10 +142,17 @@ const resultadosFiltrados = todos.filter((doc) => {
       }
     });
 
+    // ✅ ORDENAMIENTO CONFIGURABLE
     resultadosFiltrados.sort((a, b) => {
-  const getF = (x) => x.fecha_evento || x.fecha || x.fecha_creacion || "";
-  return new Date(getF(b)) - new Date(getF(a));
-});
+      const getF = (x) => {
+        return usarFechaEvento 
+          ? (x.fecha_evento || x.fecha || x.fecha_creacion || "")
+          : (x.fecha_creacion || x.fecha || x.fecha_evento || "");
+      };
+      const dateA = new Date(getF(a));
+      const dateB = new Date(getF(b));
+      return ordenDescendente ? dateB - dateA : dateA - dateB;
+    });
 
     setResultados(resultadosFiltrados);
   };
@@ -126,6 +165,25 @@ const resultadosFiltrados = todos.filter((doc) => {
     setResultados([]);
     setSugerenciasProductos([]);
     setSugerenciasClientes([]);
+  };
+
+  // ✅ FUNCIÓN PARA EDITAR DOCUMENTO
+  const editarDocumento = (doc, tipoDoc) => {
+    // Preparar datos para CrearDocumento (formato compatible con su useEffect)
+    const documentoParaEditar = {
+      ...doc,
+      tipo: tipoDoc, // "cotizacion" u "orden"
+      esEdicion: true,
+      idOriginal: doc.id
+    };
+    
+    // Navegar a CrearDocumento con el documento precargado
+    navigate("/crear-documento", { 
+      state: { 
+        documento: documentoParaEditar, // ← nombre correcto que espera CrearDocumento
+        tipo: tipoDoc
+      } 
+    });
   };
 
   const manejarCambioProducto = (e) => {
@@ -207,6 +265,60 @@ const resultadosFiltrados = todos.filter((doc) => {
           </ul>
         )}
 
+        {/* ✅ FILTRO POR TIPO DE DOCUMENTO */}
+        <div style={{ marginBottom: "10px", marginTop: "15px" }}>
+          <label style={{ fontWeight: "500", display: "block", marginBottom: "6px" }}>
+            Tipo de documento:
+          </label>
+          <select
+            value={tipoDocumento}
+            onChange={(e) => setTipoDocumento(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "8px",
+              borderRadius: "6px",
+              border: "1px solid #ccc"
+            }}
+          >
+            <option value="todos">📄 Todos los documentos</option>
+            <option value="cotizacion">💰 Solo cotizaciones</option>
+            <option value="orden">📦 Solo órdenes de pedido</option>
+          </select>
+        </div>
+
+        {/* ✅ SWITCH PARA TIPO DE FECHA */}
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: "10px", 
+          marginBottom: "10px",
+          padding: "10px",
+          backgroundColor: "#f3f4f6",
+          borderRadius: "6px",
+          flexWrap: "wrap"
+        }}>
+          <label style={{ fontWeight: "500" }}>Filtrar por:</label>
+          <button
+            onClick={() => setUsarFechaEvento(!usarFechaEvento)}
+            style={{
+              padding: "6px 12px",
+              background: usarFechaEvento ? "#3b82f6" : "#6b7280",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "14px"
+            }}
+          >
+            {usarFechaEvento ? "📅 Fecha del evento" : "🗓️ Fecha de creación"}
+          </button>
+          <small style={{ color: "#6b7280" }}>
+            {usarFechaEvento 
+              ? "(Día del alquiler/servicio)" 
+              : "(Cuándo se registró el documento)"}
+          </small>
+        </div>
+
         <div style={{ display: "flex", gap: "10px", marginBottom: 10 }}>
           <div style={{ flex: 1 }}>
             <label>Desde:</label>
@@ -226,6 +338,27 @@ const resultadosFiltrados = todos.filter((doc) => {
               style={{ width: "100%" }}
             />
           </div>
+        </div>
+
+        {/* ✅ BOTÓN DE ORDENAMIENTO */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+          <label style={{ fontWeight: "500" }}>Ordenar resultados:</label>
+          <button
+            onClick={() => setOrdenDescendente(!ordenDescendente)}
+            style={{
+              padding: "8px 16px",
+              background: "#374151",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            {ordenDescendente ? "⬇️ Más reciente primero" : "⬆️ Más antiguo primero"}
+          </button>
         </div>
 
         <button
@@ -249,23 +382,31 @@ const resultadosFiltrados = todos.filter((doc) => {
                   <strong>Fecha:</strong> {fecha?.split("T")[0] || "-"}<br />
                   <strong>Archivo:</strong> {nombrePDF}
                   <div style={{ marginTop: 6 }}>
-                    <span
-                      style={{ cursor: "pointer", marginRight: 10 }}
-                      onClick={() => generarPDF(doc, tipo)}
-                      title="Descargar PDF"
-                    >
-                      📄
-                    </span>
-                    {tipo === "orden" && (
-                      <span
-                        style={{ cursor: "pointer" }}
-                        onClick={() => generarRemision(doc)}
-                        title="Descargar Remisión"
-                      >
-                        🚚
-                      </span>
-                    )}
-                  </div>
+  {/* ✅ BOTÓN PARA EDITAR - AHORA PRIMERO */}
+  <span
+    style={{ cursor: "pointer", marginRight: 10 }}
+    onClick={() => editarDocumento(doc, tipo)}
+    title="Editar documento"
+  >
+    ✏️
+  </span>
+  <span
+    style={{ cursor: "pointer", marginRight: 10 }}
+    onClick={() => generarPDF(doc, tipo)}
+    title="Descargar PDF"
+  >
+    📄
+  </span>
+  {tipo === "orden" && (
+    <span
+      style={{ cursor: "pointer" }}
+      onClick={() => generarRemision(doc)}
+      title="Descargar Remisión"
+    >
+      🚚
+    </span>
+  )}
+</div>
                 </li>
               );
             })}
