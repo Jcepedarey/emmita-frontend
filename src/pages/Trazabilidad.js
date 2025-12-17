@@ -1,30 +1,57 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
 import Protegido from "../components/Protegido";
+import { useNavigationState } from "../context/NavigationContext";
 
 export default function Trazabilidad() {
-  const [productoBuscar, setProductoBuscar] = useState("");
-  const [clienteFiltro, setClienteFiltro] = useState("");
-  const [fechaDesde, setFechaDesde] = useState("");
-  const [fechaHasta, setFechaHasta] = useState("");
-  const [resultados, setResultados] = useState([]);
+  const { saveModuleState, getModuleState } = useNavigationState();
+  const navigate = useNavigate();
 
-  // ✅ NUEVOS ESTADOS
-  const [ordenDescendente, setOrdenDescendente] = useState(true);
-  const [tipoDocumento, setTipoDocumento] = useState("todos"); // "todos", "cotizacion", "orden"
-  const [usarFechaEvento, setUsarFechaEvento] = useState(true); // true = fecha_evento, false = fecha_creacion
+  // ✅ Cargar estado guardado solo una vez
+  const estadoGuardado = useRef(getModuleState("/trazabilidad")).current;
+
+  const [productoBuscar, setProductoBuscar] = useState(estadoGuardado?.productoBuscar || "");
+  const [clienteFiltro, setClienteFiltro] = useState(estadoGuardado?.clienteFiltro || "");
+  const [fechaDesde, setFechaDesde] = useState(estadoGuardado?.fechaDesde || "");
+  const [fechaHasta, setFechaHasta] = useState(estadoGuardado?.fechaHasta || "");
+  const [resultados, setResultados] = useState(estadoGuardado?.resultados || []);
+  const [ordenDescendente, setOrdenDescendente] = useState(estadoGuardado?.ordenDescendente ?? true);
+  const [tipoDocumento, setTipoDocumento] = useState(estadoGuardado?.tipoDocumento || "todos");
+  const [usarFechaEvento, setUsarFechaEvento] = useState(estadoGuardado?.usarFechaEvento ?? true);
 
   const [productosLista, setProductosLista] = useState([]);
   const [clientesLista, setClientesLista] = useState([]);
-
   const [sugerenciasProductos, setSugerenciasProductos] = useState([]);
   const [sugerenciasClientes, setSugerenciasClientes] = useState([]);
 
-  // ✅ HOOK DE NAVEGACIÓN
-  const navigate = useNavigate();
+  // ✅ GUARDAR ESTADO - Usar un useEffect separado sin incluir arrays/objetos
+  useEffect(() => {
+    const estadoActual = {
+      productoBuscar,
+      clienteFiltro,
+      fechaDesde,
+      fechaHasta,
+      resultados,
+      ordenDescendente,
+      tipoDocumento,
+      usarFechaEvento
+    };
+    
+    saveModuleState("/trazabilidad", estadoActual);
+  }, [
+    productoBuscar,
+    clienteFiltro,
+    fechaDesde,
+    fechaHasta,
+    JSON.stringify(resultados), // ✅ Convertir a string para evitar comparación por referencia
+    ordenDescendente,
+    tipoDocumento,
+    usarFechaEvento,
+    saveModuleState
+  ]);
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -37,7 +64,6 @@ export default function Trazabilidad() {
     cargarDatos();
   }, []);
 
-  // ✅ FUNCIÓN PARA NORMALIZAR FECHAS (sin horas)
   const normalizarFecha = (fecha) => {
     if (!fecha) return null;
     const d = new Date(fecha);
@@ -65,18 +91,15 @@ export default function Trazabilidad() {
         .map((c) => c.id);
     }
 
-    // 🔎 Devuelve true si el documento contiene el producto buscado
     const coincideEnDoc = (doc, idsCoinciden, nombreBuscado) => {
       const productos = doc.productos || [];
       for (const p of productos) {
-        // Coincidencia por nombre o por ID (nivel 1)
         const pId = p.producto_id || p.id;
         const matchNivel1 =
           ((p.nombre || "").toLowerCase().includes(nombreBuscado)) ||
           (pId && idsCoinciden.has(pId));
         if (matchNivel1) return true;
 
-        // Si es grupo, abrir sub-ítems
         if (p.es_grupo && Array.isArray(p.productos)) {
           for (const sub of p.productos) {
             const subId = sub.producto_id || sub.id;
@@ -90,7 +113,6 @@ export default function Trazabilidad() {
       return false;
     };
 
-    // 🧮 Precomputar IDs de productos cuyo nombre coincide con la búsqueda
     const nombreBuscado = productoBuscar.trim().toLowerCase();
     const idsCoinciden = new Set(
       (productosLista || [])
@@ -99,23 +121,19 @@ export default function Trazabilidad() {
     );
 
     const resultadosFiltrados = todos.filter((doc) => {
-      // ✅ FILTRO POR TIPO DE DOCUMENTO
       if (tipoDocumento !== "todos") {
         const esCotizacion = doc.numero?.startsWith("COT");
         if (tipoDocumento === "cotizacion" && !esCotizacion) return false;
         if (tipoDocumento === "orden" && esCotizacion) return false;
       }
 
-      // ✅ Reemplazo: usar coincideEnDoc para revisar productos y sub-items de grupos
       const contieneProducto = coincideEnDoc(doc, idsCoinciden, nombreBuscado);
       if (!contieneProducto) return false;
 
-      // ✅ FILTRAR POR FECHAS - Usar tipo de fecha seleccionado
       const fechaBase = usarFechaEvento 
         ? (doc.fecha_evento || doc.fecha)
         : (doc.fecha_creacion || doc.fecha);
 
-      // ✅ NORMALIZAR FECHAS PARA COMPARACIÓN PRECISA
       const fechaDocNormalizada = normalizarFecha(fechaBase);
       const fechaDesdeLimite = normalizarFecha(fechaDesde);
       const fechaHastaLimite = normalizarFecha(fechaHasta);
@@ -123,7 +141,6 @@ export default function Trazabilidad() {
       if (fechaDesdeLimite && fechaDocNormalizada < fechaDesdeLimite) return false;
       if (fechaHastaLimite && fechaDocNormalizada > fechaHastaLimite) return false;
 
-      // ✅ Filtrar por cliente (si aplica)
       if (clienteFiltro && clienteIdsFiltrados.length > 0) {
         return clienteIdsFiltrados.includes(doc.cliente_id);
       }
@@ -142,7 +159,6 @@ export default function Trazabilidad() {
       }
     });
 
-    // ✅ ORDENAMIENTO CONFIGURABLE
     resultadosFiltrados.sort((a, b) => {
       const getF = (x) => {
         return usarFechaEvento 
@@ -167,20 +183,17 @@ export default function Trazabilidad() {
     setSugerenciasClientes([]);
   };
 
-  // ✅ FUNCIÓN PARA EDITAR DOCUMENTO
   const editarDocumento = (doc, tipoDoc) => {
-    // Preparar datos para CrearDocumento (formato compatible con su useEffect)
     const documentoParaEditar = {
       ...doc,
-      tipo: tipoDoc, // "cotizacion" u "orden"
+      tipo: tipoDoc,
       esEdicion: true,
       idOriginal: doc.id
     };
     
-    // Navegar a CrearDocumento con el documento precargado
     navigate("/crear-documento", { 
       state: { 
-        documento: documentoParaEditar, // ← nombre correcto que espera CrearDocumento
+        documento: documentoParaEditar,
         tipo: tipoDoc
       } 
     });
@@ -265,7 +278,6 @@ export default function Trazabilidad() {
           </ul>
         )}
 
-        {/* ✅ FILTRO POR TIPO DE DOCUMENTO */}
         <div style={{ marginBottom: "10px", marginTop: "15px" }}>
           <label style={{ fontWeight: "500", display: "block", marginBottom: "6px" }}>
             Tipo de documento:
@@ -286,7 +298,6 @@ export default function Trazabilidad() {
           </select>
         </div>
 
-        {/* ✅ SWITCH PARA TIPO DE FECHA */}
         <div style={{ 
           display: "flex", 
           alignItems: "center", 
@@ -340,7 +351,6 @@ export default function Trazabilidad() {
           </div>
         </div>
 
-        {/* ✅ BOTÓN DE ORDENAMIENTO */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
           <label style={{ fontWeight: "500" }}>Ordenar resultados:</label>
           <button
@@ -382,31 +392,30 @@ export default function Trazabilidad() {
                   <strong>Fecha:</strong> {fecha?.split("T")[0] || "-"}<br />
                   <strong>Archivo:</strong> {nombrePDF}
                   <div style={{ marginTop: 6 }}>
-  {/* ✅ BOTÓN PARA EDITAR - AHORA PRIMERO */}
-  <span
-    style={{ cursor: "pointer", marginRight: 10 }}
-    onClick={() => editarDocumento(doc, tipo)}
-    title="Editar documento"
-  >
-    ✏️
-  </span>
-  <span
-    style={{ cursor: "pointer", marginRight: 10 }}
-    onClick={() => generarPDF(doc, tipo)}
-    title="Descargar PDF"
-  >
-    📄
-  </span>
-  {tipo === "orden" && (
-    <span
-      style={{ cursor: "pointer" }}
-      onClick={() => generarRemision(doc)}
-      title="Descargar Remisión"
-    >
-      🚚
-    </span>
-  )}
-</div>
+                    <span
+                      style={{ cursor: "pointer", marginRight: 10 }}
+                      onClick={() => editarDocumento(doc, tipo)}
+                      title="Editar documento"
+                    >
+                      ✏️
+                    </span>
+                    <span
+                      style={{ cursor: "pointer", marginRight: 10 }}
+                      onClick={() => generarPDF(doc, tipo)}
+                      title="Descargar PDF"
+                    >
+                      📄
+                    </span>
+                    {tipo === "orden" && (
+                      <span
+                        style={{ cursor: "pointer" }}
+                        onClick={() => generarRemision(doc)}
+                        title="Descargar Remisión"
+                      >
+                        🚚
+                      </span>
+                    )}
+                  </div>
                 </li>
               );
             })}

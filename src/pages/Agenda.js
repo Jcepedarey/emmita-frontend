@@ -7,15 +7,35 @@ import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
-import Protegido from "../components/Protegido"; // 🔐 Protección
+import Protegido from "../components/Protegido";
+import { useNavigationState } from "../context/NavigationContext";
 
 export default function Agenda() {
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
+  const { saveModuleState, getModuleState } = useNavigationState();
+  const navigate = useNavigate();
+
+  // ✅ Cargar estado guardado - SOLO LA FECHA
+  const estadoGuardado = getModuleState("/agenda");
+
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(() => {
+    if (estadoGuardado?.fechaSeleccionada) {
+      return new Date(estadoGuardado.fechaSeleccionada);
+    }
+    return new Date();
+  });
+  
   const [nuevaNota, setNuevaNota] = useState("");
   const [notas, setNotas] = useState([]);
   const [ordenes, setOrdenes] = useState([]);
   const [cotizaciones, setCotizaciones] = useState([]);
-  const navigate = useNavigate();
+
+  // Guardar cada vez que cambie algo
+const handleFechaChange = (fecha) => {
+  setFechaSeleccionada(fecha);
+  saveModuleState("/agenda", { 
+    fechaSeleccionada: fecha.toISOString() 
+  });
+};
 
   const cargarDatos = useCallback(async () => {
     const fecha = fechaSeleccionada.toISOString().split("T")[0];
@@ -32,9 +52,9 @@ export default function Agenda() {
       .eq("fecha_evento", fecha);
 
     const { data: cotizacionesData } = await supabase
-  .from("cotizaciones")
-  .select("*, clientes(*)")      // ← traemos el cliente
-  .eq("fecha_evento", fecha);
+      .from("cotizaciones")
+      .select("*, clientes(*)")
+      .eq("fecha_evento", fecha);
 
     setNotas(notasData || []);
     setOrdenes(ordenesData || []);
@@ -138,41 +158,41 @@ export default function Agenda() {
   };
 
   const editarCotizacion = (cot) => {
-  const cliente = cot.clientes || {};
-  const documentoCompleto = {
-    ...cot,
-    nombre_cliente: cliente.nombre || "",
-    identificacion: cliente.identificacion || "",
-    telefono: cliente.telefono || "",
-    direccion: cliente.direccion || "",
-    email: cliente.email || "",
-    fecha_creacion: cot.fecha_creacion || cot.fecha || null,
-    abonos: cot.abonos || [],
-    garantia: cot.garantia || "",
-    fechaGarantia: cot.fechaGarantia || "",
-    garantiaRecibida: cot.garantiaRecibida || false,
-    estado: cot.estado || "",
-    numero: cot.numero || "",
-    esEdicion: true,
-    idOriginal: cot.id,
+    const cliente = cot.clientes || {};
+    const documentoCompleto = {
+      ...cot,
+      nombre_cliente: cliente.nombre || "",
+      identificacion: cliente.identificacion || "",
+      telefono: cliente.telefono || "",
+      direccion: cliente.direccion || "",
+      email: cliente.email || "",
+      fecha_creacion: cot.fecha_creacion || cot.fecha || null,
+      abonos: cot.abonos || [],
+      garantia: cot.garantia || "",
+      fechaGarantia: cot.fechaGarantia || "",
+      garantiaRecibida: cot.garantiaRecibida || false,
+      estado: cot.estado || "",
+      numero: cot.numero || "",
+      esEdicion: true,
+      idOriginal: cot.id,
+    };
+
+    navigate("/crear-documento", {
+      state: { documento: documentoCompleto, tipo: "cotizacion" },
+    });
   };
 
-  navigate("/crear-documento", {
-    state: { documento: documentoCompleto, tipo: "cotizacion" },
-  });
-};
-
-const manejarPDFCotizacion = async (cot) => {
-  const doc = {
-    ...cot,
-    nombre_cliente: cot.clientes?.nombre || "No disponible",
-    identificacion: cot.clientes?.identificacion || "-",
-    telefono: cot.clientes?.telefono || "-",
-    direccion: cot.clientes?.direccion || "-",
-    email: cot.clientes?.email || "-",
+  const manejarPDFCotizacion = async (cot) => {
+    const doc = {
+      ...cot,
+      nombre_cliente: cot.clientes?.nombre || "No disponible",
+      identificacion: cot.clientes?.identificacion || "-",
+      telefono: cot.clientes?.telefono || "-",
+      direccion: cot.clientes?.direccion || "-",
+      email: cot.clientes?.email || "-",
+    };
+    await generarPDF(doc, "cotizacion");
   };
-  await generarPDF(doc, "cotizacion");
-};
 
   return (
     <Protegido>
@@ -183,10 +203,10 @@ const manejarPDFCotizacion = async (cot) => {
           {/* Calendario */}
           <div style={{ flex: "1" }}>
             <Calendar
-              onChange={setFechaSeleccionada}
-              value={fechaSeleccionada}
-              className="react-calendar"
-            />
+  onChange={handleFechaChange}  // ← Usa la función nueva que guarda
+  value={fechaSeleccionada}
+  className="react-calendar"
+/>
           </div>
 
           {/* Notas */}
@@ -279,51 +299,51 @@ const manejarPDFCotizacion = async (cot) => {
           </div>
 
           {/* Cotizaciones */}
-<div style={{ flex: "1", backgroundColor: "#ffebee", padding: "10px", borderRadius: "8px", minHeight: "200px", overflowY: "auto" }}>
-  <h4>📄 Cotizaciones</h4>
-  {cotizaciones.length === 0 && <p>No hay cotizaciones para este día.</p>}
-  {cotizaciones.map((cot) => (
-    <div
-      key={cot.id}
-      style={{
-        backgroundColor: "#fff",               // igual al panel de pedidos
-        padding: "10px",
-        margin: "5px 0",
-        borderRadius: "8px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-      }}
-    >
-      <div>
-        <p style={{ fontWeight: "bold", color: "#c62828", margin: 0 }}>
-          {cot.numero || "COT-???"}
-        </p>
-        <p style={{ margin: 0 }}>{cot.clientes?.nombre || "Cliente"}</p>
-        <p style={{ margin: 0, fontSize: "12px", color: "gray" }}>
-          {cot.fecha_evento ? new Date(cot.fecha_evento).toLocaleDateString() : "Sin fecha"}
-        </p>
-      </div>
-      <div style={{ display: "flex", gap: "8px", fontSize: "18px" }}>
-        <button
-          onClick={() => editarCotizacion(cot)}
-          title="Editar"
-          style={{ border: "none", background: "none", cursor: "pointer" }}
-        >
-          ✏️
-        </button>
-        <button
-          onClick={() => manejarPDFCotizacion(cot)}
-          title="PDF"
-          style={{ border: "none", background: "none", cursor: "pointer" }}
-        >
-          📄
-        </button>
-      </div>
-    </div>
-  ))}
-</div>
+          <div style={{ flex: "1", backgroundColor: "#ffebee", padding: "10px", borderRadius: "8px", minHeight: "200px", overflowY: "auto" }}>
+            <h4>📄 Cotizaciones</h4>
+            {cotizaciones.length === 0 && <p>No hay cotizaciones para este día.</p>}
+            {cotizaciones.map((cot) => (
+              <div
+                key={cot.id}
+                style={{
+                  backgroundColor: "#fff",
+                  padding: "10px",
+                  margin: "5px 0",
+                  borderRadius: "8px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                }}
+              >
+                <div>
+                  <p style={{ fontWeight: "bold", color: "#c62828", margin: 0 }}>
+                    {cot.numero || "COT-???"}
+                  </p>
+                  <p style={{ margin: 0 }}>{cot.clientes?.nombre || "Cliente"}</p>
+                  <p style={{ margin: 0, fontSize: "12px", color: "gray" }}>
+                    {cot.fecha_evento ? new Date(cot.fecha_evento).toLocaleDateString() : "Sin fecha"}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "8px", fontSize: "18px" }}>
+                  <button
+                    onClick={() => editarCotizacion(cot)}
+                    title="Editar"
+                    style={{ border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => manejarPDFCotizacion(cot)}
+                    title="PDF"
+                    style={{ border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    📄
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </Protegido>

@@ -4,16 +4,19 @@ import { AppBar, Toolbar, Typography, Button, IconButton, Tooltip } from "@mui/m
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowBack, ArrowForward, Home } from "@mui/icons-material";
 import supabase from "../supabaseClient";
+import { useNavigationState } from "../context/NavigationContext";
 
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem("usuario"));
   const esLogin = location.pathname === "/" || location.pathname === "/login";
+  const { clearAllStates } = useNavigationState();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem("usuario");
+    clearAllStates(); // ✅ Limpia todos los estados guardados
     navigate("/");
   };
 

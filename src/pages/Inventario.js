@@ -1,19 +1,53 @@
 import * as XLSX from "xlsx";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import Papa from "papaparse";
-import Protegido from "../components/Protegido"; // 🔐 Protección
+import Protegido from "../components/Protegido";
+import { useNavigationState } from "../context/NavigationContext";
 
 export default function Inventario() {
+  const { saveModuleState, getModuleState } = useNavigationState();
+
+  // ✅ Cargar estado guardado solo una vez
+  const estadoGuardado = useRef(getModuleState("/inventario")).current;
+
   const [productos, setProductos] = useState([]);
-  const [form, setForm] = useState({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "" });
-  const [buscar, setBuscar] = useState("");
-  const [categoriaFiltro, setCategoriaFiltro] = useState("");
-  const [editandoId, setEditandoId] = useState(null);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [mostrarTodo, setMostrarTodo] = useState(false);
+  const [form, setForm] = useState(estadoGuardado?.form || { 
+    nombre: "", 
+    descripcion: "", 
+    precio: "", 
+    stock: "", 
+    categoria: "" 
+  });
+  const [buscar, setBuscar] = useState(estadoGuardado?.buscar || "");
+  const [categoriaFiltro, setCategoriaFiltro] = useState(estadoGuardado?.categoriaFiltro || "");
+  const [editandoId, setEditandoId] = useState(estadoGuardado?.editandoId || null);
+  const [mostrarFormulario, setMostrarFormulario] = useState(estadoGuardado?.mostrarFormulario || false);
+  const [mostrarTodo, setMostrarTodo] = useState(estadoGuardado?.mostrarTodo || false);
+
+  // ✅ GUARDAR ESTADO - Convertir objetos a string para evitar bucles
+  useEffect(() => {
+    const estadoActual = {
+      form,
+      buscar,
+      categoriaFiltro,
+      editandoId,
+      mostrarFormulario,
+      mostrarTodo
+    };
+    
+    saveModuleState("/inventario", estadoActual);
+  }, [
+    JSON.stringify(form), // ✅ Convertir a string
+    buscar,
+    categoriaFiltro,
+    editandoId,
+    mostrarFormulario,
+    mostrarTodo,
+    saveModuleState
+  ]);
 
   useEffect(() => {
     obtenerProductos();
@@ -176,7 +210,7 @@ export default function Inventario() {
             ➕ Agregar
           </button>
           <button onClick={exportarCSV} style={{ padding: "10px", background: "#4caf50", color: "#fff", borderRadius: "5px" }}>
-            📁 Exportar CSV
+            📊 Exportar CSV
           </button>
           <button onClick={() => document.getElementById("archivoExcel").click()} style={{ padding: "10px", background: "#2196f3", color: "#fff", borderRadius: "5px" }}>
             📥 Importar desde Excel

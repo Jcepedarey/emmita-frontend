@@ -7,6 +7,7 @@ import BotonIAFlotante from "./components/BotonIAFlotante";
 import AsistenteModal from "./components/AsistenteModal";
 import "./swal.css";
 import "./App.css";
+import { useNavigationState } from "./context/NavigationContext";
 
 
 // 📦 Páginas principales
@@ -30,6 +31,7 @@ import Usuarios from "./pages/Usuarios";
 
 function App() {
   const [modalVisible, setModalVisible] = useState(false);
+  const { clearAllStates } = useNavigationState();
 
   // 🔐 FASE 1: Cierre de sesión por inactividad
   useEffect(() => {
@@ -42,6 +44,7 @@ function App() {
         const usuario = localStorage.getItem("usuario");
         if (usuario) {
           localStorage.removeItem("usuario");
+          clearAllStates(); // ✅ Limpia estados por inactividad
           alert("Sesión cerrada por inactividad.");
           window.location.href = "/";
         }

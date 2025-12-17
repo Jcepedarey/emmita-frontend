@@ -1,22 +1,46 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import Papa from "papaparse";
-import Protegido from "../components/Protegido"; // 🔐 Protección
+import Protegido from "../components/Protegido";
+import { useNavigationState } from "../context/NavigationContext";
 
 export default function Clientes() {
+  const { saveModuleState, getModuleState } = useNavigationState();
+
+  // ✅ Cargar estado guardado solo una vez
+  const estadoGuardado = useRef(getModuleState("/clientes")).current;
+
   const [clientes, setClientes] = useState([]);
-  const [buscar, setBuscar] = useState("");
-  const [form, setForm] = useState({
+  const [buscar, setBuscar] = useState(estadoGuardado?.buscar || "");
+  const [form, setForm] = useState(estadoGuardado?.form || {
     nombre: "",
     identificacion: "",
     telefono: "",
     direccion: "",
     email: ""
   });
-  const [editando, setEditando] = useState(null);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [editando, setEditando] = useState(estadoGuardado?.editando || null);
+  const [mostrarFormulario, setMostrarFormulario] = useState(estadoGuardado?.mostrarFormulario || false);
+
+  // ✅ GUARDAR ESTADO
+  useEffect(() => {
+    const estadoActual = {
+      buscar,
+      form,
+      editando,
+      mostrarFormulario
+    };
+    
+    saveModuleState("/clientes", estadoActual);
+  }, [
+    buscar,
+    JSON.stringify(form),
+    editando,
+    mostrarFormulario,
+    saveModuleState
+  ]);
 
   useEffect(() => {
     cargarClientes();
@@ -157,80 +181,80 @@ export default function Clientes() {
       .some((campo) => campo?.toLowerCase().includes(buscar.toLowerCase()))
   );
 
- return (
-  <Protegido>
-    <div style={{ padding: "1rem", maxWidth: "650px", margin: "auto" }}>
-      <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Clientes</h2>
+  return (
+    <Protegido>
+      <div style={{ padding: "1rem", maxWidth: "650px", margin: "auto" }}>
+        <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Clientes</h2>
 
-      <button
-        onClick={() => {
-          setEditando(null);
-          setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
-          setMostrarFormulario(true);
-        }}
-        style={{ margin: "10px 0", padding: "10px", background: "#ccc", borderRadius: "5px" }}
-      >
-        ➕ Agregar
-      </button>
+        <button
+          onClick={() => {
+            setEditando(null);
+            setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" });
+            setMostrarFormulario(true);
+          }}
+          style={{ margin: "10px 0", padding: "10px", background: "#ccc", borderRadius: "5px" }}
+        >
+          ➕ Agregar
+        </button>
 
-      <button
-        onClick={exportarCSV}
-        style={{ margin: "10px 0 20px 10px", padding: "10px", background: "#4caf50", color: "#fff", borderRadius: "5px" }}
-      >
-        📁 Exportar CSV
-      </button>
+        <button
+          onClick={exportarCSV}
+          style={{ margin: "10px 0 20px 10px", padding: "10px", background: "#4caf50", color: "#fff", borderRadius: "5px" }}
+        >
+          📊 Exportar CSV
+        </button>
 
-      {mostrarFormulario && (
-        <>
-          <h3>{editando ? "Editar Cliente" : "Agregar Cliente"}</h3>
-          <input type="text" placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
-          <input type="text" placeholder="Identificación" value={form.identificacion} onChange={(e) => setForm({ ...form, identificacion: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
-          <input type="text" placeholder="Teléfono" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
-          <input type="text" placeholder="Dirección" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
-          <input type="email" placeholder="Correo electrónico" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
-          <button onClick={guardarCliente} style={{ width: "100%", padding: "10px", marginBottom: "8px" }}>{editando ? "Actualizar" : "Guardar"}</button>
-          <button onClick={() => { setEditando(null); setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" }); setMostrarFormulario(false); }} style={{ width: "100%", padding: "8px", marginBottom: "1rem", background: "#eee" }}>Cancelar</button>
-        </>
-      )}
+        {mostrarFormulario && (
+          <>
+            <h3>{editando ? "Editar Cliente" : "Agregar Cliente"}</h3>
+            <input type="text" placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+            <input type="text" placeholder="Identificación" value={form.identificacion} onChange={(e) => setForm({ ...form, identificacion: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+            <input type="text" placeholder="Teléfono" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+            <input type="text" placeholder="Dirección" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+            <input type="email" placeholder="Correo electrónico" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ width: "100%", padding: "8px", marginBottom: "0.5rem" }} />
+            <button onClick={guardarCliente} style={{ width: "100%", padding: "10px", marginBottom: "8px" }}>{editando ? "Actualizar" : "Guardar"}</button>
+            <button onClick={() => { setEditando(null); setForm({ nombre: "", identificacion: "", telefono: "", direccion: "", email: "" }); setMostrarFormulario(false); }} style={{ width: "100%", padding: "8px", marginBottom: "1rem", background: "#eee" }}>Cancelar</button>
+          </>
+        )}
 
-      {/* 🔍 Buscador debajo del formulario */}
-      <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", gap: "10px" }}>
-        <input
-          type="text"
-          placeholder="Buscar cliente"
-          value={buscar}
-          onChange={(e) => setBuscar(e.target.value)}
-        />
+        {/* 🔍 Buscador debajo del formulario */}
+        <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <input
+            type="text"
+            placeholder="Buscar cliente"
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+          />
+        </div>
+
+        {buscar && filtrados.length > 0 && (
+          <>
+            <h3 style={{ marginTop: "1.5rem" }}>Resultados</h3>
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {filtrados.map((c) => (
+                <li key={c.id} style={{
+                  marginBottom: "1rem",
+                  border: "1px solid #ccc",
+                  borderRadius: "8px",
+                  padding: "10px",
+                  background: "#f9f9f9"
+                }}>
+                  <strong>{c.codigo || "Sin código"}</strong><br />
+                  {c.nombre}<br />
+                  🆔 {c.identificacion}<br />
+                  📞 {c.telefono}<br />
+                  📍 {c.direccion}<br />
+                  📧 {c.email}
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <button onClick={() => editarCliente(c)} style={{ marginRight: "10px" }}><FaEdit /></button>
+                    <button onClick={() => eliminarCliente(c.id)}><FaTrash /></button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
-
-      {buscar && filtrados.length > 0 && (
-        <>
-          <h3 style={{ marginTop: "1.5rem" }}>Resultados</h3>
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {filtrados.map((c) => (
-              <li key={c.id} style={{
-                marginBottom: "1rem",
-                border: "1px solid #ccc",
-                borderRadius: "8px",
-                padding: "10px",
-                background: "#f9f9f9"
-              }}>
-                <strong>{c.codigo || "Sin código"}</strong><br />
-                {c.nombre}<br />
-                🆔 {c.identificacion}<br />
-                📞 {c.telefono}<br />
-                📍 {c.direccion}<br />
-                📧 {c.email}
-                <div style={{ marginTop: "0.5rem" }}>
-                  <button onClick={() => editarCliente(c)} style={{ marginRight: "10px" }}><FaEdit /></button>
-                  <button onClick={() => eliminarCliente(c.id)}><FaTrash /></button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  </Protegido>
-);
+    </Protegido>
+  );
 }
