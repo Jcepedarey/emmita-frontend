@@ -29,21 +29,23 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
       );
       // Asegurar campos clave en items
       const items = (grupoEnEdicion.productos || []).map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        descripcion: p.descripcion || "",
-        precio: typeof p.precio === "number" ? p.precio : Number(p.precio || 0),
-        cantidad:
-          typeof p.cantidad === "number"
-            ? p.cantidad
-            : Number(p.cantidad || 1),
-        subtotal:
-          (typeof p.subtotal === "number"
-            ? p.subtotal
-            : Number(p.precio || 0) * Number(p.cantidad || 1)) || 0,
-        temporal: !!p.temporal,
-        es_proveedor: !!p.es_proveedor,
-      }));
+  id: p.id,
+  nombre: p.nombre,
+  descripcion: p.descripcion || "",
+  precio: typeof p.precio === "number" ? p.precio : Number(p.precio || 0),
+  cantidad:
+    typeof p.cantidad === "number"
+      ? p.cantidad
+      : Number(p.cantidad || 1),
+  subtotal:
+    (typeof p.subtotal === "number"
+      ? p.subtotal
+      : Number(p.precio || 0) * Number(p.cantidad || 1)) || 0,
+  temporal: !!p.temporal,
+  es_proveedor: !!p.es_proveedor,
+  multiplicar: p.multiplicar !== undefined ? !!p.multiplicar : true, // ✅ NUEVO
+  precio_compra: p.precio_compra || 0, // ✅ Asegurar que exista
+}));
       setSeleccionados(items);
     }
   }, [grupoEnEdicion]);
@@ -127,7 +129,8 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
     cantidad: "",       // sin número por defecto
     subtotal: 0,        // hasta que elijas cantidad
     temporal: false,
-    precio_compra: producto.precio_compra || 0, // ✅ Nuevo campo
+    multiplicar: true,  // ✅ NUEVO: por defecto SÍ se multiplica
+    precio_compra: producto.precio_compra || 0,
   };
   setSeleccionados((prev) => [...prev, nuevo]);
   setBusqueda("");
@@ -140,8 +143,10 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
 
     if (campo === "temporal") {
       arr[index][campo] = !!valor;
+    } else if (campo === "multiplicar") {  // ✅ NUEVO CASO
+      arr[index][campo] = !!valor;
     } else if (campo === "cantidad") {
-      const raw = valor;
+      const raw = valor;  // ✅ DECLARAR LA VARIABLE
 
       // Permitir borrar todo
       if (raw === "") {
@@ -351,7 +356,19 @@ const [cantidadGrupo, setCantidadGrupo] = useState(""); // vacío por defecto
             <li key={`${item.id}-${index}`} style={{ listStyle: "none", marginBottom: 8 }}>
   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
     
-    {/* ✅ CANTIDAD AHORA VA PRIMERO */}
+    {/* ✅ CHECKBOX PARA MULTIPLICAR (NUEVO) */}
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <input
+        type="checkbox"
+        checked={item.multiplicar !== false} // por defecto true
+        onChange={(e) => actualizarCampo(index, "multiplicar", e.target.checked)}
+        title="Multiplicar por cantidad del grupo"
+        style={{ cursor: "pointer", width: 18, height: 18 }}
+      />
+      <span style={{ fontSize: 12, color: "#666" }}>×</span>
+    </div>
+    
+    {/* ✅ CANTIDAD */}
     <div>
       Cant:
       <input

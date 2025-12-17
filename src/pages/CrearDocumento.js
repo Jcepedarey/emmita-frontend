@@ -331,6 +331,29 @@ let res = await supabase
       ? 1
       : (item.multiplicarPorDias === false ? 1 : (numeroDias || 1));
 
+    // ✅ NUEVO: Calcular subtotal de grupos considerando checkbox "multiplicar"
+    if (item.es_grupo && Array.isArray(item.productos)) {
+      const cantidadGrupo = Number(item.cantidad || 1);
+      let subtotalGrupo = 0;
+
+      item.productos.forEach((sub) => {
+        const precioSub = Number(sub.precio || 0);
+        const cantidadSub = Number(sub.cantidad || 0);
+        const multiplicarSub = sub.multiplicar !== false; // por defecto true
+
+        if (multiplicarSub) {
+          // Se multiplica por la cantidad del grupo
+          subtotalGrupo += precioSub * cantidadSub * cantidadGrupo * diasEfectivos;
+        } else {
+          // NO se multiplica, solo se usa la cantidad fija del sub-item
+          subtotalGrupo += precioSub * cantidadSub * diasEfectivos;
+        }
+      });
+
+      return Math.max(0, subtotalGrupo);
+    }
+
+    // Items normales (no grupos)
     return Math.max(0, precio * cantidad * diasEfectivos);
   };
 

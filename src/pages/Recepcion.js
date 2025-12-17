@@ -68,11 +68,21 @@ const Recepcion = () => {
 
     orden.productos.forEach((p) => {
       if (p.es_grupo && Array.isArray(p.productos)) {
+        const cantidadGrupo = Number(p.cantidad || 1);
+        
         p.productos.forEach((sub) => {
+          const cantidadSub = Number(sub.cantidad || 0);
+          const multiplicarSub = sub.multiplicar !== false; // por defecto true
+          
+          // ✅ Calcular cantidad esperada según checkbox
+          const cantidadEsperada = multiplicarSub 
+            ? cantidadSub * cantidadGrupo 
+            : cantidadSub;
+          
           productosConCampo.push({
             nombre: sub.nombre,
-            esperado: sub.cantidad,
-            recibido: sub.cantidad,
+            esperado: cantidadEsperada,
+            recibido: cantidadEsperada,
             observacion: "",
             producto_id: sub.id,
             proveedor: sub.proveedor || null,
@@ -155,7 +165,14 @@ const Recepcion = () => {
             const factorGrupo = Number(p.cantidad) || 1;
             p.productos.forEach((sub) => {
               if (sub.es_proveedor && sub.precio_compra) {
-                const cantidadTotal = (Number(sub.cantidad) || 0) * factorGrupo;
+                const cantidadSub = Number(sub.cantidad) || 0;
+                const multiplicarSub = sub.multiplicar !== false; // ✅ NUEVO
+                
+                // ✅ Aplicar multiplicación solo si está marcado
+                const cantidadTotal = multiplicarSub 
+                  ? cantidadSub * factorGrupo 
+                  : cantidadSub;
+                  
                 total += cantidadTotal * Number(sub.precio_compra);
               }
             });
