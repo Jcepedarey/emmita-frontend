@@ -200,25 +200,42 @@
 
 /* 🖥️ Estilos específicos para PC/Desktop */
 @media (min-width: 769px) {
-  /* Menú compacto en PC - 6 columnas para aprovechar espacio */
+  /* Menú compacto en PC - 6 columnas con iconos más grandes y separados */
   .menu-grid-compacto {
     grid-template-columns: repeat(6, 1fr) !important;
-    gap: 16px !important;
-    max-width: 600px !important;
+    row-gap: 12px !important;      /* Espacio vertical (entre filas) */
+    column-gap: 50px !important;   /* Espacio horizontal (entre columnas) */
+    max-width: 850px !important;
+}
+
+  .boton-modulo-compacto {
+    gap: 6px !important;
   }
 
   .boton-modulo-compacto .icono-circulo {
-    width: 56px !important;
-    height: 56px !important;
+    width: 64px !important;
+    height: 64px !important;
   }
 
   .boton-modulo-compacto .icono-circulo img {
-    width: 34px !important;
-    height: 34px !important;
+    width: 40px !important;
+    height: 40px !important;
   }
 
   .boton-modulo-compacto p {
-    font-size: 11px !important;
-    max-width: 75px !important;
+    font-size: 13px !important;
+    max-width: 85px !important;
+    line-height: 1.25 !important;
+  }
+
+  /* Cuadros de pedidos más altos para mostrar 3 items */
+  .h-36 {
+    height: 185px !important;
+  }
+
+  /* Título del menú más grande */
+  .menu-grid-compacto + h2,
+  h2.text-base {
+    font-size: 1.1rem !important;
   }
 }
