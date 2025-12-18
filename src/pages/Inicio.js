@@ -6,13 +6,32 @@ import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
 import Protegido from "../components/Protegido"; // 🔐 Protección
 
+// ✅ NUEVO: Componente de botón compacto con círculo
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div
-    className="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md hover:bg-gray-100 transition cursor-pointer"
+    className="boton-modulo-compacto flex flex-col items-center justify-center cursor-pointer transition hover:scale-105"
     onClick={onClick}
+    style={{ gap: "4px" }}
   >
-    <img src={imagen} alt={titulo} className="w-12 h-12 object-contain mb-2" />
-    <p className="text-sm font-medium text-gray-700 text-center">{titulo}</p>
+    <div
+      className="icono-circulo flex items-center justify-center"
+      style={{
+        width: "52px",
+        height: "52px",
+        borderRadius: "50%",
+        backgroundColor: "#f3f4f6",
+        border: "1px solid #e5e7eb",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.08)"
+      }}
+    >
+      <img src={imagen} alt={titulo} style={{ width: "32px", height: "32px", objectFit: "contain" }} />
+    </div>
+    <p
+      className="text-center text-gray-700 font-medium"
+      style={{ fontSize: "11px", lineHeight: "1.2", maxWidth: "70px" }}
+    >
+      {titulo}
+    </p>
   </div>
 );
 
@@ -294,45 +313,45 @@ const { data: ords } = await supabase
 
   return (
     <Protegido>
-      <div className="p-6 pb-24 md:pb-6">
-        <h1 className="text-2xl font-bold mb-6">Bienvenido</h1>
+      <div className="p-4 pb-20 md:pb-4">
+        <h1 className="text-xl font-bold mb-4">Bienvenido</h1>
 
-        {/* TABLA VISUAL CON SCROLL INTERNO */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* TABLA VISUAL CON SCROLL INTERNO - MÁS COMPACTA */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           {/* Columna izquierda - Activos */}
-          <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 shadow-sm">
-            <h2 className="text-lg font-semibold text-blue-800 mb-3 text-center">
+          <div className="bg-blue-50 rounded-lg border border-blue-200 p-3 shadow-sm">
+            <h2 className="text-base font-semibold text-blue-800 mb-2 text-center">
               Pedidos activos más próximos
             </h2>
             {ordenesProximas.length === 0 ? (
-              <p className="text-center text-gray-500">No hay pedidos próximos.</p>
+              <p className="text-center text-gray-500 text-sm py-2">No hay pedidos próximos.</p>
             ) : (
-              <div className="h-48 overflow-y-auto pr-2">
-                <ul className="space-y-3">
+              <div className="h-36 overflow-y-auto pr-1">
+                <ul className="space-y-2">
                   {ordenesProximas.map((orden) => (
                     <li
                       key={orden.id}
-                      className="bg-white p-3 rounded-lg shadow flex justify-between items-center hover:bg-blue-100 transition"
+                      className="bg-white p-2 rounded-lg shadow-sm flex justify-between items-center hover:bg-blue-100 transition"
                     >
-                      <div>
-                        <p className="font-bold text-blue-700">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-blue-700 text-sm truncate">
                           {orden.numero || "OP-???"}
                         </p>
-                        <p className="text-gray-800">
+                        <p className="text-gray-800 text-sm truncate">
                           {orden.clientes?.nombre || "Cliente"}
                         </p>
-                        <p className="text-gray-500 text-sm">
+                        <p className="text-gray-500 text-xs">
                           {soloFecha(orden.fecha_evento) || "-"}
                         </p>
                       </div>
-                      <div className="flex gap-2 text-lg">
-                        <button onClick={() => editarOrden(orden)} title="Editar">
+                      <div className="flex gap-1 text-base ml-2 flex-shrink-0">
+                        <button onClick={() => editarOrden(orden)} title="Editar" className="p-1 hover:bg-blue-200 rounded">
                           ✏️
                         </button>
-                        <button onClick={() => manejarPDF(orden)} title="PDF">
+                        <button onClick={() => manejarPDF(orden)} title="PDF" className="p-1 hover:bg-blue-200 rounded">
                           📄
                         </button>
-                        <button onClick={() => manejarRemision(orden)} title="Remisión">
+                        <button onClick={() => manejarRemision(orden)} title="Remisión" className="p-1 hover:bg-blue-200 rounded">
                           🚚
                         </button>
                       </div>
@@ -344,36 +363,36 @@ const { data: ords } = await supabase
           </div>
 
           {/* Columna derecha - Pendientes */}
-          <div className="bg-red-50 rounded-xl border border-red-200 p-4 shadow-sm">
-            <h2 className="text-lg font-semibold text-red-700 mb-3 text-center">
+          <div className="bg-red-50 rounded-lg border border-red-200 p-3 shadow-sm">
+            <h2 className="text-base font-semibold text-red-700 mb-2 text-center">
               Pedidos pendientes por revisar
             </h2>
             {ordenesPendientes.length === 0 ? (
-              <p className="text-center text-gray-500">No hay pedidos pendientes.</p>
+              <p className="text-center text-gray-500 text-sm py-2">No hay pedidos pendientes.</p>
             ) : (
-              <div className="h-48 overflow-y-auto pr-2">
-                <ul className="space-y-3">
+              <div className="h-36 overflow-y-auto pr-1">
+                <ul className="space-y-2">
                   {ordenesPendientes.map((orden) => (
                     <li
                       key={orden.id}
-                      className="bg-white p-3 rounded-lg shadow flex justify-between items-center hover:bg-red-100 transition"
+                      className="bg-white p-2 rounded-lg shadow-sm flex justify-between items-center hover:bg-red-100 transition"
                     >
-                      <div>
-                        <p className="font-bold text-red-700">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-red-700 text-sm truncate">
                           {orden.numero || "OP-???"}
                         </p>
-                        <p className="text-gray-800">
+                        <p className="text-gray-800 text-sm truncate">
                           {orden.clientes?.nombre || "Cliente"}
                         </p>
-                        <p className="text-gray-500 text-sm">
+                        <p className="text-gray-500 text-xs">
                           {soloFecha(orden.fecha_evento) || "-"}
                         </p>
                       </div>
-                      <div className="text-lg">
+                      <div className="text-base ml-2 flex-shrink-0">
                         <button
-                          // ✅ Recepción recibe ?id=...
                           onClick={() => navigate(`/recepcion?id=${orden.id}`)}
                           title="Revisar"
+                          className="p-1 hover:bg-red-200 rounded"
                         >
                           📝
                         </button>
@@ -386,182 +405,158 @@ const { data: ords } = await supabase
           </div>
         </div>
 
-        {/* ───────────────── Consulta rápida de stock ───────────────── */}
-        <div className="mb-6">
-          <h3 className="text-base font-semibold mb-2">Consulta rápida de stock</h3>
+        {/* ───────────────── Consulta rápida de stock - MÁS COMPACTA ───────────────── */}
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold mb-2">Consulta rápida de stock</h3>
 
-         <div className="flex flex-col md:flex-row gap-3 items-center">
-  {/* Fecha (izquierda, ancho fijo pequeño) */}
-  <input
-    type="date"
-    value={fechaConsulta}
-    onChange={(e) => setFechaConsulta(e.target.value)}
-    className="border rounded-md px-3 py-2 w-[160px] md:w-[180px] text-base placeholder-gray-400"
-    title="Seleccione la fecha a consultar"
-  />
+          <div className="flex flex-col md:flex-row gap-2 items-center">
+            {/* Fecha */}
+            <input
+              type="date"
+              value={fechaConsulta}
+              onChange={(e) => setFechaConsulta(e.target.value)}
+              className="border rounded-md px-2 py-1.5 w-full md:w-[140px] text-sm"
+              title="Seleccione la fecha a consultar"
+            />
 
-  {/* Buscador con sugerencias (centro, ocupa el espacio) */}
-  <div className="relative flex-1 min-w-[280px] w-full">
-    <input
-      type="text"
-      value={busqProd}
-      onChange={(e) => {
-        setBusqProd(e.target.value);
-        setProdSel(null);
-        setStockConsulta(null);
-      }}
-      placeholder="Buscar producto del inventario..."
-      className="w-full border rounded-md px-3 py-2 text-base placeholder-gray-400"
-    />
-    {sugerencias.length > 0 && (
-      <ul className="absolute z-30 bg-white border rounded-md mt-1 max-h-56 overflow-y-auto w-full shadow-lg text-lg leading-6">
-        {sugerencias.map((s) => (
-          <li key={s.id}>
-            <button
-              type="button"
-              className="w-full text-left px-3 py-2 hover:bg-gray-100"
-              onClick={() => {
-                setProdSel(s);
-                setBusqProd(s.nombre);
-                setSugerencias([]);
+            {/* Buscador con sugerencias */}
+            <div className="relative flex-1 w-full">
+              <input
+                type="text"
+                value={busqProd}
+                onChange={(e) => {
+                  setBusqProd(e.target.value);
+                  setProdSel(null);
+                  setStockConsulta(null);
+                }}
+                placeholder="Buscar producto del inventario..."
+                className="w-full border rounded-md px-2 py-1.5 text-sm"
+              />
+              {sugerencias.length > 0 && (
+                <ul className="absolute z-30 bg-white border rounded-md mt-1 max-h-48 overflow-y-auto w-full shadow-lg text-sm">
+                  {sugerencias.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100"
+                        onClick={() => {
+                          setProdSel(s);
+                          setBusqProd(s.nombre);
+                          setSugerencias([]);
+                        }}
+                      >
+                        {s.nombre}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Resultado */}
+            <div
+              className="w-full md:w-[140px] text-sm font-semibold text-center px-2 py-1.5 rounded-md border"
+              style={{
+                backgroundColor: "rgba(168, 181, 162, 0.18)",
+                borderColor: "rgba(168, 181, 162, 0.6)",
+                color: "#1f2937",
               }}
+              title="Unidades disponibles para la fecha seleccionada"
             >
-              {s.nombre}
-            </button>
-          </li>
-        ))}
-      </ul>
-    )}
-  </div>
-
-  {/* Resultado (derecha, ancho fijo pequeño, “sage” suave) */}
-  <div
-    className="w-[170px] text-base font-semibold text-center px-3 py-2 rounded-md border"
-    style={{
-      backgroundColor: "rgba(168, 181, 162, 0.18)", // sage suave
-      borderColor: "rgba(168, 181, 162, 0.6)",
-      color: "#1f2937", // texto gris oscuro legible (tailwind slate-800 aprox)
-    }}
-    title="Unidades disponibles para la fecha seleccionada"
-  >
-    {prodSel && fechaConsulta
-      ? (cargandoStock ? "Calculando..." : `Disponible: ${stockConsulta ?? "—"}`)
-      : "Disponible:"}
-  </div>
-</div>
-
+              {prodSel && fechaConsulta
+                ? (cargandoStock ? "..." : `Disp: ${stockConsulta ?? "—"}`)
+                : "Disponible:"}
+            </div>
+          </div>
         </div>
 
-        {/* MENÚ VISUAL DE ÍCONOS */}
-        <h2 className="text-xl font-semibold mb-4 text-center">Menú Principal</h2>
-        <div className="menu-grid grid sm:grid-cols-4 gap-6 place-items-center">
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Crear documento"
-              imagen={`${process.env.PUBLIC_URL}/icons/contrato.png`}
-              onClick={() => navigate("/crear-documento")}
-            />
-          </div>
+        {/* MENÚ VISUAL DE ÍCONOS - COMPACTO CON CÍRCULOS */}
+        <h2 className="text-base font-semibold mb-3 text-center">Menú Principal</h2>
+        <div 
+          className="menu-grid-compacto"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "12px",
+            justifyItems: "center",
+            maxWidth: "500px",
+            margin: "0 auto"
+          }}
+        >
+          <BotonModulo
+            titulo="Crear documento"
+            imagen={`${process.env.PUBLIC_URL}/icons/contrato.png`}
+            onClick={() => navigate("/crear-documento")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Clientes"
-              imagen={`${process.env.PUBLIC_URL}/icons/buscar_cliente.png`}
-              onClick={() => navigate("/clientes")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Clientes"
+            imagen={`${process.env.PUBLIC_URL}/icons/buscar_cliente.png`}
+            onClick={() => navigate("/clientes")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Inventario"
-              imagen={`${process.env.PUBLIC_URL}/icons/inventario.png`}
-              onClick={() => navigate("/inventario")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Inventario"
+            imagen={`${process.env.PUBLIC_URL}/icons/inventario.png`}
+            onClick={() => navigate("/inventario")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Agenda"
-              imagen={`${process.env.PUBLIC_URL}/icons/agenda.png`}
-              onClick={() => navigate("/agenda")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Agenda"
+            imagen={`${process.env.PUBLIC_URL}/icons/agenda.png`}
+            onClick={() => navigate("/agenda")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Proveedores"
-              imagen={`${process.env.PUBLIC_URL}/icons/proveedores.png`}
-              onClick={() => navigate("/proveedores")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Proveedores"
+            imagen={`${process.env.PUBLIC_URL}/icons/proveedores.png`}
+            onClick={() => navigate("/proveedores")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Buscar documento"
-              imagen={`${process.env.PUBLIC_URL}/icons/buscar_doc.png`}
-              onClick={() => navigate("/buscar-documento")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Buscar documento"
+            imagen={`${process.env.PUBLIC_URL}/icons/buscar_doc.png`}
+            onClick={() => navigate("/buscar-documento")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Reportes"
-              imagen={`${process.env.PUBLIC_URL}/icons/reportes.png`}
-              onClick={() => navigate("/reportes")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Reportes"
+            imagen={`${process.env.PUBLIC_URL}/icons/reportes.png`}
+            onClick={() => navigate("/reportes")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Trazabilidad"
-              imagen={`${process.env.PUBLIC_URL}/icons/trazabilidad.png`}
-              onClick={() => navigate("/trazabilidad")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Trazabilidad"
+            imagen={`${process.env.PUBLIC_URL}/icons/trazabilidad.png`}
+            onClick={() => navigate("/trazabilidad")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Usuarios"
-              imagen={`${process.env.PUBLIC_URL}/icons/usuario.png`}
-              onClick={() => navigate("/usuarios")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Usuarios"
+            imagen={`${process.env.PUBLIC_URL}/icons/usuario.png`}
+            onClick={() => navigate("/usuarios")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Recepción"
-              imagen={`${process.env.PUBLIC_URL}/icons/recepcion.png`}
-              onClick={() => navigate("/recepcion")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Recepción"
+            imagen={`${process.env.PUBLIC_URL}/icons/recepcion.png`}
+            onClick={() => navigate("/recepcion")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Contabilidad"
-              imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
-              onClick={() => navigate("/contabilidad")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Contabilidad"
+            imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
+            onClick={() => navigate("/contabilidad")}
+          />
 
-          <div className="boton-modulo">
-            <BotonModulo
-              titulo="Buscar recepción"
-              imagen={`${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`}
-              onClick={() => navigate("/buscar-recepcion")}
-            />
-          </div>
+          <BotonModulo
+            titulo="Buscar recepción"
+            imagen={`${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`}
+            onClick={() => navigate("/buscar-recepcion")}
+          />
 
           {usuario?.rol === "admin" && <></>}
         </div>
-
-        {/* 🔻 Eliminado: Menú inferior (solo móvil)
-        <div className="menu-inferior md:hidden">
-          <button onClick={() => navigate("/inicio")}>🏠 Inicio</button>
-          <button onClick={() => navigate("/crear-documento")}>📄 Documento</button>
-          <button onClick={() => navigate("/agenda")}>📅 Agenda</button>
-          <button onClick={() => navigate("/clientes")}>👥 Clientes</button>
-        </div>
-        */}
       </div>
     </Protegido>
   );

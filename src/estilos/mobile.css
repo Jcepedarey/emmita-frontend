@@ -3,24 +3,24 @@
 
 /* Solo móviles y tablets */
 @media (max-width: 768px) {
-  /* 🔹 Base tipográfica, fondo y SIN scroll horizontal (evita “zoom” y corrimientos) */
+  /* 🔹 Base tipográfica, fondo y SIN scroll horizontal (evita "zoom" y corrimientos) */
   html, body {
     background: var(--md-bg);
     color: var(--md-text);
     font-size: 15px;
     line-height: 1.45;
     -webkit-tap-highlight-color: transparent;
-    overflow-x: hidden; /* clave para que el navegador no “aleje” la vista */
+    overflow-x: hidden; /* clave para que el navegador no "aleje" la vista */
   }
 
   /* Espaciado lateral cómodo en vistas de página */
-  .container, .contenedor, .page { @apply px-4; }
+  .container, .contenedor, .page { @apply px-3; }
 
   /* 🔹 Escala tipográfica compacta */
-  h1 { font-size: clamp(20px, 5vw, 24px); line-height: 1.2; }
-  h2 { font-size: clamp(18px, 4.5vw, 22px); line-height: 1.25; }
-  h3 { font-size: clamp(16px, 4vw, 20px); line-height: 1.3; }
-  p, li { line-height: 1.45; }
+  h1 { font-size: clamp(18px, 5vw, 22px); line-height: 1.2; }
+  h2 { font-size: clamp(16px, 4.5vw, 20px); line-height: 1.25; }
+  h3 { font-size: clamp(14px, 4vw, 18px); line-height: 1.3; }
+  p, li { line-height: 1.4; }
 
   /* 🔹 Formularios más compactos y legibles (incluye Login) */
   input, select, textarea { @apply text-sm py-2; }
@@ -35,8 +35,8 @@
   /* 🔹 Tarjetas/controles (look Material compacto) */
   .card, .tarjeta {
     @apply bg-white rounded-lg border border-gray-200;
-    padding: 12px;
-    gap: 8px;
+    padding: 10px;
+    gap: 6px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   }
 
@@ -59,20 +59,20 @@
   /* 🔹 FAB de IA fijo: pegado al borde, respetando áreas seguras y SIN empujar el layout */
   .boton-ia {
     position: fixed;
-    right: max(16px, env(safe-area-inset-right));
-    bottom: max(16px, calc(env(safe-area-inset-bottom) + 16px));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, calc(env(safe-area-inset-bottom) + 12px));
     background: var(--md-secondary); /* morado */
     color: #ffffff;
     border: 0;
     border-radius: 9999px;
-    padding: 10px 14px;
-    font-size: 14px;
-    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    padding: 8px 12px;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     z-index: 60;
-    /* Evita que “afecte” el ancho del documento y cause overflow/zoom */
+    /* Evita que "afecte" el ancho del documento y cause overflow/zoom */
     contain: layout paint;
     isolation: isolate;
-    max-width: calc(100vw - 32px);
+    max-width: calc(100vw - 24px);
     touch-action: manipulation;
   }
 
@@ -86,23 +86,51 @@
     grid-template-columns: 1fr !important;
   }
 
-  /* 🔹 Cuadrícula de inicio compacta: 3 columnas solo en móvil */
+  /* 🔹 NUEVO: Menú de inicio compacto con círculos - 4 columnas en móvil */
+  .menu-grid-compacto {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 10px !important;
+    padding: 0 4px !important;
+    max-width: 100% !important;
+  }
+
+  .boton-modulo-compacto {
+    padding: 4px;
+  }
+
+  .boton-modulo-compacto .icono-circulo {
+    width: 46px !important;
+    height: 46px !important;
+  }
+
+  .boton-modulo-compacto .icono-circulo img {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .boton-modulo-compacto p {
+    font-size: 10px !important;
+    max-width: 60px !important;
+  }
+
+  /* 🔹 Cuadrícula de inicio ANTIGUA (por compatibilidad) */
   .menu-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    padding: 0 8px;
+    gap: 10px;
+    padding: 0 4px;
   }
   .menu-grid .boton-modulo {
-    padding: 10px;
-    border-radius: 12px;
+    padding: 8px;
+    border-radius: 10px;
     border: 1px solid var(--md-border);
     background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.05);
     text-align: center;
   }
-  .menu-grid .boton-modulo img { width: 44px; height: 44px; }
-  .menu-grid .boton-modulo p { font-size: 13px; line-height: 1.15; margin-top: 6px; }
+  .menu-grid .boton-modulo img { width: 40px; height: 40px; }
+  .menu-grid .boton-modulo p { font-size: 12px; line-height: 1.15; margin-top: 4px; }
 
   /* 🔹 Tablas desplazables horizontalmente (sin romper layout) */
   table {
@@ -112,7 +140,7 @@
     white-space: nowrap;
     border-spacing: 0;
   }
-  th, td { padding: 8px 12px; }
+  th, td { padding: 6px 10px; }
 
   /* 🔹 Modal pantalla completa en móvil */
   .modal, .dialog {
@@ -126,9 +154,19 @@
 
   /* 🔹 Helpers */
   .touch-target { min-height: 44px; min-width: 44px; } /* accesibilidad */
-  .compact-y > * + * { margin-top: 8px; }
+  .compact-y > * + * { margin-top: 6px; }
   .desktop-only { display: none !important; }
   .mobile-only { display: initial !important; }
+
+  /* 🔹 Cuadros de pedidos en Inicio - más compactos y mejor aprovechados */
+  .grid.grid-cols-1.md\\:grid-cols-2 {
+    gap: 8px !important;
+  }
+
+  /* Reducir altura de scroll interno en pedidos */
+  .h-36 {
+    height: 140px !important;
+  }
 }
 
 /* 🌙 Modo oscuro (solo móvil) */
@@ -147,5 +185,40 @@
   }
   button {
     @apply bg-slate-800 text-slate-100 border-slate-700 hover:bg-slate-700;
+  }
+
+  /* Modo oscuro para círculos del menú */
+  .boton-modulo-compacto .icono-circulo {
+    background-color: #1f2937 !important;
+    border-color: #374151 !important;
+  }
+
+  .boton-modulo-compacto p {
+    color: #e5e7eb !important;
+  }
+}
+
+/* 🖥️ Estilos específicos para PC/Desktop */
+@media (min-width: 769px) {
+  /* Menú compacto en PC - 6 columnas para aprovechar espacio */
+  .menu-grid-compacto {
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 16px !important;
+    max-width: 600px !important;
+  }
+
+  .boton-modulo-compacto .icono-circulo {
+    width: 56px !important;
+    height: 56px !important;
+  }
+
+  .boton-modulo-compacto .icono-circulo img {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .boton-modulo-compacto p {
+    font-size: 11px !important;
+    max-width: 75px !important;
   }
 }

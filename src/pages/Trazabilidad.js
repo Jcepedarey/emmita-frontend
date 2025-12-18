@@ -21,6 +21,7 @@ export default function Trazabilidad() {
   const [ordenDescendente, setOrdenDescendente] = useState(estadoGuardado?.ordenDescendente ?? true);
   const [tipoDocumento, setTipoDocumento] = useState(estadoGuardado?.tipoDocumento || "todos");
   const [usarFechaEvento, setUsarFechaEvento] = useState(estadoGuardado?.usarFechaEvento ?? true);
+  const [mostrarResultados, setMostrarResultados] = useState(estadoGuardado?.mostrarResultados ?? true);
 
   const [productosLista, setProductosLista] = useState([]);
   const [clientesLista, setClientesLista] = useState([]);
@@ -37,7 +38,8 @@ export default function Trazabilidad() {
       resultados,
       ordenDescendente,
       tipoDocumento,
-      usarFechaEvento
+      usarFechaEvento,
+      mostrarResultados
     };
     
     saveModuleState("/trazabilidad", estadoActual);
@@ -50,6 +52,7 @@ export default function Trazabilidad() {
     ordenDescendente,
     tipoDocumento,
     usarFechaEvento,
+    mostrarResultados,
     saveModuleState
   ]);
 
@@ -171,6 +174,7 @@ export default function Trazabilidad() {
     });
 
     setResultados(resultadosFiltrados);
+    setMostrarResultados(true);
   };
 
   const limpiar = () => {
@@ -181,6 +185,7 @@ export default function Trazabilidad() {
     setResultados([]);
     setSugerenciasProductos([]);
     setSugerenciasClientes([]);
+    setMostrarResultados(false);
   };
 
   const editarDocumento = (doc, tipoDoc) => {
@@ -225,19 +230,31 @@ export default function Trazabilidad() {
 
   return (
     <Protegido>
-      <div style={{ maxWidth: "900px", margin: "auto", padding: "1rem" }}>
-        <h2 style={{ textAlign: "center" }}>Trazabilidad de Artículos</h2>
+      <div style={{ padding: "1rem", maxWidth: "750px", margin: "auto" }}>
+        <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
+          Trazabilidad de Artículos
+        </h2>
 
-        <label>Nombre del producto:</label>
+        <label style={{ fontSize: "12px" }}>Nombre del producto:</label>
         <input
           type="text"
           value={productoBuscar}
           onChange={manejarCambioProducto}
           placeholder="Ej: silla rimax"
-          style={{ width: "100%", marginBottom: 4 }}
+          style={{ width: "100%", marginBottom: "4px", padding: "8px" }}
         />
         {sugerenciasProductos.length > 0 && (
-          <ul style={{ listStyle: "none", padding: 4, border: "1px solid #ccc", borderRadius: 4, maxHeight: 100, overflowY: "auto" }}>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 4,
+              border: "1px solid #ccc",
+              borderRadius: 4,
+              maxHeight: 120,
+              overflowY: "auto",
+              marginBottom: 10
+            }}
+          >
             {sugerenciasProductos.map((p, index) => (
               <li
                 key={index}
@@ -253,16 +270,26 @@ export default function Trazabilidad() {
           </ul>
         )}
 
-        <label>Filtrar por cliente (opcional):</label>
+        <label style={{ fontSize: "12px" }}>Filtrar por cliente (opcional):</label>
         <input
           type="text"
           value={clienteFiltro}
           onChange={manejarCambioCliente}
           placeholder="Nombre del cliente"
-          style={{ width: "100%", marginBottom: 4 }}
+          style={{ width: "100%", marginBottom: "4px", padding: "8px" }}
         />
         {sugerenciasClientes.length > 0 && (
-          <ul style={{ listStyle: "none", padding: 4, border: "1px solid #ccc", borderRadius: 4, maxHeight: 100, overflowY: "auto" }}>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 4,
+              border: "1px solid #ccc",
+              borderRadius: 4,
+              maxHeight: 120,
+              overflowY: "auto",
+              marginBottom: 10
+            }}
+          >
             {sugerenciasClientes.map((c, index) => (
               <li
                 key={index}
@@ -278,19 +305,12 @@ export default function Trazabilidad() {
           </ul>
         )}
 
-        <div style={{ marginBottom: "10px", marginTop: "15px" }}>
-          <label style={{ fontWeight: "500", display: "block", marginBottom: "6px" }}>
-            Tipo de documento:
-          </label>
+        <div style={{ marginBottom: "10px" }}>
+          <label style={{ fontSize: "12px" }}>Tipo de documento:</label>
           <select
             value={tipoDocumento}
             onChange={(e) => setTipoDocumento(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "8px",
-              borderRadius: "6px",
-              border: "1px solid #ccc"
-            }}
+            style={{ width: "100%", padding: "8px" }}
           >
             <option value="todos">📄 Todos los documentos</option>
             <option value="cotizacion">💰 Solo cotizaciones</option>
@@ -298,17 +318,19 @@ export default function Trazabilidad() {
           </select>
         </div>
 
-        <div style={{ 
-          display: "flex", 
-          alignItems: "center", 
-          gap: "10px", 
-          marginBottom: "10px",
-          padding: "10px",
-          backgroundColor: "#f3f4f6",
-          borderRadius: "6px",
-          flexWrap: "wrap"
-        }}>
-          <label style={{ fontWeight: "500" }}>Filtrar por:</label>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "10px",
+            padding: "10px",
+            backgroundColor: "#f3f4f6",
+            borderRadius: "6px",
+            flexWrap: "wrap"
+          }}
+        >
+          <label style={{ fontSize: "12px", fontWeight: "500" }}>Filtrar por:</label>
           <button
             onClick={() => setUsarFechaEvento(!usarFechaEvento)}
             style={{
@@ -323,113 +345,108 @@ export default function Trazabilidad() {
           >
             {usarFechaEvento ? "📅 Fecha del evento" : "🗓️ Fecha de creación"}
           </button>
-          <small style={{ color: "#6b7280" }}>
-            {usarFechaEvento 
-              ? "(Día del alquiler/servicio)" 
+          <small style={{ color: "#6b7280", fontSize: "12px" }}>
+            {usarFechaEvento
+              ? "(Día del alquiler/servicio)"
               : "(Cuándo se registró el documento)"}
           </small>
         </div>
 
-        <div style={{ display: "flex", gap: "10px", marginBottom: 10 }}>
+        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
           <div style={{ flex: 1 }}>
-            <label>Desde:</label>
+            <label style={{ fontSize: "12px" }}>Desde:</label>
             <input
               type="date"
               value={fechaDesde}
               onChange={(e) => setFechaDesde(e.target.value)}
-              style={{ width: "100%" }}
+              style={{ width: "100%", padding: "8px" }}
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label>Hasta:</label>
+            <label style={{ fontSize: "12px" }}>Hasta:</label>
             <input
               type="date"
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)}
-              style={{ width: "100%" }}
+              style={{ width: "100%", padding: "8px" }}
             />
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-          <label style={{ fontWeight: "500" }}>Ordenar resultados:</label>
-          <button
-            onClick={() => setOrdenDescendente(!ordenDescendente)}
-            style={{
-              padding: "8px 16px",
-              background: "#374151",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px"
-            }}
+        <div style={{ marginBottom: "15px" }}>
+          <label style={{ fontSize: "12px" }}>Ordenar por:</label>
+          <select
+            value={ordenDescendente ? "desc" : "asc"}
+            onChange={(e) => setOrdenDescendente(e.target.value === "desc")}
+            style={{ width: "100%", padding: "8px" }}
           >
-            {ordenDescendente ? "⬇️ Más reciente primero" : "⬆️ Más antiguo primero"}
+            <option value="desc">⬇️ Más reciente primero</option>
+            <option value="asc">⬆️ Más antiguo primero</option>
+          </select>
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+          <button onClick={buscarDocumentos} style={{ flex: 1 }}>
+            🔍 Buscar
+          </button>
+          <button onClick={limpiar} style={{ flex: 1 }}>
+            🧹 Limpiar
+          </button>
+          <button
+            onClick={() => setMostrarResultados(!mostrarResultados)}
+            style={{ flex: 1 }}
+          >
+            {mostrarResultados ? "Ocultar Resultados" : "Mostrar Resultados"}
           </button>
         </div>
 
-        <button
-          onClick={buscarDocumentos}
-          style={{ width: "100%", padding: "10px", background: "#1f2937", color: "white", marginBottom: "20px" }}
-        >
-          Buscar movimientos
-        </button>
+        {mostrarResultados && resultados.length > 0 && (
+          <>
+            <h3>Resultados</h3>
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {resultados.map((doc) => {
+                const tipo = doc.numero?.startsWith("COT") ? "cotizacion" : "orden";
+                const fecha = doc.fecha || doc.fecha_creacion || "-";
+                const fechaEvento = doc.fecha_evento?.split("T")[0] || "-";
 
-        {resultados.length > 0 ? (
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {resultados.map((doc) => {
-              const tipo = doc.numero?.startsWith("COT") ? "cotizacion" : "orden";
-              const fecha = doc.fecha || doc.fecha_creacion || "-";
-              const nombrePDF = `${tipo === "cotizacion" ? "COT" : "Ord"}_${fecha?.split("T")[0]}_${doc.nombre_cliente?.replace(/\s+/g, "_")}.pdf`;
-
-              return (
-                <li key={doc.id} style={{ borderBottom: "1px solid #ccc", padding: "10px 0" }}>
-                  <strong>Documento:</strong> {doc.numero || "-"}<br />
-                  <strong>Cliente:</strong> {doc.nombre_cliente || "Sin cliente"}<br />
-                  <strong>Fecha:</strong> {fecha?.split("T")[0] || "-"}<br />
-                  <strong>Archivo:</strong> {nombrePDF}
-                  <div style={{ marginTop: 6 }}>
-                    <span
-                      style={{ cursor: "pointer", marginRight: 10 }}
-                      onClick={() => editarDocumento(doc, tipo)}
-                      title="Editar documento"
-                    >
-                      ✏️
-                    </span>
-                    <span
-                      style={{ cursor: "pointer", marginRight: 10 }}
-                      onClick={() => generarPDF(doc, tipo)}
-                      title="Descargar PDF"
-                    >
-                      📄
-                    </span>
-                    {tipo === "orden" && (
-                      <span
-                        style={{ cursor: "pointer" }}
-                        onClick={() => generarRemision(doc)}
-                        title="Descargar Remisión"
-                      >
-                        🚚
-                      </span>
+                return (
+                  <li
+                    key={doc.id}
+                    style={{
+                      marginBottom: "1rem",
+                      border: "1px solid #ccc",
+                      borderRadius: "10px",
+                      padding: "10px",
+                      background: "#fdfdfd"
+                    }}
+                  >
+                    <strong>Documento:</strong> {doc.numero || "-"}<br />
+                    <strong>Cliente:</strong> {doc.nombre_cliente || "Sin cliente"}<br />
+                    <strong>Total:</strong> ${Number(doc.total || 0).toLocaleString("es-CO")}<br />
+                    <strong>Fecha creación:</strong> {fecha?.split("T")[0] || "-"}<br />
+                    {doc.fecha_evento && (
+                      <>
+                        <strong>Fecha evento:</strong> {fechaEvento}<br />
+                      </>
                     )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p>No se encontraron documentos con ese producto.</p>
+
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px" }}>
+                      <button onClick={() => editarDocumento(doc, tipo)}>Editar</button>
+                      <button onClick={() => generarPDF(doc, tipo)}>📄 PDF</button>
+                      {tipo === "orden" && (
+                        <button onClick={() => generarRemision(doc)}>🚚 Remisión</button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
 
-        <button
-          onClick={limpiar}
-          style={{ width: "100%", marginTop: 30, backgroundColor: "#e53935", color: "white", padding: "10px", borderRadius: "6px" }}
-        >
-          🧹 Limpiar módulo
-        </button>
+        {mostrarResultados && resultados.length === 0 && (
+          <p>No se encontraron documentos con ese producto.</p>
+        )}
       </div>
     </Protegido>
   );
