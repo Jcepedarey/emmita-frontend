@@ -10,6 +10,37 @@ import { generarRemisionPDF as generarRemision } from "../utils/generarRemision"
 import Protegido from "../components/Protegido";
 import { useNavigationState } from "../context/NavigationContext";
 
+// ✅ NUEVO: Componente IconoPago - Muestra $ verde (pagado) o rojo (pendiente)
+const IconoPago = ({ orden }) => {
+  const totalNeto = Number(orden.total_neto || orden.total || 0);
+  const sumaAbonos = (orden.abonos || []).reduce((acc, ab) => acc + Number(ab.valor || ab || 0), 0);
+  const saldo = Math.max(0, totalNeto - sumaAbonos);
+  const estaPagado = saldo === 0 && totalNeto > 0;
+
+  return (
+    <div
+      title={estaPagado ? "Pagado" : `Saldo: $${saldo.toLocaleString()}`}
+      style={{
+        width: "24px",
+        height: "24px",
+        borderRadius: "50%",
+        backgroundColor: estaPagado ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
+        border: `1.5px solid ${estaPagado ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)"}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "14px",
+        fontWeight: "bold",
+        color: estaPagado ? "rgba(22, 163, 74, 0.85)" : "rgba(220, 38, 38, 0.85)",
+        cursor: "default",
+        flexShrink: 0
+      }}
+    >
+      $
+    </div>
+  );
+};
+
 export default function Agenda() {
   const { saveModuleState, getModuleState } = useNavigationState();
   const navigate = useNavigate();
@@ -271,7 +302,8 @@ const handleFechaChange = (fecha) => {
                     {new Date(orden.fecha_evento).toLocaleDateString()}
                   </p>
                 </div>
-                <div style={{ display: "flex", gap: "8px", fontSize: "18px" }}>
+                <div style={{ display: "flex", gap: "8px", fontSize: "18px", alignItems: "center" }}>
+                  <IconoPago orden={orden} />
                   <button
                     onClick={() => editarOrden(orden)}
                     title="Editar"

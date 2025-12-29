@@ -35,6 +35,38 @@ const BotonModulo = ({ titulo, imagen, onClick }) => (
   </div>
 );
 
+// ✅ NUEVO: Componente IconoPago - Muestra $ verde (pagado) o rojo (pendiente)
+const IconoPago = ({ orden }) => {
+  // Calcular saldo: total_neto - suma de abonos
+  const totalNeto = Number(orden.total_neto || orden.total || 0);
+  const sumaAbonos = (orden.abonos || []).reduce((acc, ab) => acc + Number(ab.valor || ab || 0), 0);
+  const saldo = Math.max(0, totalNeto - sumaAbonos);
+  const estaPagado = saldo === 0 && totalNeto > 0;
+
+  return (
+    <div
+      title={estaPagado ? "Pagado" : `Saldo: $${saldo.toLocaleString()}`}
+      style={{
+        width: "24px",
+        height: "24px",
+        borderRadius: "50%",
+        backgroundColor: estaPagado ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
+        border: `1.5px solid ${estaPagado ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)"}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "14px",
+        fontWeight: "bold",
+        color: estaPagado ? "rgba(22, 163, 74, 0.85)" : "rgba(220, 38, 38, 0.85)",
+        cursor: "default",
+        flexShrink: 0
+      }}
+    >
+      $
+    </div>
+  );
+};
+
 // 👉 Helper para FECHAS: devuelve "AAAA-MM-DD" sin hora
 const soloFecha = (valor) => {
   if (!valor) return "";
@@ -344,7 +376,8 @@ const { data: ords } = await supabase
                           {soloFecha(orden.fecha_evento) || "-"}
                         </p>
                       </div>
-                      <div className="flex gap-1 text-base ml-2 flex-shrink-0">
+                      <div className="flex gap-1 text-base ml-2 flex-shrink-0 items-center">
+                        <IconoPago orden={orden} />
                         <button onClick={() => editarOrden(orden)} title="Editar" className="p-1 hover:bg-blue-200 rounded">
                           ✏️
                         </button>
@@ -388,7 +421,8 @@ const { data: ords } = await supabase
                           {soloFecha(orden.fecha_evento) || "-"}
                         </p>
                       </div>
-                      <div className="text-base ml-2 flex-shrink-0">
+                      <div className="flex gap-1 text-base ml-2 flex-shrink-0 items-center">
+                        <IconoPago orden={orden} />
                         <button
                           onClick={() => navigate(`/recepcion?id=${orden.id}`)}
                           title="Revisar"
