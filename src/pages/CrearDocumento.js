@@ -1,4 +1,4 @@
-  // CrearDocumento.js
+// CrearDocumento.js
   import React, { useEffect, useMemo, useRef, useState } from "react";
   import { useLocation } from "react-router-dom";
   import supabase from "../supabaseClient";
@@ -17,8 +17,11 @@
   const CrearDocumento = () => {
     const location = useLocation();
     const { documento, tipo } = location.state || {};
-    const esEdicion = documento?.esEdicion || false;
-    const idOriginal = documento?.idOriginal || null;
+    
+    // ✅ CONVERTIR A ESTADOS para poder actualizar después de guardar
+    const [esEdicion, setEsEdicion] = useState(documento?.esEdicion || false);
+    const [idOriginal, setIdOriginal] = useState(documento?.idOriginal || null);
+    const [numeroDocumentoActual, setNumeroDocumentoActual] = useState(documento?.numero || null);
 
     // 🧠 ESTADOS
     const [tipoDocumento, setTipoDocumento] = useState(tipo || "cotizacion");
@@ -51,6 +54,9 @@
 
     // Abonos con fecha
     const [abonos, setAbonos] = useState([]); // {valor, fecha}
+
+    // 🔒 Protección contra doble clic
+    const [guardando, setGuardando] = useState(false);
 
     // 👉 Helpers de fecha para abonos
   const hoyISO = () => {
@@ -315,10 +321,13 @@ let res = await supabase
 }, [multiDias, fechaEvento, fechasEvento]);
 
   useEffect(() => {
-    if (!multiDias) {
-      setProductosAgregados((prev) => recomputarSubtotales(prev));
-    }
-  }, [fechaEvento, multiDias]);
+    // ✅ SIEMPRE recomputar subtotales cuando cambian las fechas o número de días
+    // Esto arregla el bug de que al editar no se muestran los precios correctos
+    setProductosAgregados((prev) => {
+      if (prev.length === 0) return prev;
+      return recomputarSubtotales(prev);
+    });
+  }, [fechaEvento, multiDias, numeroDias]);
 
     // 🧮 Helpers de cálculo
   const calcularSubtotal = (item) => {
@@ -566,10 +575,72 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
   );
 };
 
+    /**
+     * ✅ Genera el siguiente número de documento buscando el MAX consecutivo
+     * Esto evita el bug de números duplicados cuando hay huecos en la secuencia
+     */
+    const generarNumeroDocumento = async (tabla, prefijo, fechaNumerica) => {
+      const { data: existentes } = await supabase
+        .from(tabla)
+        .select("numero")
+        .like("numero", `${prefijo}-${fechaNumerica}-%`);
+
+      let maxConsecutivo = 0;
+
+      if (existentes && existentes.length > 0) {
+        existentes.forEach((row) => {
+          const partes = row.numero.split("-");
+          const consecutivo = parseInt(partes[2], 10);
+          if (!isNaN(consecutivo) && consecutivo > maxConsecutivo) {
+            maxConsecutivo = consecutivo;
+          }
+        });
+      }
+
+      return `${prefijo}-${fechaNumerica}-${maxConsecutivo + 1}`;
+    };
+
     // ✅ Guardar documento
     const guardarDocumento = async () => {
-      if (!clienteSeleccionado || productosAgregados.length === 0) {
-        return Swal.fire("Faltan datos", "Debes seleccionar un cliente y agregar al menos un producto.", "warning");
+      // 🔒 Protección contra doble clic
+      if (guardando) {
+        console.log("⚠️ Ya se está guardando, ignorando clic adicional");
+        return;
+      }
+      setGuardando(true);
+
+      try {
+      // ✅ VALIDACIÓN 1: Cliente y productos
+      if (!clienteSeleccionado) {
+        setGuardando(false);
+        return Swal.fire("Falta cliente", "Debes seleccionar un cliente antes de guardar.", "warning");
+      }
+      
+      if (productosAgregados.length === 0) {
+        setGuardando(false);
+        return Swal.fire("Sin productos", "Debes agregar al menos un producto.", "warning");
+      }
+
+      // ✅ VALIDACIÓN 2: Fecha de evento
+      const tieneFechaEvento = multiDias 
+        ? (fechasEvento && fechasEvento.length > 0)
+        : (fechaEvento && fechaEvento.trim() !== "");
+      
+      if (!tieneFechaEvento) {
+        setGuardando(false);
+        return Swal.fire("Falta fecha", "Debes seleccionar la fecha del evento antes de guardar.", "warning");
+      }
+
+      // ✅ VALIDACIÓN 3: Cantidades mayores a 0
+      const productosConCantidadCero = productosAgregados.filter(p => {
+        const cantidad = Number(p.cantidad || 0);
+        return cantidad <= 0;
+      });
+      
+      if (productosConCantidadCero.length > 0) {
+        const nombres = productosConCantidadCero.map(p => p.nombre).join(", ");
+        setGuardando(false);
+        return Swal.fire("Cantidad inválida", `Los siguientes productos tienen cantidad 0 o vacía: ${nombres}`, "warning");
       }
 
       const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
@@ -578,19 +649,17 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
   const fecha = `${d1.getFullYear()}-${String(d1.getMonth() + 1).padStart(2, "0")}-${String(d1.getDate()).padStart(2, "0")}`;
       const fechaNumerica = fecha.replaceAll("-", "");
 
-      let numeroDocumento = documento?.numero;
-      if (!esEdicion) {
-        const { data: existentes } = await supabase
-          .from(tabla)
-          .select("id")
-          .like("numero", `${prefijo}-${fechaNumerica}-%`);
-        const consecutivo = (existentes?.length || 0) + 1;
-        numeroDocumento = `${prefijo}-${fechaNumerica}-${consecutivo}`;
+      // ✅ MEJORADO: Usar número existente si ya se guardó antes, o generar uno nuevo
+      let numeroDocumento = numeroDocumentoActual || documento?.numero;
+      if (!esEdicion && !numeroDocumentoActual) {
+        // Solo generar nuevo número si es la PRIMERA vez que se guarda
+        numeroDocumento = await generarNumeroDocumento(tabla, prefijo, fechaNumerica);
       }
 
       const redondear = (num) => Math.round(num * 100) / 100;
       const totalAbonos = abonos.reduce((acc, ab) => acc + Number(ab.valor || 0), 0);
       if (redondear(totalAbonos) > redondear(totalNeto)) {
+        setGuardando(false);
         return Swal.fire("Error", "El total de abonos no puede superar el valor del pedido.", "warning");
       }
       const estadoFinal = redondear(totalAbonos) === redondear(totalNeto) ? "pagado" : "pendiente";
@@ -647,10 +716,14 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
       confirmButtonText: "Sí, actualizar",
       cancelButtonText: "Cancelar",
     });
-    if (!confirmar.isConfirmed) return;
+    if (!confirmar.isConfirmed) {
+      setGuardando(false); // ✅ Liberar bloqueo si cancela
+      return;
+    }
 
-    // ¿De qué tabla viene? (COT u OP)
-    const tablaOriginal = documento?.numero?.startsWith("COT") ? "cotizaciones" : "ordenes_pedido";
+    // ¿De qué tabla viene? (COT u OP) - Usar numeroDocumentoActual si existe
+    const numeroParaVerificar = numeroDocumentoActual || documento?.numero;
+    const tablaOriginal = numeroParaVerificar?.startsWith("COT") ? "cotizaciones" : "ordenes_pedido";
 
     if (tablaOriginal !== tabla) {
       // ↪️ CONVERSIÓN (COT → OP): documento NUEVO con fecha de HOY
@@ -658,14 +731,8 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
   const fechaHoy = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
   const fechaHoyNumerica = fechaHoy.replaceAll("-", "");
 
-      // Nuevo consecutivo para HOY con el prefijo de la tabla destino
-      const { data: existentes } = await supabase
-        .from(tabla)
-        .select("id")
-        .like("numero", `${prefijo}-${fechaHoyNumerica}-%`);
-      const consecutivo = (existentes?.length || 0) + 1;
-
-      numeroDocumento = `${prefijo}-${fechaHoyNumerica}-${consecutivo}`;
+      // ✅ CORREGIDO: Usar función que busca MAX consecutivo
+      numeroDocumento = await generarNumeroDocumento(tabla, prefijo, fechaHoyNumerica);
       dataGuardar.numero = numeroDocumento;
 
       // 🔄 Nueva fecha de creación (HOY) en el tipo destino
@@ -702,12 +769,8 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
 
     // Generar número si aún no existe
     if (!numeroDocumento) {
-      const { data: existentes } = await supabase
-        .from(tabla)
-        .select("id")
-        .like("numero", `${prefijo}-${fcNumerica}-%`);
-      const consecutivo = (existentes?.length || 0) + 1;
-      numeroDocumento = `${prefijo}-${fcNumerica}-${consecutivo}`;
+      // ✅ CORREGIDO: Usar función que busca MAX consecutivo
+      numeroDocumento = await generarNumeroDocumento(tabla, prefijo, fcNumerica);
     }
     dataGuardar.numero = numeroDocumento;
 
@@ -731,7 +794,7 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
     let ordenIdFinal = esEdicion && idOriginal ? idOriginal : null;
 
     // Si es una inserción nueva, necesitamos el ID de la orden recién creada
-    if (!esEdicion) {
+    if (!esEdicion || !idOriginal) {
       const { data: ordenRecienCreada } = await supabase
         .from(tabla)
         .select("id")
@@ -739,6 +802,19 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
         .single();
       
       ordenIdFinal = ordenRecienCreada?.id || null;
+      
+      // ✅ CRÍTICO: Actualizar estados para que futuros guardados sean ACTUALIZACIONES
+      // Esto previene la duplicación si el usuario hace clic en guardar de nuevo
+      if (ordenIdFinal) {
+        setEsEdicion(true);
+        setIdOriginal(ordenIdFinal);
+        setNumeroDocumentoActual(numeroDocumento);
+        console.log("✅ Documento guardado. Futuros guardados serán actualizaciones:", {
+          esEdicion: true,
+          idOriginal: ordenIdFinal,
+          numero: numeroDocumento
+        });
+      }
     }
 
     if (ordenIdFinal) {
@@ -790,6 +866,10 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
   console.error(error);
   Swal.fire("Error", "No se pudo guardar el documento", "error");
 }
+    } finally {
+      // 🔓 Siempre liberar el bloqueo al terminar
+      setGuardando(false);
+    }
   }; // 👈 CERRAR guardarDocumento AQUÍ
 
 
@@ -1285,8 +1365,16 @@ mostrar_notas: mostrarNotas
 
           {/* Botones finales */}
           <div style={{ marginTop: "30px", display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
-            <button onClick={guardarDocumento} style={{ padding: "10px 20px" }}>
-              💾 Guardar Documento
+            <button 
+              onClick={guardarDocumento} 
+              disabled={guardando}
+              style={{ 
+                padding: "10px 20px",
+                opacity: guardando ? 0.6 : 1,
+                cursor: guardando ? "not-allowed" : "pointer"
+              }}
+            >
+              {guardando ? "⏳ Guardando..." : "💾 Guardar Documento"}
             </button>
 
             <button onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)} style={{ padding: "10px 20px" }}>
