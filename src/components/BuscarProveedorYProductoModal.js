@@ -1,6 +1,8 @@
+// src/components/BuscarProveedorYProductoModal.js
 import React, { useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import supabase from "../supabaseClient";
+import "../estilos/ModalesEstilo.css";
 
 const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   const [proveedores, setProveedores] = useState([]);
@@ -15,7 +17,6 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   const [productoEditando, setProductoEditando] = useState(null);
   const [productoForm, setProductoForm] = useState({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
 
-  // Sugerencias filtradas en tiempo real
   const [sugerenciasProveedores, setSugerenciasProveedores] = useState([]);
 
   useEffect(() => {
@@ -26,7 +27,6 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     cargarProveedores();
   }, []);
 
-  // ✅ Cambio 1: Filtrar automáticamente mientras escribe
   const manejarCambioProveedor = (e) => {
     const valor = e.target.value;
     setBusquedaProveedor(valor);
@@ -41,14 +41,12 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     }
   };
 
-  // ✅ Cambio 2: Al seleccionar proveedor, cargar productos automáticamente
   const seleccionarProveedor = async (proveedor) => {
     setProveedorSeleccionado(proveedor);
     setBusquedaProveedor(proveedor.nombre);
     setSugerenciasProveedores([]);
     setMostrarFormNuevo(false);
 
-    // Cargar productos automáticamente
     const { data } = await supabase
       .from("productos_proveedores")
       .select("*")
@@ -57,7 +55,6 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     setProductos(data || []);
   };
 
-  // ✅ Cambio 3: Guardar nuevo producto
   const guardarProductoProveedor = async () => {
     if (!formProd.nombre || !formProd.precio_compra || !formProd.precio_venta || !proveedorSeleccionado?.id) {
       return Swal.fire("Faltan datos", "Completa todos los campos", "warning");
@@ -81,14 +78,17 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
       cancelButtonText: "No, solo guardar"
     }).then((result) => {
       if (result.isConfirmed) {
-        onSelect(productoCreado);
+        // ✅ CORRECCIÓN: Incluir nombre del proveedor
+        onSelect({
+          ...productoCreado,
+          proveedor_nombre: proveedorSeleccionado?.nombre || "Proveedor",
+        });
       }
     });
 
     setFormProd({ nombre: "", precio_compra: "", precio_venta: "" });
     setMostrarFormNuevo(false);
 
-    // Recargar lista de productos
     const { data: productosActualizados } = await supabase
       .from("productos_proveedores")
       .select("*")
@@ -108,7 +108,7 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
 
   const guardarEdicion = async () => {
     const { nombre, precio_compra, precio_venta, stock } = productoForm;
-    if (!nombre || !precio_venta || !stock) return Swal.fire("Campos incompletos", "Completa todos los campos", "warning");
+    if (!nombre || !precio_venta) return Swal.fire("Campos incompletos", "Completa nombre y precio de venta", "warning");
     
     const { error } = await supabase
       .from("productos_proveedores")
@@ -120,7 +120,6 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
       setProductoEditando(null);
       setProductoForm({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
       
-      // Recargar productos
       const { data } = await supabase
         .from("productos_proveedores")
         .select("*")
@@ -134,179 +133,209 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     setProductoForm({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
   };
 
+  // ✅ CORRECCIÓN: Incluir nombre del proveedor
   const manejarSeleccion = (prod) => {
-    onSelect(prod);
+    onSelect({
+      ...prod,
+      proveedor_nombre: proveedorSeleccionado?.nombre || "Proveedor",
+    });
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-      <div className="bg-white p-6 rounded w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4">📦 Buscar producto por proveedor</h2>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-contenedor ancho-medio" onClick={(e) => e.stopPropagation()}>
+        
+        {/* Header */}
+        <div className="modal-header header-morado">
+          <h2>📦 Buscar Producto por Proveedor</h2>
+          <button className="btn-cerrar-modal" onClick={onClose}>✕</button>
+        </div>
 
-        {/* ✅ Cambio 1: Búsqueda con sugerencias automáticas */}
-        <label className="block mb-1 font-medium">Proveedor:</label>
-        <input
-          type="text"
-          value={busquedaProveedor}
-          onChange={manejarCambioProveedor}
-          className="border p-2 rounded w-full mb-2"
-          placeholder="Escribe el nombre del proveedor..."
-        />
-
-        {/* Lista de sugerencias (similar a Trazabilidad) */}
-        {sugerenciasProveedores.length > 0 && (
-          <ul className="border rounded max-h-40 overflow-y-auto mb-4 bg-gray-50">
-            {sugerenciasProveedores.map((prov) => (
-              <li
-                key={prov.id}
-                onClick={() => seleccionarProveedor(prov)}
-                className="p-2 hover:bg-blue-100 cursor-pointer"
-              >
-                {prov.nombre}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* ✅ Cambio 2: Productos se muestran automáticamente al seleccionar proveedor */}
-        {proveedorSeleccionado && (
-          <div className="mb-4">
-            <h3 className="font-semibold mb-2 text-lg">
-              Proveedor: {proveedorSeleccionado.nombre}
-            </h3>
-
-            {/* ✅ Cambio 3: Botón para mostrar formulario de nuevo producto */}
-            {!mostrarFormNuevo && (
-              <button
-                onClick={() => setMostrarFormNuevo(true)}
-                className="bg-green-600 text-white px-4 py-2 rounded mb-3"
-              >
-                ➕ Nuevo producto
-              </button>
-            )}
-
-            {/* Formulario de nuevo producto (solo visible si se activa) */}
-            {mostrarFormNuevo && (
-              <div className="border p-4 rounded mb-4 bg-green-50">
-                <h4 className="font-semibold mb-2">Crear nuevo producto</h4>
-                <input
-                  type="text"
-                  placeholder="Nombre"
-                  value={formProd.nombre}
-                  onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })}
-                  className="border p-2 rounded w-full mb-2"
-                />
-                <input
-                  type="number"
-                  placeholder="Precio compra"
-                  value={formProd.precio_compra}
-                  onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })}
-                  className="border p-2 rounded w-full mb-2"
-                />
-                <input
-                  type="number"
-                  placeholder="Precio venta"
-                  value={formProd.precio_venta}
-                  onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })}
-                  className="border p-2 rounded w-full mb-2"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={guardarProductoProveedor}
-                    className="bg-green-600 text-white px-4 py-2 rounded"
-                  >
-                    💾 Guardar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMostrarFormNuevo(false);
-                      setFormProd({ nombre: "", precio_compra: "", precio_venta: "" });
-                    }}
-                    className="bg-gray-400 text-white px-4 py-2 rounded"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ✅ Cambio 4: Lista de productos (visible automáticamente) */}
-            <div className="space-y-2">
-              {productos.length === 0 ? (
-                <p className="text-gray-500 italic">No hay productos registrados para este proveedor</p>
-              ) : (
-                productos.map((prod) => (
-                  <div key={prod.id} className="border p-3 rounded bg-gray-100">
-                    {productoEditando === prod.id ? (
-                      <div className="space-y-2">
-                        <input
-                          value={productoForm.nombre}
-                          onChange={(e) => setProductoForm({ ...productoForm, nombre: e.target.value })}
-                          className="border p-2 rounded w-full"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Precio compra"
-                          value={productoForm.precio_compra}
-                          onChange={(e) => setProductoForm({ ...productoForm, precio_compra: e.target.value })}
-                          className="border p-2 rounded w-full"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Precio venta"
-                          value={productoForm.precio_venta}
-                          onChange={(e) => setProductoForm({ ...productoForm, precio_venta: e.target.value })}
-                          className="border p-2 rounded w-full"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Stock"
-                          value={productoForm.stock}
-                          onChange={(e) => setProductoForm({ ...productoForm, stock: e.target.value })}
-                          className="border p-2 rounded w-full"
-                        />
-                        <div className="flex gap-2">
-                          <button onClick={guardarEdicion} className="bg-green-500 text-white px-3 py-1 rounded">
-                            💾 Guardar
-                          </button>
-                          <button onClick={cancelarEdicion} className="bg-gray-400 text-white px-3 py-1 rounded">
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-semibold">{prod.nombre}</p>
-                          <p className="text-sm">Compra: ${Number(prod.precio_compra || 0).toLocaleString("es-CO")}</p>
-                          <p className="text-sm">Venta: ${Number(prod.precio_venta || 0).toLocaleString("es-CO")}</p>
-                          <p className="text-sm">Stock: {prod.stock || 0}</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => manejarSeleccion(prod)}
-                            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                          >
-                            ➕ Agregar
-                          </button>
-                          <button
-                            onClick={() => manejarEditar(prod)}
-                            className="bg-yellow-400 text-white px-3 py-1 rounded hover:bg-yellow-500"
-                          >
-                            ✏️ Editar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+        {/* Body */}
+        <div className="modal-body">
+          
+          {/* Búsqueda de proveedor */}
+          <div className="modal-seccion">
+            <label className="modal-label">🏢 Buscar proveedor:</label>
+            <input
+              type="text"
+              value={busquedaProveedor}
+              onChange={manejarCambioProveedor}
+              className="modal-input"
+              placeholder="Escribe el nombre del proveedor..."
+            />
           </div>
-        )}
 
-        <div className="flex justify-end mt-6">
-          <button onClick={onClose} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+          {/* Lista de sugerencias */}
+          {sugerenciasProveedores.length > 0 && (
+            <ul className="lista-sugerencias" style={{ marginBottom: 16 }}>
+              {sugerenciasProveedores.map((prov) => (
+                <li key={prov.id} onClick={() => seleccionarProveedor(prov)}>
+                  🏢 {prov.nombre}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Proveedor seleccionado */}
+          {proveedorSeleccionado && (
+            <>
+              {/* Header del proveedor */}
+              <div className="proveedor-header">
+                <h3>🏢 {proveedorSeleccionado.nombre}</h3>
+                <span className="badge badge-azul">{productos.length} productos</span>
+              </div>
+
+              {/* Botón nuevo producto */}
+              {!mostrarFormNuevo && (
+                <button
+                  onClick={() => setMostrarFormNuevo(true)}
+                  className="btn-modal btn-dashed"
+                  style={{ marginBottom: 16 }}
+                >
+                  ➕ Nuevo producto
+                </button>
+              )}
+
+              {/* Formulario nuevo producto */}
+              {mostrarFormNuevo && (
+                <div className="form-expandible">
+                  <div className="form-expandible-titulo">➕ Crear nuevo producto</div>
+                  <div className="form-grid">
+                    <input
+                      type="text"
+                      placeholder="Nombre del producto"
+                      value={formProd.nombre}
+                      onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })}
+                      className="modal-input"
+                    />
+                    <div className="form-grid form-grid-2">
+                      <input
+                        type="number"
+                        placeholder="Precio compra"
+                        value={formProd.precio_compra}
+                        onChange={(e) => setFormProd({ ...formProd, precio_compra: e.target.value })}
+                        className="modal-input"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Precio venta"
+                        value={formProd.precio_venta}
+                        onChange={(e) => setFormProd({ ...formProd, precio_venta: e.target.value })}
+                        className="modal-input"
+                      />
+                    </div>
+                  </div>
+                  <div className="form-acciones">
+                    <button onClick={guardarProductoProveedor} className="btn-modal btn-verde">
+                      💾 Guardar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMostrarFormNuevo(false);
+                        setFormProd({ nombre: "", precio_compra: "", precio_venta: "" });
+                      }}
+                      className="btn-modal btn-secundario"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de productos */}
+              <div className="modal-seccion">
+                <div className="modal-seccion-titulo">📋 Productos disponibles:</div>
+                
+                {productos.length === 0 ? (
+                  <div className="mensaje-vacio">
+                    <div className="mensaje-vacio-icono">📭</div>
+                    <div className="mensaje-vacio-texto">No hay productos registrados para este proveedor</div>
+                  </div>
+                ) : (
+                  productos.map((prod) => (
+                    <div key={prod.id} className="item-card">
+                      {productoEditando === prod.id ? (
+                        <div style={{ width: '100%' }}>
+                          <div className="form-grid" style={{ marginBottom: 10 }}>
+                            <input
+                              value={productoForm.nombre}
+                              onChange={(e) => setProductoForm({ ...productoForm, nombre: e.target.value })}
+                              className="modal-input"
+                              placeholder="Nombre"
+                            />
+                            <div className="form-grid form-grid-3">
+                              <input
+                                type="number"
+                                placeholder="Precio compra"
+                                value={productoForm.precio_compra}
+                                onChange={(e) => setProductoForm({ ...productoForm, precio_compra: e.target.value })}
+                                className="modal-input"
+                              />
+                              <input
+                                type="number"
+                                placeholder="Precio venta"
+                                value={productoForm.precio_venta}
+                                onChange={(e) => setProductoForm({ ...productoForm, precio_venta: e.target.value })}
+                                className="modal-input"
+                              />
+                              <input
+                                type="number"
+                                placeholder="Stock"
+                                value={productoForm.stock}
+                                onChange={(e) => setProductoForm({ ...productoForm, stock: e.target.value })}
+                                className="modal-input"
+                              />
+                            </div>
+                          </div>
+                          <div className="form-acciones">
+                            <button onClick={guardarEdicion} className="btn-modal btn-verde btn-pequeno">
+                              💾 Guardar
+                            </button>
+                            <button onClick={cancelarEdicion} className="btn-modal btn-secundario btn-pequeno">
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="item-card-info">
+                            <div className="item-card-titulo">{prod.nombre}</div>
+                            <div className="item-card-subtitulo">
+                              <span className="badge badge-gris">Compra: ${Number(prod.precio_compra || 0).toLocaleString("es-CO")}</span>
+                              {" "}
+                              <span className="badge badge-verde">Venta: ${Number(prod.precio_venta || 0).toLocaleString("es-CO")}</span>
+                              {" "}
+                              <span>Stock: {prod.stock || 0}</span>
+                            </div>
+                          </div>
+                          <div className="item-card-acciones">
+                            <button
+                              onClick={() => manejarSeleccion(prod)}
+                              className="btn-modal btn-primario btn-pequeno"
+                            >
+                              ➕ Agregar
+                            </button>
+                            <button
+                              onClick={() => manejarEditar(prod)}
+                              className="btn-modal btn-amarillo btn-pequeno"
+                            >
+                              ✏️
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn-modal btn-rojo">
             ✖️ Cerrar
           </button>
         </div>

@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../supabaseClient";
 import { v4 as uuidv4 } from "uuid";
+import "../estilos/ModalesEstilo.css";
 
 const DEBOUNCE_MS = 250;
 const PAGE_LIMIT = 50;
@@ -10,16 +11,14 @@ export default function BuscarProductoModal({
   onSelect,
   onAgregarProducto,
   onClose,
-  persistOpen = true, // si false, cierra al seleccionar
+  persistOpen = true,
 }) {
-  // 🔎 búsqueda
   const [q, setQ] = useState("");
   const [resultados, setResultados] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
 
-  // ➕ formulario "nuevo producto"
   const [form, setForm] = useState({
     nombre: "",
     descripcion: "",
@@ -32,12 +31,10 @@ export default function BuscarProductoModal({
 
   const inputRef = useRef(null);
 
-  // Autofocus
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  // Debounce para q
   const debouncedQ = useMemo(() => {
     let h;
     return {
@@ -48,13 +45,11 @@ export default function BuscarProductoModal({
     };
   }, []);
 
-  // Ejecuta búsqueda con debounce
   useEffect(() => {
     let cancel = false;
     setError("");
 
     const run = async (term) => {
-      // Evita traer todo si q vacío (muestra top N por nombre, opcional)
       if (!term || term.trim().length === 0) {
         setResultados([]);
         return;
@@ -97,7 +92,6 @@ export default function BuscarProductoModal({
     inputRef.current?.focus();
   };
 
-  // Agregar seleccionado desde inventario (no cierra, a menos que persistOpen=false)
   const handleAgregarSeleccion = (p) => {
     if (onSelect) onSelect(p);
     if (persistOpen) {
@@ -107,11 +101,10 @@ export default function BuscarProductoModal({
     }
   };
 
-  // Agregar como ítem temporal (a partir de un producto existente)
   const handleAgregarTemporalDesdeInventario = (p) => {
     if (onAgregarProducto) {
       onAgregarProducto({
-        id: uuidv4(), // temporal independiente
+        id: uuidv4(),
         nombre: p.nombre,
         precio: Number(p.precio || 0),
         cantidad: 1,
@@ -127,7 +120,6 @@ export default function BuscarProductoModal({
     }
   };
 
-  // Guardar nuevo producto (DB o temporal "desde cero")
   const guardarNuevoProducto = async () => {
     const { nombre, descripcion, precio, stock, categoria, cantidad } = form;
 
@@ -136,7 +128,6 @@ export default function BuscarProductoModal({
       return;
     }
 
-    // Si solo lo quieres para este documento (temporal puro)
     if (temporal) {
       const itemTemporal = {
         id: uuidv4(),
@@ -149,7 +140,6 @@ export default function BuscarProductoModal({
       };
       onAgregarProducto?.(itemTemporal);
       if (persistOpen) {
-        // limpiar form y mantener abierto
         setForm({
           nombre: "",
           descripcion: "",
@@ -158,6 +148,7 @@ export default function BuscarProductoModal({
           categoria: "",
           cantidad: 1,
         });
+        setMostrarFormNuevo(false);
         inputRef.current?.focus();
       } else {
         onClose?.();
@@ -165,7 +156,6 @@ export default function BuscarProductoModal({
       return;
     }
 
-    // Guardar en DB y agregar al pedido
     try {
       const { data, error } = await supabase
         .from("productos")
@@ -191,7 +181,6 @@ export default function BuscarProductoModal({
       onAgregarProducto?.(nuevoProducto);
 
       if (persistOpen) {
-        // limpiar form para seguir agregando
         setForm({
           nombre: "",
           descripcion: "",
@@ -200,6 +189,7 @@ export default function BuscarProductoModal({
           categoria: "",
           cantidad: 1,
         });
+        setMostrarFormNuevo(false);
         inputRef.current?.focus();
       } else {
         onClose?.();
@@ -210,7 +200,6 @@ export default function BuscarProductoModal({
     }
   };
 
-  // Enter para seleccionar primer resultado
   const onKeyDownBuscar = (e) => {
     if (e.key === "Enter" && resultados.length > 0) {
       handleAgregarSeleccion(resultados[0]);
@@ -218,179 +207,189 @@ export default function BuscarProductoModal({
   };
 
   return (
-     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
-    <div className="bg-white rounded shadow-lg w-[min(900px,92vw)] max-h-[90vh] overflow-y-auto p-5">
-        <h2>🔍 Buscar producto</h2>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-contenedor" onClick={(e) => e.stopPropagation()}>
+        
+        {/* Header */}
+        <div className="modal-header header-azul">
+          <h2>🔍 Buscar Producto del Inventario</h2>
+          <button className="btn-cerrar-modal" onClick={onClose}>✕</button>
+        </div>
 
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="Escribe para buscar…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={onKeyDownBuscar}
-          style={{ width: "100%", marginBottom: 10, padding: 8 }}
-        />
-
-        {loading && <div style={{ marginBottom: 8 }}>Cargando…</div>}
-        {error && <div style={{ color: "crimson", marginBottom: 8 }}>{error}</div>}
-
-        {q && resultados.length > 0 && (
-          <ul style={{ maxHeight: 280, overflowY: "auto", padding: 0, listStyle: "none", margin: 0 }}>
-            {resultados.map((p) => (
-              <li
-                key={p.id}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}
-              >
-                <div>
-                  <strong>{p.nombre}</strong>
-                  <br />
-                  <small>Precio: ${Number(p.precio || 0).toLocaleString("es-CO")}</small>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => handleAgregarSeleccion(p)}>Agregar</button>
-                  <button onClick={() => handleAgregarTemporalDesdeInventario(p)} title="Agregar como temporal">
-                    Temp
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <hr style={{ margin: "20px 0" }} />
-
-{/* ✅ Botón para mostrar/ocultar formulario */}
-{!mostrarFormNuevo ? (
-  <button
-    onClick={() => setMostrarFormNuevo(true)}
-    style={{
-      backgroundColor: "#4CAF50",
-      color: "white",
-      padding: "10px 20px",
-      border: "none",
-      borderRadius: "6px",
-      cursor: "pointer",
-      fontSize: "16px"
-    }}
-  >
-    ➕ Agregar nuevo producto
-  </button>
-) : (
-  <div style={{ border: "1px solid #ddd", padding: "15px", borderRadius: "8px", backgroundColor: "#f9f9f9" }}>
-    <h3 style={{ marginTop: 0 }}>➕ Agregar nuevo producto</h3>
-
-    <input
-      type="text"
-      placeholder="Nombre"
-      value={form.nombre}
-      onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-      style={{ width: "100%", marginBottom: 8, padding: 6 }}
-    />
-    <input
-      type="text"
-      placeholder="Descripción"
-      value={form.descripcion}
-      onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-      style={{ width: "100%", marginBottom: 8, padding: 6 }}
-    />
-    <input
-      type="number"
-      placeholder="Precio"
-      value={form.precio}
-      onChange={(e) => setForm({ ...form, precio: e.target.value })}
-      style={{ width: "100%", marginBottom: 8, padding: 6 }}
-    />
-    <input
-      type="number"
-      placeholder="Stock"
-      value={form.stock}
-      onChange={(e) => setForm({ ...form, stock: e.target.value })}
-      style={{ width: "100%", marginBottom: 8, padding: 6 }}
-    />
-    <input
-      type="text"
-      placeholder="Categoría"
-      value={form.categoria}
-      onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-      style={{ width: "100%", marginBottom: 8, padding: 6 }}
-    />
-    <input
-      type="number"
-      placeholder="Cantidad"
-      min="1"
-      value={form.cantidad}
-      onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
-      style={{ width: "100%", marginBottom: 8, padding: 6 }}
-    />
-
-    <div style={{ marginTop: 10, marginBottom: 10 }}>
-      <span style={{ display: "block", marginBottom: 4 }}>¿Producto temporal?</span>
-      <input
-        type="checkbox"
-        checked={temporal}
-        onChange={(e) => setTemporal(e.target.checked)}
-        style={{ width: 16, height: 16, verticalAlign: "middle" }}
-      />
-    </div>
-
-    <div style={{ display: "flex", gap: "10px", marginTop: 10 }}>
-      <button
-        onClick={guardarNuevoProducto}
-        style={{
-          backgroundColor: "#4CAF50",
-          color: "white",
-          padding: "8px 16px",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer"
-        }}
-      >
-        💾 Guardar producto
-      </button>
-      <button
-        onClick={() => {
-          setMostrarFormNuevo(false);
-          setForm({
-            nombre: "",
-            descripcion: "",
-            precio: "",
-            stock: "",
-            categoria: "",
-            cantidad: 1,
-          });
-        }}
-        style={{
-          backgroundColor: "#9e9e9e",
-          color: "white",
-          padding: "8px 16px",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer"
-        }}
-      >
-        Cancelar
-      </button>
-    </div>
-  </div>
-)}
-
-        <hr style={{ margin: "20px 0" }} />
-        <button
-  onClick={() => {
-    setMostrarFormNuevo(false);
-    onClose();
-  }}
-  style={{ backgroundColor: "#f44336", color: "#fff", padding: "8px 12px" }}
->
-  ❌ Cerrar
-</button>
-
-        {!persistOpen && (
-          <div style={{ marginTop: 8 }}>
-            <small>Nota: <code>persistOpen=false</code> hará que el modal se cierre al agregar.</small>
+        {/* Body */}
+        <div className="modal-body">
+          
+          {/* Búsqueda */}
+          <div className="modal-seccion">
+            <label className="modal-label">Buscar en inventario:</label>
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Escribe para buscar..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={onKeyDownBuscar}
+              className="modal-input"
+            />
           </div>
-        )}
+
+          {loading && <div style={{ color: "#6b7280", marginBottom: 12 }}>Cargando...</div>}
+          {error && <div style={{ color: "#dc2626", marginBottom: 12 }}>{error}</div>}
+
+          {/* Resultados */}
+          {q && resultados.length > 0 && (
+            <div className="modal-seccion">
+              <div className="modal-seccion-titulo">📋 Resultados ({resultados.length})</div>
+              {resultados.map((p) => (
+                <div key={p.id} className="item-card">
+                  <div className="item-card-info">
+                    <div className="item-card-titulo">{p.nombre}</div>
+                    <div className="item-card-subtitulo">
+                      Precio: ${Number(p.precio || 0).toLocaleString("es-CO")}
+                      {p.stock !== undefined && ` · Stock: ${p.stock}`}
+                    </div>
+                  </div>
+                  <div className="item-card-acciones">
+                    <button 
+                      onClick={() => handleAgregarSeleccion(p)}
+                      className="btn-modal btn-primario btn-pequeno"
+                    >
+                      ➕ Agregar
+                    </button>
+                    <button 
+                      onClick={() => handleAgregarTemporalDesdeInventario(p)} 
+                      className="btn-modal btn-secundario btn-pequeno"
+                      title="Agregar como temporal"
+                    >
+                      📝 Temp
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {q && resultados.length === 0 && !loading && (
+            <div className="mensaje-vacio">
+              <div className="mensaje-vacio-icono">🔍</div>
+              <div className="mensaje-vacio-texto">No se encontraron productos con "{q}"</div>
+            </div>
+          )}
+
+          <hr className="modal-separador" />
+
+          {/* Botón para mostrar formulario */}
+          {!mostrarFormNuevo ? (
+            <button
+              onClick={() => setMostrarFormNuevo(true)}
+              className="btn-modal btn-dashed"
+            >
+              ➕ Agregar nuevo producto
+            </button>
+          ) : (
+            <div className="form-expandible">
+              <div className="form-expandible-titulo">➕ Agregar nuevo producto</div>
+              
+              <div className="form-grid">
+                <input
+                  type="text"
+                  placeholder="Nombre"
+                  value={form.nombre}
+                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  className="modal-input"
+                />
+                <input
+                  type="text"
+                  placeholder="Descripción"
+                  value={form.descripcion}
+                  onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+                  className="modal-input"
+                />
+                <div className="form-grid form-grid-2">
+                  <input
+                    type="number"
+                    placeholder="Precio"
+                    value={form.precio}
+                    onChange={(e) => setForm({ ...form, precio: e.target.value })}
+                    className="modal-input"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Stock"
+                    value={form.stock}
+                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                    className="modal-input"
+                  />
+                </div>
+                <div className="form-grid form-grid-2">
+                  <input
+                    type="text"
+                    placeholder="Categoría"
+                    value={form.categoria}
+                    onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                    className="modal-input"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Cantidad"
+                    min="1"
+                    value={form.cantidad}
+                    onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
+                    className="modal-input input-destacado"
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  id="temporal-check"
+                  checked={temporal}
+                  onChange={(e) => setTemporal(e.target.checked)}
+                  style={{ width: 18, height: 18, cursor: "pointer" }}
+                />
+                <label htmlFor="temporal-check" style={{ fontSize: 13, color: "#4b5563", cursor: "pointer" }}>
+                  ¿Producto temporal? (no se guarda en inventario)
+                </label>
+              </div>
+
+              <div className="form-acciones">
+                <button onClick={guardarNuevoProducto} className="btn-modal btn-verde">
+                  💾 Guardar producto
+                </button>
+                <button
+                  onClick={() => {
+                    setMostrarFormNuevo(false);
+                    setForm({
+                      nombre: "",
+                      descripcion: "",
+                      precio: "",
+                      stock: "",
+                      categoria: "",
+                      cantidad: 1,
+                    });
+                  }}
+                  className="btn-modal btn-secundario"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="modal-footer">
+          <button
+            onClick={() => {
+              setMostrarFormNuevo(false);
+              onClose();
+            }}
+            className="btn-modal btn-rojo"
+          >
+            ❌ Cerrar
+          </button>
+        </div>
       </div>
     </div>
   );

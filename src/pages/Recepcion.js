@@ -181,35 +181,40 @@ const actualizarPagoProveedorRecepcion = (index, campo, valor) => {
   setPagosProveedoresRecepcion(nuevos);
 };
 
+// 🔧 CORREGIDO: Mover cálculo de pagos a proveedores a useEffect
+useEffect(() => {
+  if (!ordenSeleccionada) return; // ✅ Evitar error si no hay orden seleccionada
+
   // Cargar pagos a proveedores existentes
-const pagosExistentes = ordenSeleccionada.pagos_proveedores || [];
+  const pagosExistentes = ordenSeleccionada.pagos_proveedores || [];
 
-// Calcular info de proveedores desde productos
-const proveedoresInfo = extraerInfoProveedores(ordenSeleccionada.productos);
+  // Calcular info de proveedores desde productos
+  const proveedoresInfo = extraerInfoProveedores(ordenSeleccionada.productos);
 
-// Combinar pagos existentes con info actualizada
-const pagosParaRecepcion = proveedoresInfo.map((prov) => {
-  const pagoExistente = pagosExistentes.find(
-    (p) => p.proveedor_nombre === prov.proveedor_nombre
-  );
+  // Combinar pagos existentes con info actualizada
+  const pagosParaRecepcion = proveedoresInfo.map((prov) => {
+    const pagoExistente = pagosExistentes.find(
+      (p) => p.proveedor_nombre === prov.proveedor_nombre
+    );
 
-  const abonosPrevios = pagoExistente?.abonos || [];
-  const totalAbonado = abonosPrevios.reduce((sum, ab) => sum + Number(ab.valor || 0), 0);
+    const abonosPrevios = pagoExistente?.abonos || [];
+    const totalAbonado = abonosPrevios.reduce((sum, ab) => sum + Number(ab.valor || 0), 0);
 
-  return {
-    proveedor_id: prov.proveedor_id,
-    proveedor_nombre: prov.proveedor_nombre,
-    productos: prov.productos,
-    total: prov.total,
-    abonos_previos: abonosPrevios,
-    total_abonado_previo: totalAbonado,
-    abono_recepcion: "", // Nuevo abono en recepción
-    fecha_abono_recepcion: new Date().toISOString().slice(0, 10),
-    saldo_pendiente: prov.total - totalAbonado,
-  };
-});
+    return {
+      proveedor_id: prov.proveedor_id,
+      proveedor_nombre: prov.proveedor_nombre,
+      productos: prov.productos,
+      total: prov.total,
+      abonos_previos: abonosPrevios,
+      total_abonado_previo: totalAbonado,
+      abono_recepcion: "", // Nuevo abono en recepción
+      fecha_abono_recepcion: new Date().toISOString().slice(0, 10),
+      saldo_pendiente: prov.total - totalAbonado,
+    };
+  });
 
-setPagosProveedoresRecepcion(pagosParaRecepcion);
+  setPagosProveedoresRecepcion(pagosParaRecepcion);
+}, [ordenSeleccionada]); // ✅ Se ejecuta solo cuando cambia la orden
 
   const actualizarCampo = (index, campo, valor) => {
     const copia = [...productosRevisados];
@@ -817,7 +822,8 @@ for (const pago of pagosProveedoresRecepcion) {
                     ordenSeleccionada,
                     ordenSeleccionada.clientes,
                     productosParaPDF,
-                    ingresosAdicionales
+                    ingresosAdicionales,
+                    pagosProveedoresRecepcion  // 🆕 Agregar pagos a proveedores
                   );
                 }}
                 className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105"
