@@ -17,6 +17,9 @@ const Recepcion = () => {
   const [gastosExtras, setGastosExtras] = useState([{ motivo: "", valor: "" }]);
   const [ingresosAdicionales, setIngresosAdicionales] = useState([]);
 
+  // Pagos a proveedores
+const [pagosProveedoresRecepcion, setPagosProveedoresRecepcion] = useState([]);
+
   const queryParams = new URLSearchParams(location.search);
   const ordenId = queryParams.get("id");
 
@@ -108,6 +111,106 @@ const Recepcion = () => {
     setDanos(productosConCampo.map(() => ({ monto: 0 })));
   };
 
+  // Extraer información de proveedores desde los productos
+const extraerInfoProveedores = (productos) => {
+  const mapa = new Map();
+
+  (productos || []).forEach((item) => {
+    if (item.es_grupo && Array.isArray(item.productos)) {
+      const cantidadGrupo = Number(item.cantidad || 1);
+
+      item.productos.forEach((sub) => {
+        if (sub.es_proveedor) {
+          const cantidadSub = Number(sub.cantidad || 0);
+          const multiplicar = sub.multiplicar !== false;
+          const cantidadFinal = multiplicar ? cantidadSub * cantidadGrupo : cantidadSub;
+          const subtotal = cantidadFinal * Number(sub.precio_compra || 0);
+
+          const key = sub.proveedor_nombre || "Proveedor";
+          if (!mapa.has(key)) {
+            mapa.set(key, {
+              proveedor_id: sub.proveedor_id,
+              proveedor_nombre: key,
+              productos: [],
+              total: 0,
+            });
+          }
+
+          const grupo = mapa.get(key);
+          grupo.productos.push({
+            nombre: sub.nombre,
+            cantidad: cantidadFinal,
+            precio_compra: Number(sub.precio_compra || 0),
+            subtotal,
+          });
+          grupo.total += subtotal;
+        }
+      });
+    } else if (item.es_proveedor) {
+      const cantidad = Number(item.cantidad || 0);
+      const subtotal = cantidad * Number(item.precio_compra || 0);
+
+      const key = item.proveedor_nombre || "Proveedor";
+      if (!mapa.has(key)) {
+        mapa.set(key, {
+          proveedor_id: item.proveedor_id,
+          proveedor_nombre: key,
+          productos: [],
+          total: 0,
+        });
+      }
+
+      const grupo = mapa.get(key);
+      grupo.productos.push({
+        nombre: item.nombre,
+        cantidad,
+        precio_compra: Number(item.precio_compra || 0),
+        subtotal,
+      });
+      grupo.total += subtotal;
+    }
+  });
+
+  return Array.from(mapa.values());
+};
+
+// Actualizar abono de proveedor en recepción
+const actualizarPagoProveedorRecepcion = (index, campo, valor) => {
+  const nuevos = [...pagosProveedoresRecepcion];
+  nuevos[index][campo] = valor;
+  setPagosProveedoresRecepcion(nuevos);
+};
+
+  // Cargar pagos a proveedores existentes
+const pagosExistentes = ordenSeleccionada.pagos_proveedores || [];
+
+// Calcular info de proveedores desde productos
+const proveedoresInfo = extraerInfoProveedores(ordenSeleccionada.productos);
+
+// Combinar pagos existentes con info actualizada
+const pagosParaRecepcion = proveedoresInfo.map((prov) => {
+  const pagoExistente = pagosExistentes.find(
+    (p) => p.proveedor_nombre === prov.proveedor_nombre
+  );
+
+  const abonosPrevios = pagoExistente?.abonos || [];
+  const totalAbonado = abonosPrevios.reduce((sum, ab) => sum + Number(ab.valor || 0), 0);
+
+  return {
+    proveedor_id: prov.proveedor_id,
+    proveedor_nombre: prov.proveedor_nombre,
+    productos: prov.productos,
+    total: prov.total,
+    abonos_previos: abonosPrevios,
+    total_abonado_previo: totalAbonado,
+    abono_recepcion: "", // Nuevo abono en recepción
+    fecha_abono_recepcion: new Date().toISOString().slice(0, 10),
+    saldo_pendiente: prov.total - totalAbonado,
+  };
+});
+
+setPagosProveedoresRecepcion(pagosParaRecepcion);
+
   const actualizarCampo = (index, campo, valor) => {
     const copia = [...productosRevisados];
     copia[index][campo] = campo === "recibido" ? parseInt(valor) : valor;
@@ -156,37 +259,6 @@ const Recepcion = () => {
         }
       }
 
-      // 🆕 CALCULAR COSTOS DE PROVEEDORES
-      const calcularCostoProveedor = (productos) => {
-        let total = 0;
-
-        (productos || []).forEach((p) => {
-          if (p.es_grupo && Array.isArray(p.productos)) {
-            const factorGrupo = Number(p.cantidad) || 1;
-            p.productos.forEach((sub) => {
-              if (sub.es_proveedor && sub.precio_compra) {
-                const cantidadSub = Number(sub.cantidad) || 0;
-                const multiplicarSub = sub.multiplicar !== false; // ✅ NUEVO
-                
-                // ✅ Aplicar multiplicación solo si está marcado
-                const cantidadTotal = multiplicarSub 
-                  ? cantidadSub * factorGrupo 
-                  : cantidadSub;
-                  
-                total += cantidadTotal * Number(sub.precio_compra);
-              }
-            });
-          } else if (p.es_proveedor && p.precio_compra) {
-            const cantidad = Number(p.cantidad) || 0;
-            total += cantidad * Number(p.precio_compra);
-          }
-        });
-
-        return total;
-      };
-
-      const costosProveedores = calcularCostoProveedor(ordenSeleccionada.productos || []);
-
       // 3️⃣ Registrar movimientos contables
       await registrarContabilidadPorPedido(
   ordenSeleccionada,
@@ -195,15 +267,11 @@ const Recepcion = () => {
     monto: parseInt(danos[i]?.monto || 0),
     tipo: p.tipo_origen,
   })),
-  usuario,
-  costosProveedores
+  usuario
 );
 
       // ✅ Calcular ingresos
-      const ingresos = (ordenSeleccionada.abonos || []).reduce(
-        (acc, ab) => acc + Number(ab.valor || 0),
-        0
-      );
+
 
       const numeroOP = String(ordenSeleccionada.numero || "");
       const numeroLimpio = numeroOP.startsWith("OP-") ? numeroOP : `OP-${numeroOP}`;
@@ -252,6 +320,56 @@ const Recepcion = () => {
         }
       }
 
+      // 🆕 Registrar pagos a proveedores realizados en recepción
+for (const pago of pagosProveedoresRecepcion) {
+  const valorAbono = Number(pago.abono_recepcion || 0);
+  if (valorAbono > 0) {
+    await insertMC(
+      {
+        orden_id: ordenSeleccionada.id,
+        cliente_id: null,
+        fecha: pago.fecha_abono_recepcion || new Date().toISOString().split("T")[0],
+        tipo: "gasto",
+        monto: valorAbono,
+        descripcion: `[${numeroLimpio}] Pago a proveedor: ${pago.proveedor_nombre}`,
+        categoria: "Pagos a proveedores",
+        estado: "activo",
+        usuario: usuario?.nombre || "Administrador",
+        fecha_modificacion: null,
+      },
+      "pago proveedor recepción"
+    );
+
+    // Actualizar los pagos en la orden
+    const abonosActualizados = [
+      ...(pago.abonos_previos || []),
+      { valor: valorAbono, fecha: pago.fecha_abono_recepcion },
+    ];
+
+    // Actualizar pagos_proveedores en la orden
+    const pagosActuales = ordenSeleccionada.pagos_proveedores || [];
+    const indexPago = pagosActuales.findIndex(
+      (p) => p.proveedor_nombre === pago.proveedor_nombre
+    );
+
+    if (indexPago >= 0) {
+      pagosActuales[indexPago].abonos = abonosActualizados;
+    } else {
+      pagosActuales.push({
+        proveedor_nombre: pago.proveedor_nombre,
+        proveedor_id: pago.proveedor_id,
+        total: pago.total,
+        abonos: abonosActualizados,
+      });
+    }
+
+    await supabase
+      .from("ordenes_pedido")
+      .update({ pagos_proveedores: pagosActuales })
+      .eq("id", ordenSeleccionada.id);
+  }
+}
+
       Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
     } catch (error) {
       console.error("❌ Error general:", error);
@@ -262,8 +380,7 @@ const Recepcion = () => {
   const registrarContabilidadPorPedido = async (
   orden,
   danos,
-  usuario,
-  costosProveedores
+  usuario
 ) => {
   try {
     const base = {
@@ -278,34 +395,8 @@ const Recepcion = () => {
     const numeroOP = String(orden.numero || "");
     const numeroLimpio = numeroOP.startsWith("OP-") ? numeroOP : `OP-${numeroOP}`;
 
-    // 1. GASTOS POR PROVEEDORES
-    if (costosProveedores > 0) {
-      const proveedoresSet = new Set();
-      (orden.productos || []).forEach((p) => {
-        if (p.es_grupo && Array.isArray(p.productos)) {
-          p.productos.forEach((sub) => {
-            if (sub.es_proveedor && sub.proveedor_nombre) {
-              proveedoresSet.add(sub.proveedor_nombre);
-            }
-          });
-        } else if (p.es_proveedor && p.proveedor_nombre) {
-          proveedoresSet.add(p.proveedor_nombre);
-        }
-      });
-
-      const nombresProveedores = Array.from(proveedoresSet).join(", ") || "Proveedores";
-
-      await insertMC(
-        {
-          ...base,
-          tipo: "gasto",
-          monto: costosProveedores,
-          descripcion: `[${numeroLimpio}] Pago a proveedores: ${nombresProveedores}`,
-          categoria: "Costos proveedores",
-        },
-        "costos proveedores"
-      );
-    }
+    // Los pagos a proveedores ahora se registran manualmente desde CrearDocumento
+// y se pueden completar aquí en Recepción
 
     // 2. GASTOS POR DAÑOS
     for (const d of danos) {
@@ -568,6 +659,96 @@ const Recepcion = () => {
                 ➕ Agregar ingreso adicional
               </button>
             </div>
+
+            {/* 💰 PAGOS A PROVEEDORES */}
+{pagosProveedoresRecepcion.length > 0 && (
+  <div className="mt-6 bg-purple-50 p-4 rounded-lg shadow">
+    <h3 className="text-lg font-semibold mb-3 text-purple-800">
+      💰 Pagos a Proveedores
+    </h3>
+    <p className="text-sm text-gray-600 mb-4">
+      Registra aquí los pagos pendientes a proveedores. Los pagos previos ya están registrados en contabilidad.
+    </p>
+
+    {pagosProveedoresRecepcion.map((pago, index) => (
+      <div
+        key={pago.proveedor_nombre}
+        className="bg-white border border-purple-200 rounded-lg p-4 mb-4"
+      >
+        {/* Header del proveedor */}
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="font-semibold text-gray-800">
+            🏢 {pago.proveedor_nombre}
+          </h4>
+          {pago.saldo_pendiente <= 0 ? (
+            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+              ✓ Pagado
+            </span>
+          ) : (
+            <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+              Pendiente: ${Number(pago.saldo_pendiente).toLocaleString("es-CO")}
+            </span>
+          )}
+        </div>
+
+        {/* Productos */}
+        <div className="text-sm text-gray-600 mb-3">
+          {pago.productos.map((prod, i) => (
+            <div key={i} className="flex justify-between py-1 border-b border-gray-100">
+              <span>{prod.nombre} ({prod.cantidad} × ${Number(prod.precio_compra).toLocaleString("es-CO")})</span>
+              <span className="font-medium">${Number(prod.subtotal).toLocaleString("es-CO")}</span>
+            </div>
+          ))}
+          <div className="flex justify-between py-2 font-semibold text-gray-800">
+            <span>Total:</span>
+            <span>${Number(pago.total).toLocaleString("es-CO")}</span>
+          </div>
+        </div>
+
+        {/* Abonos previos */}
+        {pago.abonos_previos.length > 0 && (
+          <div className="mb-3 p-2 bg-green-50 rounded">
+            <p className="text-xs font-medium text-green-700 mb-1">Abonos previos:</p>
+            {pago.abonos_previos.map((ab, i) => (
+              <div key={i} className="text-xs text-green-600 flex justify-between">
+                <span>{ab.fecha ? new Date(ab.fecha).toLocaleDateString("es-CO") : "Sin fecha"}</span>
+                <span>${Number(ab.valor).toLocaleString("es-CO")}</span>
+              </div>
+            ))}
+            <div className="text-xs font-semibold text-green-800 mt-1 pt-1 border-t border-green-200 flex justify-between">
+              <span>Total abonado:</span>
+              <span>${Number(pago.total_abonado_previo).toLocaleString("es-CO")}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Abono en recepción */}
+        {pago.saldo_pendiente > 0 && (
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-200">
+            <span className="text-sm text-gray-600 whitespace-nowrap">Pagar ahora:</span>
+            <input
+              type="number"
+              placeholder="Monto"
+              value={pago.abono_recepcion}
+              onChange={(e) =>
+                actualizarPagoProveedorRecepcion(index, "abono_recepcion", e.target.value)
+              }
+              className="w-32 px-3 py-2 border border-gray-300 rounded text-sm"
+            />
+            <input
+              type="date"
+              value={pago.fecha_abono_recepcion}
+              onChange={(e) =>
+                actualizarPagoProveedorRecepcion(index, "fecha_abono_recepcion", e.target.value)
+              }
+              className="px-3 py-2 border border-gray-300 rounded text-sm"
+            />
+          </div>
+        )}
+      </div>
+    ))}
+  </div>
+)}
 
             <label className="block mt-4">Comentario general (opcional):</label>
             <textarea

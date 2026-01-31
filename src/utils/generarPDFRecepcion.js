@@ -50,7 +50,8 @@ const procesarImagen = (src, width = 150, calidad = 1.0) =>
   });
 
 // ──────────────── Principal ────────────────
-export async function generarPDFRecepcion(revision, clienteInput, productosRecibidos, ingresosAdicionales = []) {
+// 🆕 Agregado parámetro pagosProveedoresRecepcion
+export async function generarPDFRecepcion(revision, clienteInput, productosRecibidos, ingresosAdicionales = [], pagosProveedoresRecepcion = []) {
   const doc = new jsPDF();
 
   // Recursos gráficos (MISMO tratamiento que Remisión)
@@ -139,7 +140,6 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
         if (column.index === table.columns.length - 1) zebraIndex++;
       }
     },
-    // ⚠️ NO llamar insertarFondo() en didDrawPage
     margin: { left: 10, right: 10 },
   });
 
@@ -157,7 +157,7 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
     return [`Abono ${i + 1}`, fecha, money(valor)];
   });
 
-  // 🆕 Agregar ingresos adicionales (pagos en recepción)
+  // Ingresos adicionales (pagos en recepción de cliente)
   ingresosAdicionales.forEach((ing, i) => {
     const valor = Number(ing.valor || 0);
     if (valor > 0) {
@@ -212,41 +212,55 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
 
   y = doc.lastAutoTable.finalY + 8;
 
-  // ===== GASTOS =====
+  // ===== GASTOS (ACTUALIZADO CON DETALLE DE PAGOS A PROVEEDORES) =====
   let totalGastos = 0;
   const gastosRows = [];
 
-  const calcularCostoProveedor = (productos) => {
-    let total = 0;
-    (productos || []).forEach((p) => {
-      if (p.es_grupo && Array.isArray(p.productos)) {
-        const f = Number(p.cantidad) || 1;
-        p.productos.forEach((sub) => {
-          if (sub.es_proveedor && sub.precio_compra) {
-            total += (Number(sub.cantidad) || 0) * f * Number(sub.precio_compra);
-          }
-        });
-      } else if (p.es_proveedor && p.precio_compra) {
-        total += (Number(p.cantidad) || 0) * Number(p.precio_compra);
+  // 🆕 PAGOS A PROVEEDORES (desde pagos_proveedores de la orden)
+  const pagosProveedoresOrden = revision?.pagos_proveedores || [];
+
+  pagosProveedoresOrden.forEach((prov) => {
+    (prov.abonos || []).forEach((abono) => {
+      const valor = Number(abono.valor || 0);
+      if (valor > 0) {
+        const fecha = abono.fecha ? soloFecha(abono.fecha) : "—";
+        gastosRows.push([
+          `Pago a ${prov.proveedor_nombre}`,
+          fecha,
+          money(valor),
+        ]);
+        totalGastos += valor;
       }
     });
-    return total;
-  };
+  });
 
-  const costosProveedores = calcularCostoProveedor(revision?.productos || []);
-  if (costosProveedores > 0) {
-    gastosRows.push(["Pago a proveedores", "—", money(costosProveedores)]);
-    totalGastos += costosProveedores;
-  }
+  // 🆕 PAGOS ADICIONALES EN RECEPCIÓN
+  (pagosProveedoresRecepcion || []).forEach((pago) => {
+    const valor = Number(pago.abono_recepcion || 0);
+    if (valor > 0) {
+      const fecha = pago.fecha_abono_recepcion ? soloFecha(pago.fecha_abono_recepcion) : soloFecha(new Date());
+      gastosRows.push([
+        `Pago a ${pago.proveedor_nombre} (recepción)`,
+        fecha,
+        money(valor),
+      ]);
+      totalGastos += valor;
+    }
+  });
+
+  // Descuento aplicado
   if (Number(revision?.descuento) > 0) {
     gastosRows.push(["Descuento aplicado", "—", money(Number(revision.descuento))]);
     totalGastos += Number(revision.descuento);
   }
+
+  // Retención legal
   if (Number(revision?.retencion) > 0) {
     gastosRows.push(["Retención legal", "—", money(Number(revision.retencion))]);
     totalGastos += Number(revision.retencion);
   }
 
+  // ✅ TABLA DE GASTOS
   zebraIndex = 0;
   autoTable(doc, {
     startY: y,

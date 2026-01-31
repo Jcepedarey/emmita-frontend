@@ -7,6 +7,7 @@
   import AgregarGrupoModal from "../components/AgregarGrupoModal";
   import CrearClienteModal from "../components/CrearClienteModal";
   import BuscarProveedorYProductoModal from "../components/BuscarProveedorYProductoModal";
+  import PagosProveedorModal from "../components/PagosProveedorModal";
 
   import { generarPDF } from "../utils/generarPDF";
   import { generarRemisionPDF } from "../utils/generarRemision";
@@ -148,6 +149,10 @@
     const [modalGrupo, setModalGrupo] = useState(false);
     const [modalProveedor, setModalProveedor] = useState(false);
 
+    // Modal de pagos a proveedores
+const [modalPagosProveedor, setModalPagosProveedor] = useState(false);
+const [pagosProveedores, setPagosProveedores] = useState([]);
+
     // Edición de grupo
     const [grupoEnEdicion, setGrupoEnEdicion] = useState(null);
     const [indiceGrupoEnEdicion, setIndiceGrupoEnEdicion] = useState(null);
@@ -207,6 +212,7 @@ useEffect(() => {
       setProductosAgregados(documento.productos || []);
       setGarantia(documento.garantia || "");
       setAbonos(Array.isArray(documento.abonos) ? documento.abonos : []);
+      setPagosProveedores(Array.isArray(documento.pagos_proveedores) ? documento.pagos_proveedores : []);
       setGarantiaRecibida(!!documento?.garantia_recibida);
       setFechaGarantia(documento?.fecha_garantia || "");
       setMostrarNotas(!!documento?.mostrar_notas);
@@ -486,6 +492,23 @@ let res = await supabase
     setAbonos([...abonos, { valor: "", fecha: hoyISO() }]); // valor vacío, fecha hoy
   };
 
+  // ✅ Verificar si hay productos de proveedor en el pedido
+const tieneProductosProveedor = useMemo(() => {
+  return productosAgregados.some((item) => {
+    if (item.es_proveedor) return true;
+    if (item.es_grupo && Array.isArray(item.productos)) {
+      return item.productos.some((sub) => sub.es_proveedor);
+    }
+    return false;
+  });
+}, [productosAgregados]);
+
+// ✅ Manejar guardado de pagos a proveedores desde el modal
+const handleGuardarPagosProveedores = (pagosActualizados) => {
+  setPagosProveedores(pagosActualizados);
+  setModalPagosProveedor(false);
+};
+
   // 🆕 FUNCIÓN PARA REGISTRAR ABONOS EN CONTABILIDAD
 const registrarAbonosEnContabilidad = async (ordenId, clienteId, abonos, abonosYaRegistrados, numeroOrden, nombreCliente) => {
   const movimientosCreados = [];
@@ -573,6 +596,120 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
   return abonosRegistrados.filter((reg) =>
     abonosActuales.find((ab) => ab.fecha === reg.fecha)
   );
+};
+
+// 🆕 FUNCIÓN PARA REGISTRAR PAGOS A PROVEEDORES EN CONTABILIDAD
+const registrarPagosProveedoresEnContabilidad = async (ordenId, pagosProveedores, numeroOrden) => {
+  const movimientosCreados = [];
+
+  for (const proveedor of pagosProveedores) {
+    for (const abono of proveedor.abonos || []) {
+      const valorAbono = Number(abono.valor || 0);
+      const fechaAbono = abono.fecha || new Date().toISOString().slice(0, 10);
+
+      // Solo registrar abonos nuevos (sin movimiento_id o marcados como nuevo)
+      if ((!abono.movimiento_id || abono.nuevo) && valorAbono > 0) {
+        const { data, error } = await supabase.from("movimientos_contables").insert([{
+          orden_id: ordenId,
+          cliente_id: null, // No aplica para proveedores
+          fecha: fechaAbono,
+          tipo: "gasto",
+          monto: valorAbono,
+          descripcion: `[${numeroOrden}] Pago a proveedor: ${proveedor.proveedor_nombre}`,
+          categoria: "Pagos a proveedores",
+          estado: "activo",
+          usuario: usuario?.nombre || "Administrador",
+        }]).select();
+
+        if (error) {
+          console.error("❌ Error registrando pago a proveedor:", error);
+          throw error;
+        }
+
+        // Guardar referencia del movimiento creado
+        movimientosCreados.push({
+          proveedor_nombre: proveedor.proveedor_nombre,
+          valor: valorAbono,
+          fecha: fechaAbono,
+          movimiento_id: data[0].id,
+        });
+
+        // Actualizar el abono con el ID del movimiento
+        abono.movimiento_id = data[0].id;
+        delete abono.nuevo;
+      }
+    }
+  }
+
+  return movimientosCreados;
+};
+
+// 🆕 FUNCIÓN PARA SINCRONIZAR PAGOS A PROVEEDORES (eliminar/actualizar)
+const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnteriores) => {
+  // Obtener todos los movimientos anteriores
+  const movimientosAnteriores = [];
+  (pagosAnteriores || []).forEach((prov) => {
+    (prov.abonos || []).forEach((ab) => {
+      if (ab.movimiento_id) {
+        movimientosAnteriores.push({
+          movimiento_id: ab.movimiento_id,
+          proveedor_nombre: prov.proveedor_nombre,
+          valor: ab.valor,
+          fecha: ab.fecha,
+        });
+      }
+    });
+  });
+
+  // Obtener todos los movimientos actuales
+  const movimientosActuales = [];
+  (pagosActuales || []).forEach((prov) => {
+    (prov.abonos || []).forEach((ab) => {
+      if (ab.movimiento_id && !ab.nuevo) {
+        movimientosActuales.push({
+          movimiento_id: ab.movimiento_id,
+          proveedor_nombre: prov.proveedor_nombre,
+          valor: ab.valor,
+          fecha: ab.fecha,
+        });
+      }
+    });
+  });
+
+  // Detectar movimientos ELIMINADOS
+  for (const anterior of movimientosAnteriores) {
+    const existe = movimientosActuales.find(
+      (act) => act.movimiento_id === anterior.movimiento_id
+    );
+
+    if (!existe) {
+      // Eliminar de contabilidad
+      await supabase
+        .from("movimientos_contables")
+        .delete()
+        .eq("id", anterior.movimiento_id);
+    }
+  }
+
+  // Detectar movimientos EDITADOS
+  for (const actual of movimientosActuales) {
+    const anterior = movimientosAnteriores.find(
+      (ant) => ant.movimiento_id === actual.movimiento_id
+    );
+
+    if (anterior && (anterior.valor !== actual.valor || anterior.fecha !== actual.fecha)) {
+      // Actualizar en contabilidad
+      await supabase
+        .from("movimientos_contables")
+        .update({
+          monto: actual.valor,
+          fecha: actual.fecha,
+          fecha_modificacion: new Date().toISOString(),
+          estado: "editado",
+        })
+        .eq("id", actual.movimiento_id);
+    }
+  }
 };
 
     /**
@@ -673,6 +810,7 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
     descuento: aplicarDescuento ? Number(descuento || 0) : 0,
     retencion: aplicarRetencion ? Number(retencion || 0) : 0,
     abonos,
+    pagos_proveedores: pagosProveedores,
     garantia: parseFloat(garantia || 0),
     garantia_recibida: !!garantiaRecibida,
     fecha_garantia: fechaGarantia || null,
@@ -856,6 +994,35 @@ const sincronizarAbonosContabilidad = async (abonosActuales, abonosRegistrados) 
           .eq("id", ordenIdFinal);
       }
     }
+
+    // 🆕 REGISTRAR PAGOS A PROVEEDORES EN CONTABILIDAD
+if (pagosProveedores && pagosProveedores.length > 0) {
+  try {
+    // Si es edición, primero sincronizar cambios
+    if (esEdicion && documento?.pagos_proveedores) {
+      await sincronizarPagosProveedoresContabilidad(
+        pagosProveedores,
+        documento.pagos_proveedores
+      );
+    }
+
+    // Registrar pagos nuevos
+    await registrarPagosProveedoresEnContabilidad(
+      ordenIdFinal,
+      pagosProveedores,
+      numeroDocumento
+    );
+
+    // Actualizar la orden con los pagos actualizados (con movimiento_id)
+    await supabase
+      .from(tabla)
+      .update({ pagos_proveedores: pagosProveedores })
+      .eq("id", ordenIdFinal);
+
+  } catch (errorPagos) {
+    console.error("❌ Error registrando pagos a proveedores:", errorPagos);
+  }
+}
 
     Swal.fire("✅ Guardado", `La ${tipoDocumento} y los abonos fueron registrados en contabilidad.`, "success");
   } catch (error) {
@@ -1201,6 +1368,26 @@ mostrar_notas: mostrarNotas
             </button>
           </div>
 
+          {/* 💰 Botón Pagos a Proveedores (solo si hay productos de proveedor) */}
+{tieneProductosProveedor && (
+  <button
+    onClick={() => setModalPagosProveedor(true)}
+    style={{
+      padding: "8px 12px",
+      backgroundColor: "#7c3aed",
+      color: "white",
+      border: "none",
+      borderRadius: "6px",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+    }}
+  >
+    💰 Pagos a Proveedores
+  </button>
+)}
+
           {/* Garantía y abonos */}
           <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
             <div style={{ flex: "1" }}>
@@ -1396,6 +1583,7 @@ mostrar_notas: mostrarNotas
                 setProductosAgregados([]);
                 setGarantia("");
                 setAbonos([]);
+                setPagosProveedores([]);
                 setBusquedaCliente("");
                 setFechaEvento("");
                 setFechasEvento([]);
@@ -1477,6 +1665,17 @@ mostrar_notas: mostrarNotas
       onClose={() => setModalCrearCliente(false)}
     />
   )}
+
+  {/* Modal de Pagos a Proveedores */}
+{modalPagosProveedor && (
+  <PagosProveedorModal
+    productosAgregados={productosAgregados}
+    pagosProveedores={pagosProveedores}
+    numeroDias={numeroDias}
+    onGuardar={handleGuardarPagosProveedores}
+    onClose={() => setModalPagosProveedor(false)}
+  />
+)}
         </div>
       </Protegido>
     );
