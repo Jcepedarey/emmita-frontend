@@ -18,6 +18,7 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   const [productoForm, setProductoForm] = useState({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
 
   const [sugerenciasProveedores, setSugerenciasProveedores] = useState([]);
+  const [busquedaProducto, setBusquedaProducto] = useState("");
 
   useEffect(() => {
     const cargarProveedores = async () => {
@@ -46,6 +47,7 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
     setBusquedaProveedor(proveedor.nombre);
     setSugerenciasProveedores([]);
     setMostrarFormNuevo(false);
+    setBusquedaProducto(""); // Limpiar búsqueda de productos
 
     const { data } = await supabase
       .from("productos_proveedores")
@@ -197,6 +199,17 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
                 </button>
               )}
 
+              {/* 🔍 Campo de búsqueda de productos */}
+              <div className="modal-seccion" style={{ marginBottom: 16 }}>
+                <input
+                  type="text"
+                  value={busquedaProducto}
+                  onChange={(e) => setBusquedaProducto(e.target.value)}
+                  className="modal-input"
+                  placeholder="🔍 Buscar producto..."
+                />
+              </div>
+
               {/* Formulario nuevo producto */}
               {mostrarFormNuevo && (
                 <div className="form-expandible">
@@ -253,7 +266,12 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
                     <div className="mensaje-vacio-texto">No hay productos registrados para este proveedor</div>
                   </div>
                 ) : (
-                  productos.map((prod) => (
+                  productos
+                    .filter((prod) => 
+                      !busquedaProducto || 
+                      prod.nombre.toLowerCase().includes(busquedaProducto.toLowerCase())
+                    )
+                    .map((prod) => (
                     <div key={prod.id} className="item-card">
                       {productoEditando === prod.id ? (
                         <div style={{ width: '100%' }}>
