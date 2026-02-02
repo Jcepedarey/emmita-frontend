@@ -9,7 +9,7 @@ import "../estilos/EstilosGlobales.css";
 
 // ========== COMPONENTES INTERNOS ==========
 
-// Botón de módulo del menú
+// Botón de módulo del menú (estética nueva)
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div className="sw-menu-item" onClick={onClick}>
     <div className="sw-menu-icono">
@@ -19,7 +19,7 @@ const BotonModulo = ({ titulo, imagen, onClick }) => (
   </div>
 );
 
-// Icono de estado de pago
+// Icono de estado de pago (estética nueva)
 const IconoPago = ({ orden }) => {
   const totalNeto = Number(orden.total_neto || orden.total || 0);
   const sumaAbonos = (orden.abonos || []).reduce((acc, ab) => acc + Number(ab.valor || ab || 0), 0);
@@ -55,7 +55,7 @@ const Inicio = () => {
   const [ordenesProximas, setOrdenesProximas] = useState([]);
   const [ordenesPendientes, setOrdenesPendientes] = useState([]);
 
-  // Consulta rápida de stock
+  // 🔎 Consulta rápida de stock
   const [busqProd, setBusqProd] = useState("");
   const [sugerencias, setSugerencias] = useState([]);
   const [prodSel, setProdSel] = useState(null);
@@ -63,7 +63,7 @@ const Inicio = () => {
   const [stockConsulta, setStockConsulta] = useState(null);
   const [cargandoStock, setCargandoStock] = useState(false);
 
-  // Cargar órdenes
+  // ───────────────────── Cargar órdenes (PRÓXIMAS y PENDIENTES) ─────────────────────
   useEffect(() => {
     const cargarOrdenes = async () => {
       const { data, error } = await supabase
@@ -115,7 +115,7 @@ const Inicio = () => {
     cargarOrdenes();
   }, []);
 
-  // Sugerencias de búsqueda
+  // ───────────────────── Sugerencias por nombre (mín. 2 letras) ────────────────────
   useEffect(() => {
     const fetch = async () => {
       if (!busqProd || busqProd.trim().length < 2) {
@@ -129,6 +129,7 @@ const Inicio = () => {
         .limit(10);
 
       if (error) {
+        console.error("Error buscando productos:", error);
         setSugerencias([]);
         return;
       }
@@ -137,7 +138,7 @@ const Inicio = () => {
     fetch();
   }, [busqProd]);
 
-  // Calcular stock por fecha
+  // ───────────────────── Calcular stock por fecha ─────────────────────
   const calcularStockParaFecha = async (productoId, fechaISO) => {
     setCargandoStock(true);
     try {
@@ -171,19 +172,20 @@ const Inicio = () => {
         
         if (!dias.has(fecha)) return;
 
-        const productos = o.productos || [];
-        productos.forEach((p) => {
-          if (p.es_grupo && p.productos) {
+        (o.productos || []).forEach((p) => {
+          if (p.es_grupo && Array.isArray(p.productos)) {
             p.productos.forEach((sub) => {
-              if (String(sub.id) === String(productoId)) {
-                const cantBase = Number(sub.cantidad || 1);
-                const cantGrupo = Number(p.cantidad || 1);
-                const multiplicar = sub.multiplicar !== false;
-                reservado += multiplicar ? cantBase * cantGrupo : cantBase;
+              const id = sub.producto_id || sub.id;
+              const cant = (Number(sub.cantidad) || 0) * (Number(p.cantidad) || 1);
+              if (id === productoId) {
+                reservado += cant;
               }
             });
-          } else if (String(p.id) === String(productoId)) {
-            reservado += Number(p.cantidad || 1);
+          } else {
+            const id = p.producto_id || p.id;
+            if (id === productoId) {
+              reservado += (Number(p.cantidad) || 0);
+            }
           }
         });
       });
@@ -197,29 +199,76 @@ const Inicio = () => {
     }
   };
 
+  // ───────────────────── Recalcular cuando haya producto y fecha ───────────────────
   useEffect(() => {
-    if (prodSel && fechaConsulta) {
+    if (prodSel?.id && fechaConsulta) {
       calcularStockParaFecha(prodSel.id, fechaConsulta);
+    } else {
+      setStockConsulta(null);
     }
   }, [prodSel, fechaConsulta]);
 
-  // Funciones de acción
-  const editarOrden = (orden) => navigate(`/crear-documento?id=${orden.id}`);
-  
-  const manejarPDF = async (orden) => {
-    try {
-      await generarPDF(orden);
-    } catch (error) {
-      console.error("Error generando PDF:", error);
-    }
+  // ───────────────────── Acciones UI ─────────────────────
+  // ✅ FUNCIÓN ORIGINAL COMPLETA - Pasa toda la info via state
+  const editarOrden = (orden) => {
+    const cliente = orden.clientes || {};
+
+    const documentoCompleto = {
+      ...orden,
+      nombre_cliente: cliente.nombre || "",
+      identificacion: cliente.identificacion || "",
+      telefono: cliente.telefono || "",
+      direccion: cliente.direccion || "",
+      email: cliente.email || "",
+      fecha_creacion: orden.fecha_creacion || orden.fecha || null,
+      abonos: orden.abonos || [],
+      garantia: orden.garantia || "",
+      fechaGarantia: orden.fechaGarantia || "",
+      garantiaRecibida: orden.garantiaRecibida || false,
+      estado: orden.estado || "",
+      numero: orden.numero || "",
+      esEdicion: true,
+      idOriginal: orden.id,
+    };
+
+    navigate("/crear-documento", {
+      state: {
+        documento: documentoCompleto,
+        tipo: "orden",
+      },
+    });
   };
 
+  // ✅ PDF con fechas sin hora - FUNCIÓN ORIGINAL
+  const manejarPDF = async (orden) => {
+    const doc = {
+      ...orden,
+      nombre_cliente: orden.clientes?.nombre || "N/A",
+      identificacion: orden.clientes?.identificacion || "N/A",
+      telefono: orden.clientes?.telefono || "N/A",
+      direccion: orden.clientes?.direccion || "N/A",
+      email: orden.clientes?.email || "N/A",
+      fecha_creacion: soloFecha(orden.fecha_creacion || orden.fecha),
+      fecha_evento: soloFecha(orden.fecha_evento),
+    };
+
+    await generarPDF(doc, "orden");
+  };
+
+  // ✅ Remisión con fechas sin hora - FUNCIÓN ORIGINAL
   const manejarRemision = async (orden) => {
-    try {
-      await generarRemision(orden);
-    } catch (error) {
-      console.error("Error generando remisión:", error);
-    }
+    const doc = {
+      ...orden,
+      nombre_cliente: orden.clientes?.nombre || "N/A",
+      identificacion: orden.clientes?.identificacion || "N/A",
+      telefono: orden.clientes?.telefono || "N/A",
+      direccion: orden.clientes?.direccion || "N/A",
+      email: orden.clientes?.email || "N/A",
+      fecha_creacion: soloFecha(orden.fecha_creacion || orden.fecha),
+      fecha_evento: soloFecha(orden.fecha_evento),
+    };
+
+    await generarRemision(doc);
   };
 
   return (
