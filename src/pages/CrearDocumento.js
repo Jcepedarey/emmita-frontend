@@ -823,7 +823,8 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
     descuento: aplicarDescuento ? Number(descuento || 0) : 0,
     retencion: aplicarRetencion ? Number(retencion || 0) : 0,
     abonos,
-    pagos_proveedores: pagosProveedores,
+    // 🔧 CORREGIDO: pagos_proveedores solo existe en ordenes_pedido, NO en cotizaciones
+    ...(tipoDocumento !== "cotizacion" && { pagos_proveedores: pagosProveedores }),
     garantia: parseFloat(garantia || 0),
     garantia_recibida: !!garantiaRecibida,
     fecha_garantia: fechaGarantia || null,
@@ -1009,7 +1010,8 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
     }
 
     // 🆕 REGISTRAR PAGOS A PROVEEDORES EN CONTABILIDAD
-if (pagosProveedores && pagosProveedores.length > 0) {
+    // 🔧 CORREGIDO: Solo para ordenes_pedido (cotizaciones no tienen este campo)
+if (tipoDocumento !== "cotizacion" && pagosProveedores && pagosProveedores.length > 0) {
   try {
     // Si es edición, primero sincronizar cambios
     if (esEdicion && documento?.pagos_proveedores) {
