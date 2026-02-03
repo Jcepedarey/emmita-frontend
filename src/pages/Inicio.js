@@ -9,7 +9,7 @@ import "../estilos/EstilosGlobales.css";
 
 // ========== COMPONENTES INTERNOS ==========
 
-// Botón de módulo del menú (estética nueva) - PARA PC
+// Botón de módulo del menú (solo para PC - en móvil usamos sidebar/bottom nav)
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div className="sw-menu-item" onClick={onClick}>
     <div className="sw-menu-icono">
@@ -19,26 +19,7 @@ const BotonModulo = ({ titulo, imagen, onClick }) => (
   </div>
 );
 
-// 🆕 Item de lista estilo iOS - PARA MÓVIL
-const ModuloListaItem = ({ titulo, imagen, onClick, color = "#00B4D8" }) => (
-  <div 
-    className="modulo-lista-item"
-    onClick={onClick}
-  >
-    <div 
-      className="modulo-lista-icono"
-      style={{
-        background: `linear-gradient(135deg, ${color}20 0%, ${color}40 100%)`
-      }}
-    >
-      <img src={imagen} alt={titulo} />
-    </div>
-    <span className="modulo-lista-texto">{titulo}</span>
-    <span className="modulo-lista-flecha">›</span>
-  </div>
-);
-
-// Icono de estado de pago (estética nueva)
+// Icono de estado de pago
 const IconoPago = ({ orden }) => {
   const totalNeto = Number(orden.total_neto || orden.total || 0);
   const sumaAbonos = (orden.abonos || []).reduce((acc, ab) => acc + Number(ab.valor || ab || 0), 0);
@@ -228,7 +209,6 @@ const Inicio = () => {
   }, [prodSel, fechaConsulta]);
 
   // ───────────────────── Acciones UI ─────────────────────
-  // ✅ FUNCIÓN ORIGINAL COMPLETA - Pasa toda la info via state
   const editarOrden = (orden) => {
     const cliente = orden.clientes || {};
 
@@ -258,7 +238,6 @@ const Inicio = () => {
     });
   };
 
-  // ✅ PDF con fechas sin hora - FUNCIÓN ORIGINAL
   const manejarPDF = async (orden) => {
     const doc = {
       ...orden,
@@ -274,7 +253,6 @@ const Inicio = () => {
     await generarPDF(doc, "orden");
   };
 
-  // ✅ Remisión con fechas sin hora - FUNCIÓN ORIGINAL
   const manejarRemision = async (orden) => {
     const doc = {
       ...orden,
@@ -289,22 +267,6 @@ const Inicio = () => {
 
     await generarRemision(doc);
   };
-
-  // 🆕 Datos de módulos para lista móvil (con colores únicos)
-  const modulos = [
-    { titulo: "Crear documento", imagen: `${process.env.PUBLIC_URL}/icons/contrato.png`, ruta: "/crear-documento", color: "#00B4D8" },
-    { titulo: "Clientes", imagen: `${process.env.PUBLIC_URL}/icons/buscar_cliente.png`, ruta: "/clientes", color: "#10b981" },
-    { titulo: "Inventario", imagen: `${process.env.PUBLIC_URL}/icons/inventario.png`, ruta: "/inventario", color: "#f59e0b" },
-    { titulo: "Agenda", imagen: `${process.env.PUBLIC_URL}/icons/agenda.png`, ruta: "/agenda", color: "#ef4444" },
-    { titulo: "Proveedores", imagen: `${process.env.PUBLIC_URL}/icons/proveedores.png`, ruta: "/proveedores", color: "#8b5cf6" },
-    { titulo: "Buscar documento", imagen: `${process.env.PUBLIC_URL}/icons/buscar_doc.png`, ruta: "/buscar-documento", color: "#3b82f6" },
-    { titulo: "Reportes", imagen: `${process.env.PUBLIC_URL}/icons/reportes.png`, ruta: "/reportes", color: "#06b6d4" },
-    { titulo: "Trazabilidad", imagen: `${process.env.PUBLIC_URL}/icons/trazabilidad.png`, ruta: "/trazabilidad", color: "#ec4899" },
-    { titulo: "Usuarios", imagen: `${process.env.PUBLIC_URL}/icons/usuario.png`, ruta: "/usuarios", color: "#6366f1" },
-    { titulo: "Recepción", imagen: `${process.env.PUBLIC_URL}/icons/recepcion.png`, ruta: "/recepcion", color: "#14b8a6" },
-    { titulo: "Contabilidad", imagen: `${process.env.PUBLIC_URL}/icons/contabilidad.png`, ruta: "/contabilidad", color: "#22c55e" },
-    { titulo: "Buscar recepción", imagen: `${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`, ruta: "/buscar-recepcion", color: "#a855f7" },
-  ];
 
   return (
     <Protegido>
@@ -484,10 +446,8 @@ const Inicio = () => {
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════
-              MENÚ PRINCIPAL - Vista diferente para PC y Móvil
+              MENÚ PRINCIPAL - Solo visible en PC (en móvil usamos sidebar)
           ═══════════════════════════════════════════════════════════════ */}
-          
-          {/* 🖥️ MENÚ GRID - Solo visible en PC (se oculta en móvil via CSS) */}
           <div className="menu-pc-only">
             <h2 className="sw-menu-titulo">Menú Principal</h2>
             <div className="sw-menu-grid">
@@ -554,34 +514,8 @@ const Inicio = () => {
             </div>
           </div>
 
-          {/* 📱 MENÚ LISTA iOS - Solo visible en Móvil (se oculta en PC via CSS) */}
-          <div className="menu-mobile-only">
-            <h2 className="menu-mobile-titulo">Módulos</h2>
-            <div className="menu-mobile-lista">
-              {/* Omitimos "Crear documento" porque tenemos el FAB */}
-              {modulos.slice(1).map((mod, idx) => (
-                <ModuloListaItem
-                  key={idx}
-                  titulo={mod.titulo}
-                  imagen={mod.imagen}
-                  color={mod.color}
-                  onClick={() => navigate(mod.ruta)}
-                />
-              ))}
-            </div>
-          </div>
-
         </div>
       </div>
-
-      {/* 🆕 FAB Crear Documento - Solo visible en móvil (via CSS) */}
-      <button
-        className="fab-crear-documento"
-        onClick={() => navigate("/crear-documento")}
-        title="Crear documento"
-      >
-        +
-      </button>
     </Protegido>
   );
 };

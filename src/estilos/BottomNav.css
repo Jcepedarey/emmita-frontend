@@ -1,0 +1,140 @@
+/* src/estilos/BottomNav.css */
+/* Estilos para la barra de navegación inferior (solo móvil) */
+
+/* ========== VARIABLES ========== */
+:root {
+  --bottom-nav-height: 60px;
+  --bottom-nav-bg: #ffffff;
+  --bottom-nav-border: #e5e7eb;
+  --bottom-nav-text: #6b7280;
+  --bottom-nav-active: #00B4D8;
+  --bottom-nav-fab-size: 56px;
+}
+
+/* ========== BARRA INFERIOR ========== */
+.bottom-nav {
+  display: none; /* Oculto por defecto (PC) */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--bottom-nav-height);
+  background: var(--bottom-nav-bg);
+  border-top: 1px solid var(--bottom-nav-border);
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* ========== ITEMS DE NAVEGACIÓN ========== */
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: all 0.2s ease;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item:active {
+  transform: scale(0.95);
+}
+
+/* Icono */
+.bottom-nav-icon {
+  font-size: 22px;
+  line-height: 1;
+  margin-bottom: 2px;
+  transition: transform 0.2s;
+}
+
+/* Label */
+.bottom-nav-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--bottom-nav-text);
+  transition: color 0.2s;
+}
+
+/* Estado activo */
+.bottom-nav-item.active .bottom-nav-icon {
+  transform: scale(1.15);
+}
+
+.bottom-nav-item.active .bottom-nav-label {
+  color: var(--bottom-nav-active);
+  font-weight: 600;
+}
+
+/* ========== BOTÓN CENTRAL (FAB) ========== */
+.bottom-nav-item.central {
+  flex: 1.2;
+}
+
+.bottom-nav-fab {
+  width: var(--bottom-nav-fab-size);
+  height: var(--bottom-nav-fab-size);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00B4D8 0%, #0077B6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 180, 216, 0.4);
+  margin-top: -20px; /* Elevar sobre la barra */
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.bottom-nav-item.central:active .bottom-nav-fab {
+  transform: scale(0.92);
+}
+
+.bottom-nav-fab-icon {
+  color: white;
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* ========== RESPONSIVE: SOLO MÓVIL ========== */
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    align-items: stretch;
+  }
+
+  /* Ajustar altura con safe area */
+  .bottom-nav {
+    height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0));
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* ========== PC: OCULTAR ========== */
+@media (min-width: 769px) {
+  .bottom-nav {
+    display: none !important;
+  }
+}
+
+/* ========== MODO OSCURO (opcional) ========== */
+@media (prefers-color-scheme: dark) {
+  @media (max-width: 768px) {
+    .bottom-nav {
+      background: #1f2937;
+      border-top-color: #374151;
+    }
+
+    .bottom-nav-label {
+      color: #9ca3af;
+    }
+
+    .bottom-nav-item.active .bottom-nav-label {
+      color: #00B4D8;
+    }
+  }
+}
