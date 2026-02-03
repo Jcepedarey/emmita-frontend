@@ -487,6 +487,19 @@ let res = await supabase
       setProductosAgregados(nuevos);
     };
 
+    // ✅ Mover item arriba o abajo en la lista
+const moverItem = (index, direccion) => {
+  const nuevaPosicion = index + direccion;
+  if (nuevaPosicion < 0 || nuevaPosicion >= productosAgregados.length) return;
+  
+  const nuevos = [...productosAgregados];
+  const temp = nuevos[index];
+  nuevos[index] = nuevos[nuevaPosicion];
+  nuevos[nuevaPosicion] = temp;
+  
+  setProductosAgregados(nuevos);
+};
+
     // ✅ Abonos
     const agregarAbono = () => {
     setAbonos([...abonos, { valor: "", fecha: hoyISO() }]); // valor vacío, fecha hoy
@@ -1339,13 +1352,40 @@ mostrar_notas: mostrarNotas
               maximumFractionDigits: 0
             })}
           </td>
-          <td>
+             <td style={{ whiteSpace: "nowrap" }}>
+            {/* Botones para mover */}
+            <button 
+              onClick={() => moverItem(index, -1)} 
+              disabled={index === 0}
+              title="Subir"
+              style={{ 
+                opacity: index === 0 ? 0.3 : 1,
+                cursor: index === 0 ? "not-allowed" : "pointer",
+                padding: "2px 6px",
+                marginRight: "2px"
+              }}
+            >
+              ⬆️
+            </button>
+            <button 
+              onClick={() => moverItem(index, 1)} 
+              disabled={index === productosAgregados.length - 1}
+              title="Bajar"
+              style={{ 
+                opacity: index === productosAgregados.length - 1 ? 0.3 : 1,
+                cursor: index === productosAgregados.length - 1 ? "not-allowed" : "pointer",
+                padding: "2px 6px",
+                marginRight: "4px"
+              }}
+            >
+              ⬇️
+            </button>
             {item.es_grupo && (
               <button onClick={() => editarGrupo(index)} title="Editar grupo">
                 ✏️
               </button>
             )}
-            <button onClick={() => eliminarProducto(index)}>🗑️</button>
+            <button onClick={() => eliminarProducto(index)} title="Eliminar">🗑️</button>
           </td>
         </tr>
       );
@@ -1353,40 +1393,104 @@ mostrar_notas: mostrarNotas
   </tbody>
 </table>
 
-          {/* Botones para agregar */}
-          <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button onClick={() => setModalBuscarProducto(true)} style={{ padding: "8px 12px" }}>
+          {/* Botones para agregar - Estilo unificado */}
+          <div style={{ 
+            marginTop: "20px", 
+            display: "flex", 
+            gap: "10px", 
+            flexWrap: "wrap",
+            justifyContent: "center"
+          }}>
+            {/* Botón Inventario - Azul */}
+            <button 
+              onClick={() => setModalBuscarProducto(true)} 
+              style={{
+                padding: "10px 16px",
+                background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontWeight: "500",
+                fontSize: "14px",
+                transition: "all 0.2s",
+                boxShadow: "0 2px 4px rgba(59, 130, 246, 0.3)"
+              }}
+            >
               🔍 Agregar desde Inventario
             </button>
 
-            <button onClick={() => { setIndiceGrupoEnEdicion(null); setGrupoEnEdicion(null); setModalGrupo(true); }} style={{ padding: "8px 12px" }}>
+            {/* Botón Grupos - Naranja */}
+            <button 
+              onClick={() => { setIndiceGrupoEnEdicion(null); setGrupoEnEdicion(null); setModalGrupo(true); }} 
+              style={{
+                padding: "10px 16px",
+                background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontWeight: "500",
+                fontSize: "14px",
+                transition: "all 0.2s",
+                boxShadow: "0 2px 4px rgba(245, 158, 11, 0.3)"
+              }}
+            >
               📦 Crear Grupo de Artículos
             </button>
 
-            <button onClick={() => setModalProveedor(true)} style={{ padding: "8px 12px" }}>
-              📥 Agregar desde Proveedor
+            {/* Botón Proveedor - Rojo */}
+            <button 
+              onClick={() => setModalProveedor(true)} 
+              style={{
+                padding: "10px 16px",
+                background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontWeight: "500",
+                fontSize: "14px",
+                transition: "all 0.2s",
+                boxShadow: "0 2px 4px rgba(239, 68, 68, 0.3)"
+              }}
+            >
+              🏪 Agregar desde Proveedor
             </button>
-          </div>
 
-          {/* 💰 Botón Pagos a Proveedores (solo si hay productos de proveedor) */}
-{tieneProductosProveedor && (
-  <button
-    onClick={() => setModalPagosProveedor(true)}
-    style={{
-      padding: "8px 12px",
-      backgroundColor: "#7c3aed",
-      color: "white",
-      border: "none",
-      borderRadius: "6px",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      gap: "6px",
-    }}
-  >
-    💰 Pagos a Proveedores
-  </button>
-)}
+            {/* Botón Pagos a Proveedores - Morado (solo si hay productos de proveedor) */}
+            {tieneProductosProveedor && (
+              <button
+                onClick={() => setModalPagosProveedor(true)}
+                style={{
+                  padding: "10px 16px",
+                  background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontWeight: "500",
+                  fontSize: "14px",
+                  transition: "all 0.2s",
+                  boxShadow: "0 2px 4px rgba(124, 58, 237, 0.3)"
+                }}
+              >
+                💰 Pagos a Proveedores
+              </button>
+            )}
+          </div>
 
           {/* Garantía y abonos */}
           <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
@@ -1550,28 +1654,66 @@ mostrar_notas: mostrarNotas
     <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
   </div>
 
-          {/* Botones finales */}
-          <div style={{ marginTop: "30px", display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+          {/* Botones finales - Estilo moderno */}
+          <div style={{ marginTop: "30px", display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center" }}>
             <button 
               onClick={guardarDocumento} 
               disabled={guardando}
               style={{ 
-                padding: "10px 20px",
-                opacity: guardando ? 0.6 : 1,
-                cursor: guardando ? "not-allowed" : "pointer"
+                padding: "12px 24px",
+                background: guardando ? "#9ca3af" : "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: guardando ? "not-allowed" : "pointer",
+                fontWeight: "500",
+                fontSize: "14px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                boxShadow: guardando ? "none" : "0 2px 4px rgba(59, 130, 246, 0.3)"
               }}
             >
               {guardando ? "⏳ Guardando..." : "💾 Guardar Documento"}
             </button>
 
-            <button onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)} style={{ padding: "10px 20px" }}>
+            <button 
+              onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)} 
+              style={{ 
+                padding: "12px 24px",
+                background: "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: "500",
+                fontSize: "14px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                boxShadow: "0 2px 4px rgba(107, 114, 128, 0.3)"
+              }}
+            >
               📄 Descargar PDF
             </button>
 
             {tipoDocumento === "orden" && productosAgregados.length > 0 && (
               <button
                 onClick={() => generarRemisionPDF(obtenerDatosPDF())}
-                style={{ padding: "10px 20px", backgroundColor: "#4CAF50", color: "white" }}
+                style={{ 
+                  padding: "12px 24px",
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontWeight: "500",
+                  fontSize: "14px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 2px 4px rgba(16, 185, 129, 0.3)"
+                }}
               >
                 📦 Generar Remisión
               </button>
@@ -1589,10 +1731,23 @@ mostrar_notas: mostrarNotas
                 setFechasEvento([]);
                 setMultiDias(false);
                 setAplicarDescuento(false); setDescuento("");
-  setAplicarRetencion(false); setRetencion("");
+                setAplicarRetencion(false); setRetencion("");
                 setGarantiaRecibida(false); setFechaGarantia("");
               }}
-              style={{ padding: "10px 20px", marginLeft: "10px", backgroundColor: "#e53935", color: "white" }}
+              style={{ 
+                padding: "12px 24px",
+                background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: "500",
+                fontSize: "14px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                boxShadow: "0 2px 4px rgba(239, 68, 68, 0.3)"
+              }}
             >
               🧹 Limpiar módulo
             </button>

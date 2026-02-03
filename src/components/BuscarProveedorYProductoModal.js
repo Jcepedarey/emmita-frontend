@@ -148,7 +148,7 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
       <div className="modal-contenedor ancho-medio" onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}
-        <div className="modal-header header-morado">
+        <div className="modal-header header-rojo">
           <h2>📦 Buscar Producto por Proveedor</h2>
           <button className="btn-cerrar-modal" onClick={onClose}>✕</button>
         </div>

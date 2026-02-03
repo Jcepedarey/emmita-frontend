@@ -9,13 +9,32 @@ import "../estilos/EstilosGlobales.css";
 
 // ========== COMPONENTES INTERNOS ==========
 
-// Botón de módulo del menú (estética nueva)
+// Botón de módulo del menú (estética nueva) - PARA PC
 const BotonModulo = ({ titulo, imagen, onClick }) => (
   <div className="sw-menu-item" onClick={onClick}>
     <div className="sw-menu-icono">
       <img src={imagen} alt={titulo} />
     </div>
     <span className="sw-menu-texto">{titulo}</span>
+  </div>
+);
+
+// 🆕 Item de lista estilo iOS - PARA MÓVIL
+const ModuloListaItem = ({ titulo, imagen, onClick, color = "#00B4D8" }) => (
+  <div 
+    className="modulo-lista-item"
+    onClick={onClick}
+  >
+    <div 
+      className="modulo-lista-icono"
+      style={{
+        background: `linear-gradient(135deg, ${color}20 0%, ${color}40 100%)`
+      }}
+    >
+      <img src={imagen} alt={titulo} />
+    </div>
+    <span className="modulo-lista-texto">{titulo}</span>
+    <span className="modulo-lista-flecha">›</span>
   </div>
 );
 
@@ -271,6 +290,22 @@ const Inicio = () => {
     await generarRemision(doc);
   };
 
+  // 🆕 Datos de módulos para lista móvil (con colores únicos)
+  const modulos = [
+    { titulo: "Crear documento", imagen: `${process.env.PUBLIC_URL}/icons/contrato.png`, ruta: "/crear-documento", color: "#00B4D8" },
+    { titulo: "Clientes", imagen: `${process.env.PUBLIC_URL}/icons/buscar_cliente.png`, ruta: "/clientes", color: "#10b981" },
+    { titulo: "Inventario", imagen: `${process.env.PUBLIC_URL}/icons/inventario.png`, ruta: "/inventario", color: "#f59e0b" },
+    { titulo: "Agenda", imagen: `${process.env.PUBLIC_URL}/icons/agenda.png`, ruta: "/agenda", color: "#ef4444" },
+    { titulo: "Proveedores", imagen: `${process.env.PUBLIC_URL}/icons/proveedores.png`, ruta: "/proveedores", color: "#8b5cf6" },
+    { titulo: "Buscar documento", imagen: `${process.env.PUBLIC_URL}/icons/buscar_doc.png`, ruta: "/buscar-documento", color: "#3b82f6" },
+    { titulo: "Reportes", imagen: `${process.env.PUBLIC_URL}/icons/reportes.png`, ruta: "/reportes", color: "#06b6d4" },
+    { titulo: "Trazabilidad", imagen: `${process.env.PUBLIC_URL}/icons/trazabilidad.png`, ruta: "/trazabilidad", color: "#ec4899" },
+    { titulo: "Usuarios", imagen: `${process.env.PUBLIC_URL}/icons/usuario.png`, ruta: "/usuarios", color: "#6366f1" },
+    { titulo: "Recepción", imagen: `${process.env.PUBLIC_URL}/icons/recepcion.png`, ruta: "/recepcion", color: "#14b8a6" },
+    { titulo: "Contabilidad", imagen: `${process.env.PUBLIC_URL}/icons/contabilidad.png`, ruta: "/contabilidad", color: "#22c55e" },
+    { titulo: "Buscar recepción", imagen: `${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`, ruta: "/buscar-recepcion", color: "#a855f7" },
+  ];
+
   return (
     <Protegido>
       <div className="sw-pagina">
@@ -448,73 +483,105 @@ const Inicio = () => {
             </div>
           </div>
 
-          {/* Menú principal */}
-          <h2 className="sw-menu-titulo">Menú Principal</h2>
-          <div className="sw-menu-grid">
-            <BotonModulo
-              titulo="Crear documento"
-              imagen={`${process.env.PUBLIC_URL}/icons/contrato.png`}
-              onClick={() => navigate("/crear-documento")}
-            />
-            <BotonModulo
-              titulo="Clientes"
-              imagen={`${process.env.PUBLIC_URL}/icons/buscar_cliente.png`}
-              onClick={() => navigate("/clientes")}
-            />
-            <BotonModulo
-              titulo="Inventario"
-              imagen={`${process.env.PUBLIC_URL}/icons/inventario.png`}
-              onClick={() => navigate("/inventario")}
-            />
-            <BotonModulo
-              titulo="Agenda"
-              imagen={`${process.env.PUBLIC_URL}/icons/agenda.png`}
-              onClick={() => navigate("/agenda")}
-            />
-            <BotonModulo
-              titulo="Proveedores"
-              imagen={`${process.env.PUBLIC_URL}/icons/proveedores.png`}
-              onClick={() => navigate("/proveedores")}
-            />
-            <BotonModulo
-              titulo="Buscar documento"
-              imagen={`${process.env.PUBLIC_URL}/icons/buscar_doc.png`}
-              onClick={() => navigate("/buscar-documento")}
-            />
-            <BotonModulo
-              titulo="Reportes"
-              imagen={`${process.env.PUBLIC_URL}/icons/reportes.png`}
-              onClick={() => navigate("/reportes")}
-            />
-            <BotonModulo
-              titulo="Trazabilidad"
-              imagen={`${process.env.PUBLIC_URL}/icons/trazabilidad.png`}
-              onClick={() => navigate("/trazabilidad")}
-            />
-            <BotonModulo
-              titulo="Usuarios"
-              imagen={`${process.env.PUBLIC_URL}/icons/usuario.png`}
-              onClick={() => navigate("/usuarios")}
-            />
-            <BotonModulo
-              titulo="Recepción"
-              imagen={`${process.env.PUBLIC_URL}/icons/recepcion.png`}
-              onClick={() => navigate("/recepcion")}
-            />
-            <BotonModulo
-              titulo="Contabilidad"
-              imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
-              onClick={() => navigate("/contabilidad")}
-            />
-            <BotonModulo
-              titulo="Buscar recepción"
-              imagen={`${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`}
-              onClick={() => navigate("/buscar-recepcion")}
-            />
+          {/* ═══════════════════════════════════════════════════════════════
+              MENÚ PRINCIPAL - Vista diferente para PC y Móvil
+          ═══════════════════════════════════════════════════════════════ */}
+          
+          {/* 🖥️ MENÚ GRID - Solo visible en PC (se oculta en móvil via CSS) */}
+          <div className="menu-pc-only">
+            <h2 className="sw-menu-titulo">Menú Principal</h2>
+            <div className="sw-menu-grid">
+              <BotonModulo
+                titulo="Crear documento"
+                imagen={`${process.env.PUBLIC_URL}/icons/contrato.png`}
+                onClick={() => navigate("/crear-documento")}
+              />
+              <BotonModulo
+                titulo="Clientes"
+                imagen={`${process.env.PUBLIC_URL}/icons/buscar_cliente.png`}
+                onClick={() => navigate("/clientes")}
+              />
+              <BotonModulo
+                titulo="Inventario"
+                imagen={`${process.env.PUBLIC_URL}/icons/inventario.png`}
+                onClick={() => navigate("/inventario")}
+              />
+              <BotonModulo
+                titulo="Agenda"
+                imagen={`${process.env.PUBLIC_URL}/icons/agenda.png`}
+                onClick={() => navigate("/agenda")}
+              />
+              <BotonModulo
+                titulo="Proveedores"
+                imagen={`${process.env.PUBLIC_URL}/icons/proveedores.png`}
+                onClick={() => navigate("/proveedores")}
+              />
+              <BotonModulo
+                titulo="Buscar documento"
+                imagen={`${process.env.PUBLIC_URL}/icons/buscar_doc.png`}
+                onClick={() => navigate("/buscar-documento")}
+              />
+              <BotonModulo
+                titulo="Reportes"
+                imagen={`${process.env.PUBLIC_URL}/icons/reportes.png`}
+                onClick={() => navigate("/reportes")}
+              />
+              <BotonModulo
+                titulo="Trazabilidad"
+                imagen={`${process.env.PUBLIC_URL}/icons/trazabilidad.png`}
+                onClick={() => navigate("/trazabilidad")}
+              />
+              <BotonModulo
+                titulo="Usuarios"
+                imagen={`${process.env.PUBLIC_URL}/icons/usuario.png`}
+                onClick={() => navigate("/usuarios")}
+              />
+              <BotonModulo
+                titulo="Recepción"
+                imagen={`${process.env.PUBLIC_URL}/icons/recepcion.png`}
+                onClick={() => navigate("/recepcion")}
+              />
+              <BotonModulo
+                titulo="Contabilidad"
+                imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
+                onClick={() => navigate("/contabilidad")}
+              />
+              <BotonModulo
+                titulo="Buscar recepción"
+                imagen={`${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`}
+                onClick={() => navigate("/buscar-recepcion")}
+              />
+            </div>
+          </div>
+
+          {/* 📱 MENÚ LISTA iOS - Solo visible en Móvil (se oculta en PC via CSS) */}
+          <div className="menu-mobile-only">
+            <h2 className="menu-mobile-titulo">Módulos</h2>
+            <div className="menu-mobile-lista">
+              {/* Omitimos "Crear documento" porque tenemos el FAB */}
+              {modulos.slice(1).map((mod, idx) => (
+                <ModuloListaItem
+                  key={idx}
+                  titulo={mod.titulo}
+                  imagen={mod.imagen}
+                  color={mod.color}
+                  onClick={() => navigate(mod.ruta)}
+                />
+              ))}
+            </div>
           </div>
 
         </div>
       </div>
+
+      {/* 🆕 FAB Crear Documento - Solo visible en móvil (via CSS) */}
+      <button
+        className="fab-crear-documento"
+        onClick={() => navigate("/crear-documento")}
+        title="Crear documento"
+      >
+        +
+      </button>
     </Protegido>
   );
 };
