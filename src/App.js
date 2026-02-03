@@ -1,7 +1,7 @@
 // src/App.js
 import React, { Suspense, useState, useEffect } from "react";
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from "react-router-dom";
-import { CssBaseline, CircularProgress } from "@mui/material";
+import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
+import { CssBaseline, CircularProgress, Container } from "@mui/material";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
@@ -30,84 +30,15 @@ import Reportes from "./pages/Reportes";
 import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
 
-// 🆕 Componente Layout que maneja Sidebar + Contenido
-const AppLayout = ({ children }) => {
-  const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-
-  const esLogin = location.pathname === "/" || location.pathname === "/login";
-  const usuario = JSON.parse(localStorage.getItem("usuario"));
-
-  // Detectar cambio de tamaño de ventana
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth <= 768;
-      setIsMobile(mobile);
-      // En móvil, cerrar sidebar automáticamente
-      if (mobile) {
-        setSidebarOpen(false);
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Cerrar sidebar en móvil al cambiar de ruta
-  useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
-  }, [location.pathname, isMobile]);
-
-  const handleMenuClick = () => {
-    if (isMobile) {
-      // En móvil: toggle abrir/cerrar
-      setSidebarOpen(!sidebarOpen);
-    } else {
-      // En PC: toggle colapsar/expandir
-      setSidebarCollapsed(!sidebarCollapsed);
-    }
-  };
-
-  const handleCloseSidebar = () => {
-    setSidebarOpen(false);
-  };
-
-  // Si es login, no mostrar sidebar ni bottom nav
-  if (esLogin || !usuario) {
-    return <>{children}</>;
-  }
-
-  return (
-    <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      {/* Sidebar */}
-      <Sidebar 
-        isOpen={sidebarOpen}
-        isCollapsed={sidebarCollapsed}
-        onClose={handleCloseSidebar}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-
-      {/* Contenido principal */}
-      <main className="app-main">
-        {children}
-      </main>
-
-      {/* Bottom Nav (solo móvil) */}
-      <BottomNav />
-    </div>
-  );
-};
-
 function App() {
   const [modalVisible, setModalVisible] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { clearAllStates } = useNavigationState();
+  
+  // 🆕 Estados para el sidebar
+  const [sidebarAbierto, setSidebarAbierto] = useState(false);
+  const [sidebarColapsado, setSidebarColapsado] = useState(false);
 
-  // 🔐 FASE 1: Cierre de sesión por inactividad
+  // 🔐 Cierre de sesión por inactividad
   useEffect(() => {
     let timer;
     const MAX_INACTIVIDAD = 20 * 60 * 1000; // 20 minutos
@@ -139,29 +70,47 @@ function App() {
       window.removeEventListener("click", resetTimer);
       window.removeEventListener("touchstart", resetTimer);
     };
-  }, []);
+  }, [clearAllStates]);
 
-  const handleMenuClick = () => {
-    const isMobile = window.innerWidth <= 768;
-    if (isMobile) {
-      setSidebarOpen(!sidebarOpen);
+  // 🆕 Función para el botón hamburguesa
+  const toggleSidebar = () => {
+    const esMobile = window.innerWidth <= 768;
+    console.log("Toggle sidebar - esMobile:", esMobile, "sidebarAbierto:", sidebarAbierto);
+    
+    if (esMobile) {
+      setSidebarAbierto(prev => !prev);
     } else {
-      setSidebarCollapsed(!sidebarCollapsed);
+      setSidebarColapsado(prev => !prev);
     }
+  };
+
+  // 🆕 Función para cerrar sidebar
+  const cerrarSidebar = () => {
+    console.log("Cerrando sidebar");
+    setSidebarAbierto(false);
   };
 
   return (
     <>
       <CssBaseline />
       <Router>
-        <Navbar onMenuClick={handleMenuClick} />
+        {/* Navbar con botón hamburguesa */}
+        <Navbar onMenuClick={toggleSidebar} />
         
-        <AppLayoutWrapper 
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          sidebarCollapsed={sidebarCollapsed}
-          setSidebarCollapsed={setSidebarCollapsed}
-        >
+        {/* 🆕 Sidebar */}
+        <Sidebar 
+          isOpen={sidebarAbierto}
+          isCollapsed={sidebarColapsado}
+          onClose={cerrarSidebar}
+          onToggleCollapse={() => setSidebarColapsado(prev => !prev)}
+        />
+
+        {/* Contenido principal */}
+        <Container style={{ 
+          marginLeft: window.innerWidth > 768 ? (sidebarColapsado ? 68 : 240) : 0,
+          transition: 'margin-left 0.25s ease',
+          paddingBottom: window.innerWidth <= 768 ? 80 : 20,
+        }}>
           <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
             <Routes>
               <Route path="/" element={<Login />} />
@@ -184,57 +133,17 @@ function App() {
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </Suspense>
-        </AppLayoutWrapper>
+        </Container>
 
-        {/* ✅ Asistente IA: modal y botón flotante */}
+        {/* 🆕 Barra inferior (solo móvil) */}
+        <BottomNav />
+
+        {/* Asistente IA */}
         <AsistenteModal visible={modalVisible} onClose={() => setModalVisible(false)} />
         <BotonIAFlotante onClick={() => setModalVisible(true)} />
       </Router>
     </>
   );
 }
-
-// 🆕 Wrapper que usa useLocation (debe estar dentro de Router)
-const AppLayoutWrapper = ({ children, sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed }) => {
-  const location = useLocation();
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-
-  const esLogin = location.pathname === "/" || location.pathname === "/login";
-  const usuario = JSON.parse(localStorage.getItem("usuario"));
-
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth <= 768;
-      setIsMobile(mobile);
-      if (mobile) setSidebarOpen(false);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [setSidebarOpen]);
-
-  useEffect(() => {
-    if (isMobile) setSidebarOpen(false);
-  }, [location.pathname, isMobile, setSidebarOpen]);
-
-  // Si es login, no mostrar layout especial
-  if (esLogin || !usuario) {
-    return <div className="app-content-login">{children}</div>;
-  }
-
-  return (
-    <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      <Sidebar 
-        isOpen={sidebarOpen}
-        isCollapsed={sidebarCollapsed}
-        onClose={() => setSidebarOpen(false)}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-      <main className="app-main">
-        {children}
-      </main>
-      <BottomNav />
-    </div>
-  );
-};
 
 export default App;

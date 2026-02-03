@@ -224,40 +224,41 @@
 @media (max-width: 768px) {
   /* Mostrar overlay en móvil */
   .sidebar-overlay {
-    display: block;
+    display: block !important;
   }
 
   /* Sidebar oculto por defecto, se desliza desde la izquierda */
   .sidebar {
-    transform: translateX(-100%);
-    width: 280px;
-    top: 0;
+    transform: translateX(-100%) !important;
+    width: 280px !important;
+    top: 0 !important;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
   }
 
+  /* 🔥 IMPORTANTE: Cuando está abierto, mostrar */
   .sidebar.open {
-    transform: translateX(0);
+    transform: translateX(0) !important;
   }
 
   /* Nunca colapsar en móvil, siempre mostrar completo cuando está abierto */
   .sidebar.collapsed {
-    width: 280px;
+    width: 280px !important;
   }
 
   .sidebar.collapsed .sidebar-brand,
   .sidebar.collapsed .sidebar-item-text,
   .sidebar.collapsed .sidebar-item-indicator {
-    display: flex;
+    display: flex !important;
   }
 
   .sidebar.collapsed .sidebar-item {
-    justify-content: flex-start;
-    padding: 10px 12px;
+    justify-content: flex-start !important;
+    padding: 10px 12px !important;
   }
 
   /* Ocultar botón de colapsar en móvil */
   .sidebar-footer {
-    display: none;
+    display: none !important;
   }
 
   /* Header del sidebar en móvil incluye botón cerrar */
@@ -270,7 +271,7 @@
 @media (min-width: 769px) {
   /* Sidebar siempre visible en PC */
   .sidebar {
-    transform: translateX(0);
+    transform: translateX(0) !important;
   }
 
   /* Overlay nunca visible en PC */

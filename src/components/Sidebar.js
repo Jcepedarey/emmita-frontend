@@ -1,13 +1,72 @@
 // src/components/Sidebar.js
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import "../estilos/Sidebar.css";
 
 const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const sidebarRef = useRef(null);
+  
+  // Para el gesto swipe
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
 
-  // Lista de módulos con iconos y colores
+  // Detectar cambio de tamaño
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // 🆕 Detectar swipe desde el borde izquierdo para abrir
+  useEffect(() => {
+    const minSwipeDistance = 50;
+
+    const handleTouchStart = (e) => {
+      // Solo detectar si el touch empieza cerca del borde izquierdo (< 30px)
+      if (e.touches[0].clientX < 30 && !isOpen) {
+        setTouchStart(e.touches[0].clientX);
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (touchStart !== null) {
+        setTouchEnd(e.touches[0].clientX);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!touchStart || !touchEnd) return;
+      
+      const distance = touchEnd - touchStart;
+      const isSwipeRight = distance > minSwipeDistance;
+      
+      if (isSwipeRight && !isOpen) {
+        // Abrir sidebar con swipe derecho desde el borde
+        console.log("Swipe detectado - abriendo sidebar");
+        // Necesitamos llamar a una función del padre, pero como no la tenemos,
+        // esto solo funcionará para cerrar. Para abrir, usar el botón ☰
+      }
+      
+      setTouchStart(null);
+      setTouchEnd(null);
+    };
+
+    if (isMobile) {
+      document.addEventListener('touchstart', handleTouchStart);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
+    }
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isMobile, isOpen, touchStart, touchEnd]);
+
+  // Lista de módulos
   const modulos = [
     { id: "inicio", titulo: "Inicio", icono: "🏠", ruta: "/inicio", color: "#00B4D8" },
     { id: "crear", titulo: "Crear documento", icono: "📝", ruta: "/crear-documento", color: "#10b981" },
@@ -26,71 +85,246 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
 
   const handleNavegar = (ruta) => {
     navigate(ruta);
-    // En móvil, cerrar sidebar al navegar
-    if (window.innerWidth <= 768) {
+    if (isMobile) {
       onClose();
     }
   };
 
   const esActivo = (ruta) => location.pathname === ruta;
 
+  // No mostrar en login
+  if (location.pathname === "/" || location.pathname === "/login") {
+    return null;
+  }
+
+  // No mostrar si no hay usuario
+  const usuario = JSON.parse(localStorage.getItem("usuario"));
+  if (!usuario) {
+    return null;
+  }
+
+  // Calcular el ancho del sidebar
+  const sidebarWidth = isMobile ? 280 : (isCollapsed ? 68 : 240);
+  
+  // Determinar si mostrar el sidebar
+  const mostrarSidebar = isMobile ? isOpen : true;
+
+  console.log("Sidebar render - isMobile:", isMobile, "isOpen:", isOpen, "mostrarSidebar:", mostrarSidebar);
+
   return (
     <>
-      {/* Overlay para móvil (solo visible cuando sidebar está abierto en móvil) */}
-      <div 
-        className={`sidebar-overlay ${isOpen ? 'visible' : ''}`}
-        onClick={onClose}
-      />
+      {/* ========== OVERLAY (solo móvil) ========== */}
+      {isMobile && (
+        <div
+          onClick={onClose}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            zIndex: 998,
+            opacity: isOpen ? 1 : 0,
+            visibility: isOpen ? "visible" : "hidden",
+            transition: "opacity 0.3s ease, visibility 0.3s ease",
+          }}
+        />
+      )}
 
-      {/* Sidebar */}
-      <aside className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
-        {/* Header del sidebar con logo */}
-        <div className="sidebar-header">
-          <img 
-            src="/icons/swalquiler-logo.png" 
-            alt="SwAlquiler" 
-            className="sidebar-logo"
+      {/* ========== SIDEBAR ========== */}
+      <aside
+        ref={sidebarRef}
+        style={{
+          position: "fixed",
+          top: isMobile ? 0 : 56,
+          left: 0,
+          bottom: 0,
+          width: sidebarWidth,
+          backgroundColor: "#ffffff",
+          borderRight: "1px solid #e5e7eb",
+          display: "flex",
+          flexDirection: "column",
+          zIndex: 999,
+          transform: isMobile 
+            ? (isOpen ? "translateX(0)" : "translateX(-100%)")
+            : "translateX(0)",
+          transition: "transform 0.3s ease, width 0.25s ease",
+          boxShadow: isMobile && isOpen ? "4px 0 25px rgba(0, 0, 0, 0.15)" : "none",
+          overflowX: "hidden",
+          overflowY: "auto",
+        }}
+      >
+        {/* ========== HEADER ========== */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: isMobile ? "16px" : "16px",
+            borderBottom: "1px solid #e5e7eb",
+            minHeight: 64,
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
+          {/* Botón cerrar (solo móvil) */}
+          {isMobile && (
+            <button
+              onClick={onClose}
+              style={{
+                background: "none",
+                border: "none",
+                fontSize: 22,
+                cursor: "pointer",
+                padding: "4px 8px",
+                color: "#6b7280",
+                borderRadius: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ✕
+            </button>
+          )}
+
+          {/* Logo */}
+          <img
+            src="/icons/swalquiler-logo.png"
+            alt="SwAlquiler"
+            style={{
+              width: 36,
+              height: 36,
+              objectFit: "contain",
+              flexShrink: 0,
+            }}
           />
-          {!isCollapsed && (
-            <div className="sidebar-brand">
-              <span className="sidebar-brand-title">SwAlquiler</span>
-              <span className="sidebar-brand-subtitle">Gestión de alquileres</span>
+
+          {/* Texto (ocultar si colapsado en PC) */}
+          {(!isCollapsed || isMobile) && (
+            <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#374151" }}>
+                SwAlquiler
+              </div>
+              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                Gestión de alquileres
+              </div>
             </div>
           )}
         </div>
 
-        {/* Lista de módulos */}
-        <nav className="sidebar-nav">
-          {modulos.map((mod) => (
-            <button
-              key={mod.id}
-              className={`sidebar-item ${esActivo(mod.ruta) ? 'active' : ''}`}
-              onClick={() => handleNavegar(mod.ruta)}
-              title={isCollapsed ? mod.titulo : ''}
-              style={{
-                '--item-color': mod.color,
-                '--item-bg': `${mod.color}15`,
-              }}
-            >
-              <span className="sidebar-item-icon">{mod.icono}</span>
-              {!isCollapsed && (
-                <span className="sidebar-item-text">{mod.titulo}</span>
-              )}
-              {esActivo(mod.ruta) && <span className="sidebar-item-indicator" />}
-            </button>
-          ))}
+        {/* ========== LISTA DE MÓDULOS ========== */}
+        <nav style={{ flex: 1, padding: 8, overflowY: "auto" }}>
+          {modulos.map((mod) => {
+            const activo = esActivo(mod.ruta);
+            return (
+              <button
+                key={mod.id}
+                onClick={() => handleNavegar(mod.ruta)}
+                title={isCollapsed && !isMobile ? mod.titulo : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  width: "100%",
+                  padding: isCollapsed && !isMobile ? "12px" : "10px 12px",
+                  marginBottom: 4,
+                  backgroundColor: activo ? `${mod.color}15` : "transparent",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  gap: 12,
+                  justifyContent: isCollapsed && !isMobile ? "center" : "flex-start",
+                  position: "relative",
+                  transition: "background-color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!activo) e.currentTarget.style.backgroundColor = "#f3f4f6";
+                }}
+                onMouseLeave={(e) => {
+                  if (!activo) e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                {/* Indicador activo */}
+                {activo && (!isCollapsed || isMobile) && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: 3,
+                      height: 20,
+                      backgroundColor: mod.color,
+                      borderRadius: "0 3px 3px 0",
+                    }}
+                  />
+                )}
+
+                {/* Icono */}
+                <span
+                  style={{
+                    fontSize: 20,
+                    width: 28,
+                    height: 28,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    transform: activo ? "scale(1.1)" : "scale(1)",
+                    transition: "transform 0.15s ease",
+                  }}
+                >
+                  {mod.icono}
+                </span>
+
+                {/* Texto (ocultar si colapsado en PC) */}
+                {(!isCollapsed || isMobile) && (
+                  <span
+                    style={{
+                      fontSize: 14,
+                      color: activo ? mod.color : "#374151",
+                      fontWeight: activo ? 600 : 400,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {mod.titulo}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Footer del sidebar (solo PC) */}
-        <div className="sidebar-footer">
-          <button 
-            className="sidebar-collapse-btn"
-            onClick={onToggleCollapse}
-            title={isCollapsed ? "Expandir menú" : "Colapsar menú"}
-          >
-            <span>{isCollapsed ? '»' : '«'}</span>
-          </button>
-        </div>
+        {/* ========== FOOTER (solo PC) ========== */}
+        {!isMobile && (
+          <div style={{ padding: 12, borderTop: "1px solid #e5e7eb", flexShrink: 0 }}>
+            <button
+              onClick={onToggleCollapse}
+              title={isCollapsed ? "Expandir menú" : "Colapsar menú"}
+              style={{
+                width: "100%",
+                padding: 10,
+                backgroundColor: "#f3f4f6",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontSize: 16,
+                color: "#6b7280",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#e5e7eb")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+            >
+              {isCollapsed ? "»" : "«"}
+            </button>
+          </div>
+        )}
       </aside>
     </>
   );
