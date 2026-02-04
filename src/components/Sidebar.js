@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
-// 🆕 Componente Tooltip personalizado
+// 🆕 Componente Tooltip personalizado 1
 const Tooltip = ({ children, text, show }) => {
   if (!show) return children;
   
