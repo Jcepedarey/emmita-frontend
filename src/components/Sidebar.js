@@ -2,11 +2,59 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
+// 🆕 Componente Tooltip personalizado
+const Tooltip = ({ children, text, show }) => {
+  if (!show) return children;
+  
+  return (
+    <div style={{ position: "relative" }}>
+      {children}
+      <div
+        style={{
+          position: "absolute",
+          left: "calc(100% + 12px)",
+          top: "50%",
+          transform: "translateY(-50%)",
+          backgroundColor: "#1f2937",
+          color: "white",
+          padding: "8px 12px",
+          borderRadius: "6px",
+          fontSize: "13px",
+          fontWeight: "500",
+          whiteSpace: "nowrap",
+          zIndex: 1000,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          pointerEvents: "none",
+        }}
+      >
+        {text}
+        {/* Flecha del tooltip */}
+        <div
+          style={{
+            position: "absolute",
+            left: "-6px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            width: 0,
+            height: 0,
+            borderTop: "6px solid transparent",
+            borderBottom: "6px solid transparent",
+            borderRight: "6px solid #1f2937",
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
 const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const sidebarRef = useRef(null);
+  
+  // 🆕 Para el tooltip cuando está colapsado
+  const [hoveredItem, setHoveredItem] = useState(null);
   
   // Para el gesto swipe
   const [touchStart, setTouchStart] = useState(null);
@@ -217,59 +265,60 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
         <nav style={{ flex: 1, padding: 8, overflowY: "auto" }}>
           {modulos.map((mod) => {
             const activo = esActivo(mod.ruta);
+            const mostrarTooltip = isCollapsed && !isMobile && hoveredItem === mod.id;
+            
             return (
-              <button
-                key={mod.id}
-                onClick={() => handleNavegar(mod.ruta)}
-                title={isCollapsed && !isMobile ? mod.titulo : undefined}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  width: "100%",
-                  padding: isCollapsed && !isMobile ? "12px" : "10px 12px",
-                  marginBottom: 4,
-                  backgroundColor: activo ? `${mod.color}15` : "transparent",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  gap: 12,
-                  justifyContent: isCollapsed && !isMobile ? "center" : "flex-start",
-                  position: "relative",
-                  transition: "background-color 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!activo) e.currentTarget.style.backgroundColor = "#f3f4f6";
-                }}
-                onMouseLeave={(e) => {
-                  if (!activo) e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                {/* Indicador activo */}
-                {activo && (!isCollapsed || isMobile) && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      width: 3,
-                      height: 20,
-                      backgroundColor: mod.color,
-                      borderRadius: "0 3px 3px 0",
-                    }}
-                  />
-                )}
-
-                {/* Icono */}
-                <span
+              <Tooltip key={mod.id} text={mod.titulo} show={mostrarTooltip}>
+                <button
+                  onClick={() => handleNavegar(mod.ruta)}
+                  onMouseEnter={() => {
+                    setHoveredItem(mod.id);
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredItem(null);
+                  }}
                   style={{
-                    fontSize: 20,
-                    width: 28,
-                    height: 28,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
+                    width: "100%",
+                    padding: isCollapsed && !isMobile ? "12px" : "10px 12px",
+                    marginBottom: 4,
+                    backgroundColor: activo ? `${mod.color}15` : (hoveredItem === mod.id ? "#f3f4f6" : "transparent"),
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    gap: 12,
+                    justifyContent: isCollapsed && !isMobile ? "center" : "flex-start",
+                    position: "relative",
+                    transition: "background-color 0.15s ease",
+                  }}
+                >
+                  {/* Indicador activo */}
+                  {activo && (!isCollapsed || isMobile) && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 3,
+                        height: 20,
+                        backgroundColor: mod.color,
+                        borderRadius: "0 3px 3px 0",
+                      }}
+                    />
+                  )}
+
+                  {/* Icono */}
+                  <span
+                    style={{
+                      fontSize: 20,
+                      width: 28,
+                      height: 28,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     flexShrink: 0,
                     transform: activo ? "scale(1.1)" : "scale(1)",
                     transition: "transform 0.15s ease",
@@ -294,6 +343,7 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
                   </span>
                 )}
               </button>
+              </Tooltip>
             );
           })}
         </nav>

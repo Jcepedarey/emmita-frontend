@@ -9,16 +9,6 @@ import "../estilos/EstilosGlobales.css";
 
 // ========== COMPONENTES INTERNOS ==========
 
-// Botón de módulo del menú (solo para PC - en móvil usamos sidebar/bottom nav)
-const BotonModulo = ({ titulo, imagen, onClick }) => (
-  <div className="sw-menu-item" onClick={onClick}>
-    <div className="sw-menu-icono">
-      <img src={imagen} alt={titulo} />
-    </div>
-    <span className="sw-menu-texto">{titulo}</span>
-  </div>
-);
-
 // Icono de estado de pago
 const IconoPago = ({ orden }) => {
   const totalNeto = Number(orden.total_neto || orden.total || 0);
@@ -278,11 +268,24 @@ const Inicio = () => {
             <h1 className="sw-header-titulo">Bienvenido</h1>
           </div>
 
-          {/* Grid de pedidos */}
-          <div className="sw-pedidos-grid">
+          {/* 🆕 Grid de pedidos - Más grande en PC */}
+          <div 
+            className="sw-pedidos-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: "20px",
+              marginBottom: "24px",
+            }}
+          >
             
             {/* Pedidos próximos */}
-            <div className="sw-card">
+            <div 
+              className="sw-card"
+              style={{
+                minHeight: "300px", // 🆕 Más alto
+              }}
+            >
               <div className="sw-card-header sw-card-header-cyan">
                 <h2 className="sw-card-titulo">
                   📅 Pedidos activos más próximos
@@ -294,8 +297,14 @@ const Inicio = () => {
                     No hay pedidos próximos
                   </p>
                 ) : (
-                  <div className="sw-scroll-lista">
-                    {ordenesProximas.slice(0, 10).map((orden) => (
+                  <div 
+                    className="sw-scroll-lista"
+                    style={{
+                      maxHeight: "240px", // 🆕 Más espacio para scroll
+                      overflowY: "auto",
+                    }}
+                  >
+                    {ordenesProximas.slice(0, 15).map((orden) => (
                       <div key={orden.id} className="sw-pedido-card">
                         <div className="sw-pedido-info">
                           <p className="sw-pedido-numero">{orden.numero || "OP-???"}</p>
@@ -322,7 +331,13 @@ const Inicio = () => {
             </div>
 
             {/* Pedidos pendientes */}
-            <div className="sw-card" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+            <div 
+              className="sw-card" 
+              style={{ 
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                minHeight: "300px", // 🆕 Más alto
+              }}
+            >
               <div className="sw-card-header" style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' }}>
                 <h2 className="sw-card-titulo" style={{ color: '#dc2626' }}>
                   ⚠️ Pedidos pendientes por revisar
@@ -334,7 +349,13 @@ const Inicio = () => {
                     No hay pedidos pendientes
                   </p>
                 ) : (
-                  <div className="sw-scroll-lista">
+                  <div 
+                    className="sw-scroll-lista"
+                    style={{
+                      maxHeight: "240px", // 🆕 Más espacio para scroll
+                      overflowY: "auto",
+                    }}
+                  >
                     {ordenesPendientes.map((orden) => (
                       <div key={orden.id} className="sw-pedido-card" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>
                         <div className="sw-pedido-info">
@@ -445,74 +466,7 @@ const Inicio = () => {
             </div>
           </div>
 
-          {/* ═══════════════════════════════════════════════════════════════
-              MENÚ PRINCIPAL - Solo visible en PC (en móvil usamos sidebar)
-          ═══════════════════════════════════════════════════════════════ */}
-          <div className="menu-pc-only">
-            <h2 className="sw-menu-titulo">Menú Principal</h2>
-            <div className="sw-menu-grid">
-              <BotonModulo
-                titulo="Crear documento"
-                imagen={`${process.env.PUBLIC_URL}/icons/contrato.png`}
-                onClick={() => navigate("/crear-documento")}
-              />
-              <BotonModulo
-                titulo="Clientes"
-                imagen={`${process.env.PUBLIC_URL}/icons/buscar_cliente.png`}
-                onClick={() => navigate("/clientes")}
-              />
-              <BotonModulo
-                titulo="Inventario"
-                imagen={`${process.env.PUBLIC_URL}/icons/inventario.png`}
-                onClick={() => navigate("/inventario")}
-              />
-              <BotonModulo
-                titulo="Agenda"
-                imagen={`${process.env.PUBLIC_URL}/icons/agenda.png`}
-                onClick={() => navigate("/agenda")}
-              />
-              <BotonModulo
-                titulo="Proveedores"
-                imagen={`${process.env.PUBLIC_URL}/icons/proveedores.png`}
-                onClick={() => navigate("/proveedores")}
-              />
-              <BotonModulo
-                titulo="Buscar documento"
-                imagen={`${process.env.PUBLIC_URL}/icons/buscar_doc.png`}
-                onClick={() => navigate("/buscar-documento")}
-              />
-              <BotonModulo
-                titulo="Reportes"
-                imagen={`${process.env.PUBLIC_URL}/icons/reportes.png`}
-                onClick={() => navigate("/reportes")}
-              />
-              <BotonModulo
-                titulo="Trazabilidad"
-                imagen={`${process.env.PUBLIC_URL}/icons/trazabilidad.png`}
-                onClick={() => navigate("/trazabilidad")}
-              />
-              <BotonModulo
-                titulo="Usuarios"
-                imagen={`${process.env.PUBLIC_URL}/icons/usuario.png`}
-                onClick={() => navigate("/usuarios")}
-              />
-              <BotonModulo
-                titulo="Recepción"
-                imagen={`${process.env.PUBLIC_URL}/icons/recepcion.png`}
-                onClick={() => navigate("/recepcion")}
-              />
-              <BotonModulo
-                titulo="Contabilidad"
-                imagen={`${process.env.PUBLIC_URL}/icons/contabilidad.png`}
-                onClick={() => navigate("/contabilidad")}
-              />
-              <BotonModulo
-                titulo="Buscar recepción"
-                imagen={`${process.env.PUBLIC_URL}/icons/buscar_recepcion.png`}
-                onClick={() => navigate("/buscar-recepcion")}
-              />
-            </div>
-          </div>
+          {/* 🆕 MENÚ GRID ELIMINADO - Ya tenemos el sidebar */}
 
         </div>
       </div>
