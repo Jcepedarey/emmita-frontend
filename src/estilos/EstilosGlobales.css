@@ -832,7 +832,7 @@ body {
 
 .app-main {
   flex: 1;
-  margin-left: var(--sidebar-width, 240px);
+  margin-left: var(--sidebar-width, 200px);
   transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: calc(100vh - 56px);
 }
@@ -978,4 +978,70 @@ body {
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 68px;
   --bottom-nav-height: 60px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIX FRANJA NEGRA EN MÓVIL + MEJORAS LAYOUT PC
+   Agregar al final de EstilosGlobales.css o App.css
+   (REEMPLAZA el CSS anterior si ya lo agregaste)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ========== FIX GLOBAL: Fondo blanco en toda la app ========== */
+html, body, #root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #ffffff !important;
+}
+
+/* El contenedor principal de MUI también debe tener fondo blanco */
+.MuiContainer-root {
+  background-color: #ffffff !important;
+  min-height: calc(100vh - 56px) !important;
+  min-height: calc(100dvh - 56px) !important;
+}
+
+/* ========== MÓVIL: Asegurar que no haya franja negra ========== */
+@media (max-width: 768px) {
+  html, body, #root {
+    background-color: #ffffff !important;
+  }
+
+  .MuiContainer-root {
+    min-height: calc(100vh - 56px - 60px) !important;
+    min-height: calc(100dvh - 56px - 60px) !important;
+    padding-bottom: calc(70px + env(safe-area-inset-bottom)) !important;
+    background-color: #ffffff !important;
+    margin-left: 0 !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .sw-pagina,
+  .sw-pagina-contenido {
+    background-color: #ffffff !important;
+    min-height: calc(100vh - 56px - 60px);
+    min-height: calc(100dvh - 56px - 60px);
+  }
+}
+
+/* ========== PC: Layout con sidebar ========== */
+@media (min-width: 769px) {
+  /* 🔧 AJUSTE PRINCIPAL: margin-left igual al ancho del sidebar */
+  .MuiContainer-root {
+    margin-left: 150px !important; /* Ancho exacto del sidebar */
+    margin-right: 0 !important;
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+    max-width: none !important;
+    width: calc(100% - 240px) !important;
+  }
+}
+
+/* ========== VARIABLES DEL LAYOUT ========== */
+:root {
+  --navbar-height: 56px;
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 68px;
+  --bottom-nav-height: 60px;
+  --background-color: #ffffff;
 }

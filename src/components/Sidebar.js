@@ -2,63 +2,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
-// 🆕 Componente Tooltip personalizado 1
-const Tooltip = ({ children, text, show }) => {
-  if (!show) return children;
-  
-  return (
-    <div style={{ position: "relative" }}>
-      {children}
-      <div
-        style={{
-          position: "absolute",
-          left: "calc(100% + 12px)",
-          top: "50%",
-          transform: "translateY(-50%)",
-          backgroundColor: "#1f2937",
-          color: "white",
-          padding: "8px 12px",
-          borderRadius: "6px",
-          fontSize: "13px",
-          fontWeight: "500",
-          whiteSpace: "nowrap",
-          zIndex: 1000,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          pointerEvents: "none",
-        }}
-      >
-        {text}
-        {/* Flecha del tooltip */}
-        <div
-          style={{
-            position: "absolute",
-            left: "-6px",
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: 0,
-            height: 0,
-            borderTop: "6px solid transparent",
-            borderBottom: "6px solid transparent",
-            borderRight: "6px solid #1f2937",
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
 const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const sidebarRef = useRef(null);
   
-  // 🆕 Para el tooltip cuando está colapsado
-  const [hoveredItem, setHoveredItem] = useState(null);
-  
-  // Para el gesto swipe
-  const [touchStart, setTouchStart] = useState(null);
-  const [touchEnd, setTouchEnd] = useState(null);
+  // 🆕 Para mostrar tooltip cuando está colapsado
+  const [hoveredModulo, setHoveredModulo] = useState(null);
+  const [tooltipTop, setTooltipTop] = useState(0);
 
   // Detectar cambio de tamaño
   useEffect(() => {
@@ -66,53 +18,6 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // 🆕 Detectar swipe desde el borde izquierdo para abrir
-  useEffect(() => {
-    const minSwipeDistance = 50;
-
-    const handleTouchStart = (e) => {
-      // Solo detectar si el touch empieza cerca del borde izquierdo (< 30px)
-      if (e.touches[0].clientX < 30 && !isOpen) {
-        setTouchStart(e.touches[0].clientX);
-      }
-    };
-
-    const handleTouchMove = (e) => {
-      if (touchStart !== null) {
-        setTouchEnd(e.touches[0].clientX);
-      }
-    };
-
-    const handleTouchEnd = () => {
-      if (!touchStart || !touchEnd) return;
-      
-      const distance = touchEnd - touchStart;
-      const isSwipeRight = distance > minSwipeDistance;
-      
-      if (isSwipeRight && !isOpen) {
-        // Abrir sidebar con swipe derecho desde el borde
-        console.log("Swipe detectado - abriendo sidebar");
-        // Necesitamos llamar a una función del padre, pero como no la tenemos,
-        // esto solo funcionará para cerrar. Para abrir, usar el botón ☰
-      }
-      
-      setTouchStart(null);
-      setTouchEnd(null);
-    };
-
-    if (isMobile) {
-      document.addEventListener('touchstart', handleTouchStart);
-      document.addEventListener('touchmove', handleTouchMove);
-      document.addEventListener('touchend', handleTouchEnd);
-    }
-
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [isMobile, isOpen, touchStart, touchEnd]);
 
   // Lista de módulos
   const modulos = [
@@ -140,6 +45,19 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
 
   const esActivo = (ruta) => location.pathname === ruta;
 
+  // 🆕 Mostrar tooltip al pasar el mouse (solo cuando está colapsado en PC)
+  const handleMouseEnter = (e, modulo) => {
+    if (isCollapsed && !isMobile) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltipTop(rect.top + rect.height / 2);
+      setHoveredModulo(modulo);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredModulo(null);
+  };
+
   // No mostrar en login
   if (location.pathname === "/" || location.pathname === "/login") {
     return null;
@@ -153,11 +71,6 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
 
   // Calcular el ancho del sidebar
   const sidebarWidth = isMobile ? 280 : (isCollapsed ? 68 : 240);
-  
-  // Determinar si mostrar el sidebar
-  const mostrarSidebar = isMobile ? isOpen : true;
-
-  console.log("Sidebar render - isMobile:", isMobile, "isOpen:", isOpen, "mostrarSidebar:", mostrarSidebar);
 
   return (
     <>
@@ -178,6 +91,45 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
             transition: "opacity 0.3s ease, visibility 0.3s ease",
           }}
         />
+      )}
+
+      {/* ========== TOOLTIP FLOTANTE (solo PC colapsado) ========== */}
+      {hoveredModulo && isCollapsed && !isMobile && (
+        <div
+          style={{
+            position: "fixed",
+            left: 76,
+            top: tooltipTop,
+            transform: "translateY(-50%)",
+            backgroundColor: "#1f2937",
+            color: "white",
+            padding: "8px 14px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: "500",
+            whiteSpace: "nowrap",
+            zIndex: 1100,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            pointerEvents: "none",
+            animation: "fadeIn 0.15s ease",
+          }}
+        >
+          {hoveredModulo.titulo}
+          {/* Flecha del tooltip */}
+          <div
+            style={{
+              position: "absolute",
+              left: "-6px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 0,
+              height: 0,
+              borderTop: "6px solid transparent",
+              borderBottom: "6px solid transparent",
+              borderRight: "6px solid #1f2937",
+            }}
+          />
+        </div>
       )}
 
       {/* ========== SIDEBAR ========== */}
@@ -208,7 +160,7 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
           style={{
             display: "flex",
             alignItems: "center",
-            padding: isMobile ? "16px" : "16px",
+            padding: "16px",
             borderBottom: "1px solid #e5e7eb",
             minHeight: 64,
             gap: 12,
@@ -265,60 +217,58 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
         <nav style={{ flex: 1, padding: 8, overflowY: "auto" }}>
           {modulos.map((mod) => {
             const activo = esActivo(mod.ruta);
-            const mostrarTooltip = isCollapsed && !isMobile && hoveredItem === mod.id;
+            const isHovered = hoveredModulo?.id === mod.id;
             
             return (
-              <Tooltip key={mod.id} text={mod.titulo} show={mostrarTooltip}>
-                <button
-                  onClick={() => handleNavegar(mod.ruta)}
-                  onMouseEnter={() => {
-                    setHoveredItem(mod.id);
-                  }}
-                  onMouseLeave={() => {
-                    setHoveredItem(null);
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    width: "100%",
-                    padding: isCollapsed && !isMobile ? "12px" : "10px 12px",
-                    marginBottom: 4,
-                    backgroundColor: activo ? `${mod.color}15` : (hoveredItem === mod.id ? "#f3f4f6" : "transparent"),
-                    border: "none",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    gap: 12,
-                    justifyContent: isCollapsed && !isMobile ? "center" : "flex-start",
-                    position: "relative",
-                    transition: "background-color 0.15s ease",
-                  }}
-                >
-                  {/* Indicador activo */}
-                  {activo && (!isCollapsed || isMobile) && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        width: 3,
-                        height: 20,
-                        backgroundColor: mod.color,
-                        borderRadius: "0 3px 3px 0",
-                      }}
-                    />
-                  )}
-
-                  {/* Icono */}
+              <button
+                key={mod.id}
+                onClick={() => handleNavegar(mod.ruta)}
+                onMouseEnter={(e) => handleMouseEnter(e, mod)}
+                onMouseLeave={handleMouseLeave}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  width: "100%",
+                  padding: isCollapsed && !isMobile ? "12px" : "10px 12px",
+                  marginBottom: 4,
+                  backgroundColor: activo 
+                    ? `${mod.color}15` 
+                    : (isHovered ? "#f3f4f6" : "transparent"),
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  gap: 12,
+                  justifyContent: isCollapsed && !isMobile ? "center" : "flex-start",
+                  position: "relative",
+                  transition: "background-color 0.15s ease",
+                }}
+              >
+                {/* Indicador activo */}
+                {activo && (
                   <span
                     style={{
-                      fontSize: 20,
-                      width: 28,
-                      height: 28,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      position: "absolute",
+                      left: 0,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: 3,
+                      height: 20,
+                      backgroundColor: mod.color,
+                      borderRadius: "0 3px 3px 0",
+                    }}
+                  />
+                )}
+
+                {/* Icono */}
+                <span
+                  style={{
+                    fontSize: 20,
+                    width: 28,
+                    height: 28,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     flexShrink: 0,
                     transform: activo ? "scale(1.1)" : "scale(1)",
                     transition: "transform 0.15s ease",
@@ -343,7 +293,6 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
                   </span>
                 )}
               </button>
-              </Tooltip>
             );
           })}
         </nav>
@@ -376,6 +325,14 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
           </div>
         )}
       </aside>
+
+      {/* CSS para animación del tooltip */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-50%) translateX(-5px); }
+          to { opacity: 1; transform: translateY(-50%) translateX(0); }
+        }
+      `}</style>
     </>
   );
 };
