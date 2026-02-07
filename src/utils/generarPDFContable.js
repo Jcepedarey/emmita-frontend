@@ -11,51 +11,27 @@ const procesarImagen = (src, width = 150, calidad = 1.0) =>
       const escala = width / img.width;
       canvas.width = width;
       canvas.height = img.height * escala;
-
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL("image/png", calidad));
     };
+    img.onerror = () => resolve(null); // ← evitar crash si no carga
     img.src = src;
   });
 
-  // Devuelve dd/mm/aaaa sin desfase por zona horaria.
+// Devuelve dd/mm/aaaa sin desfase por zona horaria
 const soloFecha = (f) => {
   if (!f) return "-";
-
   if (f instanceof Date) {
-    const dd = String(f.getDate()).padStart(2, "0");
-    const mm = String(f.getMonth() + 1).padStart(2, "0");
-    const yy = f.getFullYear();
-    return `${dd}/${mm}/${yy}`;
+    return `${String(f.getDate()).padStart(2, "0")}/${String(f.getMonth() + 1).padStart(2, "0")}/${f.getFullYear()}`;
   }
-
   const s = String(f).trim();
-
-  // ISO con o sin tiempo
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) {
-    const yy = iso[1], mm = iso[2], dd = iso[3];
-    return `${dd}/${mm}/${yy}`;
-  }
-
-  // d/m/aaaa o dd/mm/aaaa
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
   const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (dmy) {
-    const dd = dmy[1].padStart(2, "0");
-    const mm = dmy[2].padStart(2, "0");
-    const yy = dmy[3];
-    return `${dd}/${mm}/${yy}`;
-  }
-
-  // fallback
+  if (dmy) return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`;
   const d = new Date(s);
-  if (!isNaN(d)) {
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yy = d.getFullYear();
-    return `${dd}/${mm}/${yy}`;
-  }
+  if (!isNaN(d)) return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
   return "-";
 };
 
@@ -65,11 +41,14 @@ export async function generarPDFContable(movimientos) {
   const logoUrl = "/icons/logo.png";
   const fondoUrl = "/icons/fondo_emmita.png";
 
-  const logoOptimizado = await procesarImagen(logoUrl, 250, 1.0);    // logo nítido
-  const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.9);  // fondo más grande
+  const logoOptimizado = await procesarImagen(logoUrl, 250, 1.0);
+  const fondoOptimizado = await procesarImagen(fondoUrl, 300, 0.9);
 
-  // ─── Encabezado ──────────────────────────────────────────────────────────────
-  doc.addImage(logo, "PNG", 10, 10, 30, 30); // ancho=alto → círculo perfecto
+  // ─── Encabezado ───
+  // ✅ FIX: Usar logoOptimizado en vez de 'logo' (que estaba undefined)
+  if (logoOptimizado) {
+    doc.addImage(logoOptimizado, "PNG", 10, 10, 30, 30);
+  }
   doc.setFontSize(16);
   doc.text("Alquiler & Eventos Emmita", 50, 20);
   doc.setFontSize(10);
@@ -78,16 +57,29 @@ export async function generarPDFContable(movimientos) {
   doc.setLineWidth(0.5);
   doc.line(10, 42, 200, 42);
 
-// subtítulo del reporte
-doc.setFontSize(12);
-doc.text("Informe de movimientos contables", 10, 48);
-doc.setFontSize(10);
-doc.text(`Generado el: ${soloFecha(new Date())}`, 10, 55);
+  // Subtítulo
+  doc.setFontSize(12);
+  doc.text("Informe de movimientos contables", 10, 48);
+  doc.setFontSize(10);
+  doc.text(`Generado el: ${soloFecha(new Date())}`, 10, 55);
 
-  // 🧮 Construir tabla
-  const tabla = movimientos
-  .filter((m) => m.fecha && m.tipo && !isNaN(m.monto))
-  .map((m) => [
+  // ─── Resumen rápido ───
+  const activos = movimientos.filter((m) => m.fecha && m.tipo && !isNaN(m.monto));
+  const ingresos = activos.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + Number(m.monto || 0), 0);
+  const gastos = activos.filter((m) => m.tipo === "gasto").reduce((s, m) => s + Number(m.monto || 0), 0);
+  const balance = ingresos - gastos;
+
+  doc.setFontSize(10);
+  doc.setTextColor(16, 185, 129); // verde
+  doc.text(`Ingresos: $${ingresos.toLocaleString("es-CO")}`, 10, 65);
+  doc.setTextColor(239, 68, 68); // rojo
+  doc.text(`Gastos: $${gastos.toLocaleString("es-CO")}`, 70, 65);
+  doc.setTextColor(balance >= 0 ? 16 : 239, balance >= 0 ? 185 : 68, balance >= 0 ? 129 : 68);
+  doc.text(`Balance: $${balance.toLocaleString("es-CO")}`, 130, 65);
+  doc.setTextColor(0, 0, 0); // reset
+
+  // ─── Tabla ───
+  const tabla = activos.map((m) => [
     soloFecha(m.fecha),
     m.tipo.toUpperCase(),
     `$${parseInt(m.monto).toLocaleString("es-CO")}`,
@@ -99,26 +91,23 @@ doc.text(`Generado el: ${soloFecha(new Date())}`, 10, 55);
     m.usuario || "Administrador",
   ]);
 
-  // 📄 Insertar tabla y fondo con marca de agua por página
   doc.autoTable({
-    startY: 85,
-    head: [[
-      "Fecha", "Tipo", "Monto", "Descripción",
-      "Categoría", "Estado", "Justificación",
-      "Modificado", "Usuario"
-    ]],
+    startY: 75,
+    head: [["Fecha", "Tipo", "Monto", "Descripción", "Categoría", "Estado", "Justificación", "Modificado", "Usuario"]],
     body: tabla,
-    styles: { font: "helvetica", fontSize: 9 },
-    headStyles: { fillColor: [41, 128, 185] },
-    didDrawPage: (data) => {
-      const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
-      const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
-
-      doc.saveGraphicsState();
-      doc.setGState(new doc.GState({ opacity: 0.08 }));
-      doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 150, 150);
-      doc.restoreGraphicsState();
-    }
+    styles: { font: "helvetica", fontSize: 8 },
+    headStyles: { fillColor: [0, 119, 182] }, // sw-azul
+    alternateRowStyles: { fillColor: [245, 247, 250] }, // zebra
+    didDrawPage: () => {
+      if (fondoOptimizado) {
+        const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
+        const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
+        doc.saveGraphicsState();
+        doc.setGState(new doc.GState({ opacity: 0.08 }));
+        doc.addImage(fondoOptimizado, "PNG", centerX, centerY, 150, 150);
+        doc.restoreGraphicsState();
+      }
+    },
   });
 
   const nombreArchivo = `movimientos_contables_${new Date().toLocaleDateString("es-CO").replaceAll("/", "-")}.pdf`;
