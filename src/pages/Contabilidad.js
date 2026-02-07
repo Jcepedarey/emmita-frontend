@@ -1,4 +1,4 @@
-// src/pages/Contabilidad.js — SESIÓN 1+2+3: Estructura + Recurrentes + Proveedores
+// src/pages/Contabilidad.js — SESIÓN 1+2+3+4: Estructura + Recurrentes + Proveedores + PDFs
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import supabase from "../supabaseClient";
 import { exportarCSV } from "../utils/exportarCSV";
@@ -433,18 +433,23 @@ const Contabilidad = () => {
     cargarMovimientos();
   };
 
-  /* ─── Exportar CSV (usa el exportarCSV existente con datos raw) ─── */
-  const exportarCSVPeriodo = (lista) => {
-    const activos = lista.filter((m) => m.estado !== "eliminado");
+  /* ─── Exportar CSV (usa el exportarCSV con datos enriquecidos) ─── */
+  const exportarCSVPeriodo = () => {
+    const activos = movsFiltrados.filter((m) => m.estado !== "eliminado");
     if (!activos.length) return Swal.fire("Sin datos", "No hay movimientos para exportar", "info");
     exportarCSV(activos, `contabilidad_${desde || "todo"}_${hasta || "todo"}`);
   };
 
-  /* ─── Exportar PDF ─── */
+  /* ─── Exportar PDF profesional ─── */
   const exportarPDF = () => {
-    const activos = movimientos.filter((m) => m.estado !== "eliminado");
+    const activos = movsFiltrados.filter((m) => m.estado !== "eliminado");
     if (!activos.length) return Swal.fire("Sin datos", "No hay movimientos para exportar", "info");
-    generarPDFContable(activos);
+    generarPDFContable(activos, {
+      desde,
+      hasta,
+      filtroCategoria: filtroCategoria !== "todas" ? filtroCategoria : null,
+      filtroOrigen: filtroOrigen !== "todos" ? filtroOrigen : null,
+    });
   };
 
   /* ─── Render trend indicator ─── */
@@ -595,7 +600,7 @@ const Contabilidad = () => {
               </button>
             </div>
             <div className="sw-acciones-grupo">
-              <button className="sw-btn sw-btn-secundario" onClick={() => exportarCSVPeriodo(movimientos)}>
+              <button className="sw-btn sw-btn-secundario" onClick={exportarCSVPeriodo}>
                 📥 CSV
               </button>
               <button className="sw-btn sw-btn-secundario" onClick={exportarPDF}>
