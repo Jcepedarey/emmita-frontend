@@ -1,4 +1,4 @@
-// src/pages/Contabilidad.js — SESIÓN 1+2: Estructura + Recurrentes
+// src/pages/Contabilidad.js — SESIÓN 1+2+3: Estructura + Recurrentes + Proveedores
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import supabase from "../supabaseClient";
 import { exportarCSV } from "../utils/exportarCSV";
@@ -85,8 +85,13 @@ const Contabilidad = () => {
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [filtroCategoria, setFiltroCategoria] = useState("todas");
+  const [filtroOrigen, setFiltroOrigen] = useState("todos");
   const [busqueda, setBusqueda] = useState("");
   const [mesesAbiertos, setMesesAbiertos] = useState({});
+
+  // Resumen de proveedores (pagos pendientes)
+  const [proveedoresResumen, setProveedoresResumen] = useState([]);
 
   // Modal recurrentes
   const [modalRecurrentes, setModalRecurrentes] = useState(false);
@@ -148,6 +153,38 @@ const Contabilidad = () => {
 
   useEffect(() => { cargarMovimientos(); }, [cargarMovimientos]);
 
+  /* ─── Cargar resumen de proveedores (pagos_proveedores de órdenes) ─── */
+  useEffect(() => {
+    (async () => {
+      try {
+        let q = supabase.from("ordenes_pedido").select("id, numero, pagos_proveedores, fecha_evento");
+        if (desde) q = q.gte("fecha_evento", desde);
+        if (hasta) q = q.lte("fecha_evento", hasta);
+        const { data } = await q;
+        if (!data) { setProveedoresResumen([]); return; }
+
+        // Consolidar por proveedor
+        const mapa = {};
+        for (const ord of data) {
+          for (const pago of (ord.pagos_proveedores || [])) {
+            const key = pago.proveedor_nombre || "Sin proveedor";
+            if (!mapa[key]) mapa[key] = { nombre: key, total: 0, abonado: 0, ordenes: [] };
+            const abonado = (pago.abonos || []).reduce((s, a) => s + Number(a.valor || 0), 0);
+            mapa[key].total += Number(pago.total || 0);
+            mapa[key].abonado += abonado;
+            mapa[key].ordenes.push(ord.numero || ord.id);
+          }
+        }
+        const lista = Object.values(mapa).map((p) => ({ ...p, pendiente: p.total - p.abonado }));
+        lista.sort((a, b) => b.pendiente - a.pendiente);
+        setProveedoresResumen(lista);
+      } catch (err) {
+        console.error("❌ Error cargando proveedores:", err);
+        setProveedoresResumen([]);
+      }
+    })();
+  }, [desde, hasta]);
+
   /* ─── Período anterior para comparativa ─── */
   useEffect(() => {
     if (!desde || !hasta) { setMovsPeriodoAnterior([]); return; }
@@ -165,21 +202,41 @@ const Contabilidad = () => {
       .then(({ data }) => setMovsPeriodoAnterior(data || []));
   }, [desde, hasta]);
 
+  /* ─── Categorías dinámicas (extraídas de los datos) ─── */
+  const categoriasDisponibles = useMemo(() => {
+    const set = new Set();
+    for (const m of movimientos) {
+      if (m.categoria && m.categoria.trim()) set.add(m.categoria.trim());
+    }
+    return Array.from(set).sort();
+  }, [movimientos]);
+
   /* ─── Filtros aplicados ─── */
   const movsFiltrados = useMemo(() => {
     let lista = movimientos;
     if (filtroTipo !== "todos") lista = lista.filter((m) => m.tipo === filtroTipo);
+    if (filtroCategoria !== "todas") lista = lista.filter((m) => (m.categoria || "").trim() === filtroCategoria);
+    if (filtroOrigen !== "todos") lista = lista.filter((m) => (m.origen || "manual") === filtroOrigen);
     if (busqueda.trim()) {
       const q = busqueda.toLowerCase();
       lista = lista.filter((m) =>
         (m.cliente_nombre || "").toLowerCase().includes(q) ||
         (m.descripcion || "").toLowerCase().includes(q) ||
         (m.categoria || "").toLowerCase().includes(q) ||
+        (m.proveedor_nombre || "").toLowerCase().includes(q) ||
         (m.op_numero || "").toString().toLowerCase().includes(q)
       );
     }
     return lista;
-  }, [movimientos, filtroTipo, busqueda]);
+  }, [movimientos, filtroTipo, filtroCategoria, filtroOrigen, busqueda]);
+
+  /* ─── Conteo de filtros activos ─── */
+  const filtrosActivos = [
+    filtroTipo !== "todos" && { label: filtroTipo === "ingreso" ? "Ingresos" : "Gastos", reset: () => setFiltroTipo("todos") },
+    filtroCategoria !== "todas" && { label: filtroCategoria, reset: () => setFiltroCategoria("todas") },
+    filtroOrigen !== "todos" && { label: filtroOrigen, reset: () => setFiltroOrigen("todos") },
+    busqueda.trim() && { label: `"${busqueda}"`, reset: () => setBusqueda("") },
+  ].filter(Boolean);
 
   /* ─── KPIs ─── */
   const kpis = useMemo(() => {
@@ -481,17 +538,51 @@ const Contabilidad = () => {
               <option value="gasto">Solo gastos</option>
             </select>
 
+            {/* Categoría */}
+            <select className="sw-filtro-select" value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)}>
+              <option value="todas">Todas las categorías</option>
+              {categoriasDisponibles.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            {/* Origen */}
+            <select className="sw-filtro-select" value={filtroOrigen} onChange={(e) => setFiltroOrigen(e.target.value)}>
+              <option value="todos">Todo origen</option>
+              <option value="manual">Manual</option>
+              <option value="automatico">Automático</option>
+              <option value="recurrente">Recurrente</option>
+              <option value="recepcion">Recepción</option>
+            </select>
+
             {/* Búsqueda */}
             <div className="sw-busqueda">
               <span className="sw-busqueda-icono">🔍</span>
               <input
                 type="text"
-                placeholder="Buscar cliente, descripción..."
+                placeholder="Buscar cliente, proveedor, descripción..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
               />
             </div>
           </div>
+
+          {/* ═══ CHIPS DE FILTROS ACTIVOS ═══ */}
+          {filtrosActivos.length > 0 && (
+            <div className="sw-chips-bar">
+              {filtrosActivos.map((f, i) => (
+                <span key={i} className="sw-chip">
+                  {f.label}
+                  <button className="sw-chip-x" onClick={f.reset}>✕</button>
+                </span>
+              ))}
+              <button className="sw-chip-limpiar" onClick={() => {
+                setFiltroTipo("todos"); setFiltroCategoria("todas"); setFiltroOrigen("todos"); setBusqueda("");
+              }}>
+                Limpiar filtros
+              </button>
+            </div>
+          )}
 
           {/* ═══ ACCIONES ═══ */}
           <div className="sw-acciones-bar" style={{ marginBottom: 16 }}>
@@ -512,6 +603,51 @@ const Contabilidad = () => {
               </button>
             </div>
           </div>
+
+          {/* ═══ RESUMEN DE PROVEEDORES ═══ */}
+          {proveedoresResumen.length > 0 && (
+            <div className="sw-proveedores-resumen">
+              <div className="sw-prov-header" onClick={() => setMesesAbiertos((prev) => ({ ...prev, "__proveedores__": !prev["__proveedores__"] }))}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className={`sw-mes-flecha ${mesesAbiertos["__proveedores__"] ? "abierto" : ""}`}>▼</span>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>🏢 Pagos a proveedores</span>
+                  <span className="sw-mes-count">{proveedoresResumen.length}</span>
+                </div>
+                <div className="sw-mes-resumen">
+                  <span className="sw-mes-stat" style={{ color: "#4b5563" }}>
+                    Total: {money(proveedoresResumen.reduce((s, p) => s + p.total, 0))}
+                  </span>
+                  <span className="sw-mes-stat ingreso">
+                    Pagado: {money(proveedoresResumen.reduce((s, p) => s + p.abonado, 0))}
+                  </span>
+                  {proveedoresResumen.some((p) => p.pendiente > 0) && (
+                    <span className="sw-mes-stat gasto">
+                      Pendiente: {money(proveedoresResumen.reduce((s, p) => s + Math.max(0, p.pendiente), 0))}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {mesesAbiertos["__proveedores__"] && (
+                <div className="sw-prov-body">
+                  {proveedoresResumen.map((p) => (
+                    <div key={p.nombre} className="sw-prov-card">
+                      <div className="sw-prov-nombre">{p.nombre}</div>
+                      <div className="sw-prov-detalle">
+                        <span>{p.ordenes.length} orden{p.ordenes.length !== 1 ? "es" : ""}</span>
+                        <span className="sw-prov-monto">Total: {money(p.total)}</span>
+                        <span className="sw-prov-monto pagado">Pagado: {money(p.abonado)}</span>
+                        {p.pendiente > 0 ? (
+                          <span className="sw-prov-monto pendiente">Pendiente: {money(p.pendiente)}</span>
+                        ) : (
+                          <span className="sw-prov-badge-pagado">✓ Pagado</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ═══ LISTADO AGRUPADO POR MES ═══ */}
           {loading ? (
@@ -575,9 +711,12 @@ const Contabilidad = () => {
                                 : ""}
                             </div>
                             <div className="sw-mov-badges">
+                              {m.categoria && <span className="sw-mov-badge categoria">{m.categoria}</span>}
                               {m.estado === "editado" && <span className="sw-mov-badge editado">editado</span>}
                               {m.origen === "automatico" && <span className="sw-mov-badge auto">automático</span>}
                               {m.origen === "recurrente" && <span className="sw-mov-badge recurrente">🔄 recurrente</span>}
+                              {m.origen === "recepcion" && <span className="sw-mov-badge recepcion">📦 recepción</span>}
+                              {m.proveedor_nombre && <span className="sw-mov-badge proveedor">🏢 {m.proveedor_nombre}</span>}
                               {m.op_numero && <span className="sw-mov-badge auto">OP-{m.op_numero}</span>}
                             </div>
                           </div>
