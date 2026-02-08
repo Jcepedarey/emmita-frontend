@@ -128,6 +128,30 @@ export default function Reportes() {
   // Drill-down modal de cliente
   const [modalCliente, setModalCliente] = useState(null); // { id, nombre, ordenes }
 
+  // ─── Filtros avanzados (Sesión 7) ───
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState("todos");       // todos | ingreso | gasto
+  const [filtroCliente, setFiltroCliente] = useState("");       // cliente_id o ""
+  const [filtroProveedor, setFiltroProveedor] = useState("");   // proveedor_nombre o ""
+  const [filtroCategoria, setFiltroCategoria] = useState("");   // categoria o ""
+  const [montoMin, setMontoMin] = useState("");
+  const [montoMax, setMontoMax] = useState("");
+
+  // ─── Sesión 8: Config gráficas + resúmenes ───
+  const [chartSize, setChartSize] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sw_chartSize")) || "normal"; } catch { return "normal"; }
+  });
+  const [showValues, setShowValues] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sw_showValues")) ?? false; } catch { return false; }
+  });
+  const [resumenAbierto, setResumenAbierto] = useState({});
+
+  useEffect(() => { try { localStorage.setItem("sw_chartSize", JSON.stringify(chartSize)); } catch {} }, [chartSize]);
+  useEffect(() => { try { localStorage.setItem("sw_showValues", JSON.stringify(showValues)); } catch {} }, [showValues]);
+
+  const chartHeight = chartSize === "compacto" ? 200 : chartSize === "grande" ? 450 : 300;
+  const toggleResumen = (key) => setResumenAbierto((p) => ({ ...p, [key]: !p[key] }));
+
   /* ─── Cargar datos ─── */
   const cargarDatos = useCallback(async () => {
     setLoading(true);
@@ -197,12 +221,49 @@ export default function Reportes() {
      ═══════════════════════════════════════════════════════════════ */
   const movsActivos = useMemo(() => (movs || []).filter((m) => m.estado !== "eliminado"), [movs]);
 
+  /* ─── Opciones únicas para dropdowns de filtros ─── */
+  const opcionesFiltro = useMemo(() => {
+    const clientes = new Map();
+    const proveedores = new Set();
+    const categorias = new Set();
+    for (const m of movsActivos) {
+      if (m.cliente_id && clientesMap[m.cliente_id]) clientes.set(m.cliente_id, clientesMap[m.cliente_id]?.nombre || "(Sin nombre)");
+      if (m.proveedor_nombre) proveedores.add(m.proveedor_nombre);
+      if (m.categoria) categorias.add(m.categoria);
+    }
+    return {
+      clientes: Array.from(clientes.entries()).sort((a, b) => a[1].localeCompare(b[1])),
+      proveedores: Array.from(proveedores).sort(),
+      categorias: Array.from(categorias).sort(),
+    };
+  }, [movsActivos, clientesMap]);
+
+  /* ─── Movimientos filtrados (fuente de verdad para TODO) ─── */
+  const movsFiltrados = useMemo(() => {
+    let result = movsActivos;
+    if (filtroTipo !== "todos") result = result.filter((m) => m.tipo === filtroTipo);
+    if (filtroCliente) result = result.filter((m) => m.cliente_id === filtroCliente);
+    if (filtroProveedor) result = result.filter((m) => m.proveedor_nombre === filtroProveedor);
+    if (filtroCategoria) result = result.filter((m) => m.categoria === filtroCategoria);
+    if (montoMin !== "") { const min = Number(montoMin); if (!isNaN(min)) result = result.filter((m) => Number(m.monto) >= min); }
+    if (montoMax !== "") { const max = Number(montoMax); if (!isNaN(max)) result = result.filter((m) => Number(m.monto) <= max); }
+    return result;
+  }, [movsActivos, filtroTipo, filtroCliente, filtroProveedor, filtroCategoria, montoMin, montoMax]);
+
+  const hayFiltros = filtroTipo !== "todos" || filtroCliente || filtroProveedor || filtroCategoria || montoMin !== "" || montoMax !== "";
+  const contarFiltros = [filtroTipo !== "todos", filtroCliente, filtroProveedor, filtroCategoria, montoMin !== "", montoMax !== ""].filter(Boolean).length;
+
+  const limpiarFiltros = () => {
+    setFiltroTipo("todos"); setFiltroCliente(""); setFiltroProveedor("");
+    setFiltroCategoria(""); setMontoMin(""); setMontoMax("");
+  };
+
   /* ─── KPIs ─── */
   const kpis = useMemo(() => {
-    const ing = movsActivos.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const gas = movsActivos.filter((m) => m.tipo === "gasto").reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const ing = movsFiltrados.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const gas = movsFiltrados.filter((m) => m.tipo === "gasto").reduce((s, m) => s + (Number(m.monto) || 0), 0);
     const gan = ing - gas;
-    const pedSet = new Set(movsActivos.filter((m) => m.tipo === "ingreso" && m.orden_id).map((m) => m.orden_id));
+    const pedSet = new Set(movsFiltrados.filter((m) => m.tipo === "ingreso" && m.orden_id).map((m) => m.orden_id));
     const ped = pedSet.size;
     const aAct = movsAnterior || [];
     const aIng = aAct.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + (Number(m.monto) || 0), 0);
@@ -210,12 +271,12 @@ export default function Reportes() {
     const aPed = (ordenesAnterior || []).length;
     const pct = (a, b) => { if (!b) return a > 0 ? 100 : 0; return Math.round(((a - b) / Math.abs(b)) * 100); };
     return { ingresos: ing, gastos: gas, ganancia: gan, pedidos: ped, pctIng: pct(ing, aIng), pctGas: pct(gas, aGas), pctGan: pct(gan, aIng - aGas), pctPed: pct(ped, aPed) };
-  }, [movsActivos, movsAnterior, ordenesAnterior]);
+  }, [movsFiltrados, movsAnterior, ordenesAnterior]);
 
   /* ─── Financiero por mes ─── */
   const serieMes = useMemo(() => {
     const map = {};
-    for (const m of movsActivos) {
+    for (const m of movsFiltrados) {
       const k = ym(m.fecha); if (!k) continue;
       if (!map[k]) map[k] = { ingresos: 0, gastos: 0 };
       if (m.tipo === "ingreso") map[k].ingresos += Number(m.monto || 0);
@@ -228,23 +289,23 @@ export default function Reportes() {
       gastos: meses.map((k) => map[k].gastos),
       ganancia: meses.map((k) => map[k].ingresos - map[k].gastos),
     };
-  }, [movsActivos]);
+  }, [movsFiltrados]);
 
   /* ─── Distribución de gastos por categoría (Donut) ─── */
   const gastosPorCategoria = useMemo(() => {
     const map = {};
-    for (const m of movsActivos) {
+    for (const m of movsFiltrados) {
       if (m.tipo !== "gasto") continue;
       const cat = m.categoria || "Sin categoría";
       map[cat] = (map[cat] || 0) + Number(m.monto || 0);
     }
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  }, [movsActivos]);
+  }, [movsFiltrados]);
 
   /* ─── Top clientes (dinero real) ─── */
   const topClientes = useMemo(() => {
     const acum = {};
-    for (const m of movsActivos) {
+    for (const m of movsFiltrados) {
       if (m.tipo !== "ingreso" || !m.cliente_id) continue;
       if (!acum[m.cliente_id]) acum[m.cliente_id] = { recaudo: 0, ordenIds: new Set() };
       acum[m.cliente_id].recaudo += Number(m.monto || 0);
@@ -261,7 +322,7 @@ export default function Reportes() {
       }))
       .sort((a, b) => b.recaudo - a.recaudo)
       .slice(0, 10);
-  }, [movsActivos, clientesMap]);
+  }, [movsFiltrados, clientesMap]);
 
   /* ─── Artículos ─── */
   const resumenArticulos = useMemo(() => {
@@ -290,7 +351,7 @@ export default function Reportes() {
       }
     }
     const pagado = {};
-    for (const m of movsActivos) {
+    for (const m of movsFiltrados) {
       if (m.tipo !== "gasto" || !m.proveedor_nombre) continue;
       pagado[m.proveedor_nombre] = (pagado[m.proveedor_nombre] || 0) + Number(m.monto || 0);
     }
@@ -300,7 +361,87 @@ export default function Reportes() {
       const p = pagado[n] || 0;
       return { nombre: n, total: a.total, pagado: p, pendiente: Math.max(0, a.total - p), ordenes: a.ordenes?.size || 0 };
     }).sort((a, b) => b.total - a.total);
-  }, [ordenes, movsActivos]);
+  }, [ordenes, movsFiltrados]);
+
+  /* ═══════════════════════════════════════════════════════════════
+     RESÚMENES INTELIGENTES (Sesión 8)
+     ═══════════════════════════════════════════════════════════════ */
+  // artD y recD se definen aquí para que los resúmenes los puedan usar
+  const artD = subTabArt === "propios" ? resumenArticulos.topUsoPropios : resumenArticulos.topUsoProveedor;
+  const recD = subTabArt === "propios" ? resumenArticulos.topRecaudoPropios : resumenArticulos.topRecaudoProv;
+
+  const periodoTexto = useMemo(() => {
+    if (!desde || !hasta) return "el período seleccionado";
+    const d = new Date(desde + "T12:00:00"), h = new Date(hasta + "T12:00:00");
+    const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    if (d.getMonth() === h.getMonth() && d.getFullYear() === h.getFullYear()) return `${meses[d.getMonth()]} ${d.getFullYear()}`;
+    return `${meses[d.getMonth()]} a ${meses[h.getMonth()]} ${h.getFullYear()}`;
+  }, [desde, hasta]);
+
+  const resumenFinanciero = useMemo(() => {
+    if (!movsFiltrados.length) return null;
+    const lines = [];
+    lines.push(`En ${periodoTexto}, los ingresos reales totalizaron ${money(kpis.ingresos)} y los gastos fueron ${money(kpis.gastos)}, dejando una ganancia neta de ${money(kpis.ganancia)}.`);
+    if (kpis.pctIng !== 0) lines.push(`Los ingresos ${kpis.pctIng > 0 ? "crecieron" : "disminuyeron"} un ${Math.abs(kpis.pctIng)}% respecto al período anterior.`);
+    if (gastosPorCategoria.length > 0) {
+      const topCat = gastosPorCategoria[0];
+      lines.push(`La categoría de gasto más significativa fue "${topCat[0]}" con ${money(topCat[1])}.`);
+    }
+    if (serieMes.meses.length > 1) {
+      const mejorIdx = serieMes.ganancia.indexOf(Math.max(...serieMes.ganancia));
+      lines.push(`El mes con mayor ganancia fue ${nombreMes(serieMes.meses[mejorIdx])} con ${money(serieMes.ganancia[mejorIdx])}.`);
+    }
+    return lines;
+  }, [movsFiltrados, kpis, gastosPorCategoria, serieMes, periodoTexto]);
+
+  const resumenClientes = useMemo(() => {
+    if (!topClientes.length) return null;
+    const lines = [];
+    const top = topClientes[0];
+    lines.push(`El cliente con mayor recaudo en ${periodoTexto} fue ${top.nombre} con ${money(top.recaudo)} en ${top.pedidos} pedido${top.pedidos > 1 ? "s" : ""}.`);
+    const totalRecaudo = topClientes.reduce((s, c) => s + c.recaudo, 0);
+    const pctTop = totalRecaudo > 0 ? Math.round((top.recaudo / totalRecaudo) * 100) : 0;
+    if (pctTop > 0) lines.push(`Este cliente representa el ${pctTop}% del recaudo total del top 10.`);
+    const promedioGeneral = topClientes.length > 0 ? Math.round(totalRecaudo / topClientes.length) : 0;
+    lines.push(`El promedio de recaudo por cliente (top 10) es de ${money(promedioGeneral)}.`);
+    if (topClientes.length >= 3) {
+      const top3Total = topClientes.slice(0, 3).reduce((s, c) => s + c.recaudo, 0);
+      const pct3 = totalRecaudo > 0 ? Math.round((top3Total / totalRecaudo) * 100) : 0;
+      lines.push(`Los 3 principales clientes concentran el ${pct3}% del recaudo.`);
+    }
+    return lines;
+  }, [topClientes, periodoTexto]);
+
+  const resumenArticulosTexto = useMemo(() => {
+    if (!artD.length && !recD.length) return null;
+    const lines = [];
+    if (artD.length > 0) {
+      const top = artD[0];
+      lines.push(`El artículo más alquilado (${subTabArt}) fue "${top.nombre}" con ${Number(top.cantidad).toLocaleString("es-CO")} unidades.`);
+      if (artD.length >= 2) lines.push(`Le sigue "${artD[1].nombre}" con ${Number(artD[1].cantidad).toLocaleString("es-CO")} unidades.`);
+    }
+    if (recD.length > 0) {
+      const topR = recD[0];
+      lines.push(`El artículo con mayor valor cotizado fue "${topR.nombre}" por ${money(topR.valor)}.`);
+    }
+    return lines;
+  }, [artD, recD, subTabArt]);
+
+  const resumenProveedoresTexto = useMemo(() => {
+    if (!resumenProveedores.length) return null;
+    const lines = [];
+    const totalAdeudado = resumenProveedores.reduce((s, p) => s + p.total, 0);
+    const totalPagado = resumenProveedores.reduce((s, p) => s + p.pagado, 0);
+    const totalPendiente = resumenProveedores.reduce((s, p) => s + p.pendiente, 0);
+    lines.push(`En ${periodoTexto}, se adeudaron ${money(totalAdeudado)} a proveedores, de los cuales se han pagado ${money(totalPagado)}.`);
+    if (totalPendiente > 0) lines.push(`Quedan ${money(totalPendiente)} pendientes de pago.`);
+    else lines.push("Todos los pagos a proveedores están al día. ✅");
+    if (resumenProveedores.length > 0) {
+      const topProv = resumenProveedores[0];
+      lines.push(`El proveedor con mayor adeudo fue "${topProv.nombre}" con ${money(topProv.total)}.`);
+    }
+    return lines;
+  }, [resumenProveedores, periodoTexto]);
 
   /* ═══════════════════════════════════════════════════════════════
      DRILL-DOWN: MODAL DE CLIENTE
@@ -383,11 +524,53 @@ export default function Reportes() {
      CHART DATA & OPTIONS
      ═══════════════════════════════════════════════════════════════ */
   const yTickCallback = (v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}K` : v;
-  const tooltipMoney = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y || ctx.parsed.x || ctx.raw)}` } };
 
-  const chartOptsBase = { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: "top" }, tooltip: tooltipMoney }, scales: { y: { ticks: { callback: yTickCallback } } } };
-  const chartOptsNoLegend = { ...chartOptsBase, plugins: { ...chartOptsBase.plugins, legend: { display: false } } };
-  const chartOptsH = { ...chartOptsNoLegend, indexAxis: "y", scales: { x: { ticks: { callback: yTickCallback } } } };
+  // Plugin inline para mostrar valores encima de barras
+  const datalabelsPlugin = showValues ? {
+    id: "swValues",
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      chart.data.datasets.forEach((ds, dsi) => {
+        const meta = chart.getDatasetMeta(dsi);
+        if (!meta.hidden) meta.data.forEach((el, i) => {
+          const val = ds.data[i];
+          if (!val || val === 0) return;
+          ctx.save();
+          ctx.font = "bold 10px sans-serif";
+          ctx.fillStyle = "#374151";
+          ctx.textAlign = "center";
+          const label = val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : val >= 1000 ? `${Math.round(val / 1000)}K` : val;
+          if (chart.options.indexAxis === "y") {
+            ctx.textAlign = "left";
+            ctx.fillText(label, el.x + 4, el.y + 4);
+          } else {
+            ctx.fillText(label, el.x, el.y - 8);
+          }
+          ctx.restore();
+        });
+      });
+    },
+  } : null;
+  const plugins = datalabelsPlugin ? [datalabelsPlugin] : [];
+
+  // Tooltip para gráficas VERTICALES (valor en eje Y)
+  const tooltipMoneyV = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y)}` } };
+  // Tooltip para gráficas HORIZONTALES (valor en eje X)
+  const tooltipMoneyH = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.x)}` } };
+  // Tooltip para CANTIDADES (sin signo $)
+  const tooltipCantH = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.x).toLocaleString("es-CO")}` } };
+
+  const chartOptsBase = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "top" }, tooltip: tooltipMoneyV }, scales: { y: { ticks: { callback: yTickCallback } } } };
+  const chartOptsH = {
+    responsive: true, maintainAspectRatio: false, indexAxis: "y",
+    plugins: { legend: { display: false }, tooltip: tooltipMoneyH },
+    scales: { x: { ticks: { callback: yTickCallback } } },
+  };
+  const chartOptsCantH = {
+    responsive: true, maintainAspectRatio: false, indexAxis: "y",
+    plugins: { legend: { display: false }, tooltip: tooltipCantH },
+    scales: { x: { ticks: { callback: (v) => Number(v).toLocaleString("es-CO") } } },
+  };
   const doughnutOpts = {
     responsive: true, maintainAspectRatio: true,
     plugins: { legend: { position: "right", labels: { boxWidth: 12, padding: 10, font: { size: 11 } } }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${money(ctx.raw)}` } } },
@@ -411,9 +594,7 @@ export default function Reportes() {
     datasets: [{ label: "Recaudo real ($)", data: topClientes.map((t) => t.recaudo), backgroundColor: PALETA.slice(0, topClientes.length), borderColor: PALETA_SOLIDA.slice(0, topClientes.length), borderWidth: 1 }],
   };
 
-  // ── Artículos ──
-  const artD = subTabArt === "propios" ? resumenArticulos.topUsoPropios : resumenArticulos.topUsoProveedor;
-  const recD = subTabArt === "propios" ? resumenArticulos.topRecaudoPropios : resumenArticulos.topRecaudoProv;
+  // ── Artículos (artD y recD definidos arriba, antes de los resúmenes) ──
   const dataArtUso = { labels: artD.map((t) => t.nombre), datasets: [{ label: `Cantidad`, data: artD.map((t) => t.cantidad), backgroundColor: PALETA.slice(0, artD.length), borderColor: PALETA_SOLIDA.slice(0, artD.length), borderWidth: 1 }] };
   const dataArtRec = { labels: recD.map((t) => t.nombre), datasets: [{ label: `Valor cotizado ($)`, data: recD.map((t) => t.valor), backgroundColor: PALETA.slice(0, recD.length), borderColor: PALETA_SOLIDA.slice(0, recD.length), borderWidth: 1 }] };
 
@@ -456,7 +637,7 @@ export default function Reportes() {
     <Protegido>
       <div className="sw-page">
         <div className="sw-container">
-          <h1 className="sw-titulo-pagina">📊 Dashboard</h1>
+          <h1 className="sw-titulo-pagina" style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)", margin: "24px 0 20px" }}>📊 Dashboard</h1>
 
           {/* ═══ KPIs ═══ */}
           {!loading && (
@@ -503,7 +684,54 @@ export default function Reportes() {
               <span className="sw-filtro-label">Hasta</span>
               <input type="date" className="sw-filtro-input" value={hasta} onChange={(e) => setHasta(e.target.value)} style={{ width: 135 }} />
             </div>
+            <div className="sw-filtro-sep" />
+            <button className={`sw-btn-filtros ${hayFiltros ? "con-filtros" : ""}`} onClick={() => setDrawerOpen(true)}>
+              🔍 Filtros {contarFiltros > 0 && <span className="sw-filtro-badge">{contarFiltros}</span>}
+            </button>
           </div>
+
+          {/* ═══ CHIPS DE FILTROS ACTIVOS ═══ */}
+          {hayFiltros && (
+            <div className="sw-chips-bar">
+              {filtroTipo !== "todos" && (
+                <span className="sw-chip">
+                  {filtroTipo === "ingreso" ? "💰 Solo ingresos" : "💸 Solo gastos"}
+                  <button className="sw-chip-x" onClick={() => setFiltroTipo("todos")}>✕</button>
+                </span>
+              )}
+              {filtroCliente && (
+                <span className="sw-chip">
+                  👤 {clientesMap[filtroCliente]?.nombre || "Cliente"}
+                  <button className="sw-chip-x" onClick={() => setFiltroCliente("")}>✕</button>
+                </span>
+              )}
+              {filtroProveedor && (
+                <span className="sw-chip">
+                  🏢 {filtroProveedor}
+                  <button className="sw-chip-x" onClick={() => setFiltroProveedor("")}>✕</button>
+                </span>
+              )}
+              {filtroCategoria && (
+                <span className="sw-chip">
+                  🏷️ {filtroCategoria}
+                  <button className="sw-chip-x" onClick={() => setFiltroCategoria("")}>✕</button>
+                </span>
+              )}
+              {montoMin !== "" && (
+                <span className="sw-chip">
+                  Mín: {money(montoMin)}
+                  <button className="sw-chip-x" onClick={() => setMontoMin("")}>✕</button>
+                </span>
+              )}
+              {montoMax !== "" && (
+                <span className="sw-chip">
+                  Máx: {money(montoMax)}
+                  <button className="sw-chip-x" onClick={() => setMontoMax("")}>✕</button>
+                </span>
+              )}
+              <button className="sw-chip sw-chip-limpiar" onClick={limpiarFiltros}>🗑️ Limpiar todos</button>
+            </div>
+          )}
 
           {/* ═══ TABS ═══ */}
           <div className="sw-tabs-bar">
@@ -516,6 +744,19 @@ export default function Reportes() {
               ))}
             </div>
             <div className="sw-acciones-grupo">
+              <div className="sw-chart-config">
+                <div className="sw-config-sizes">
+                  {[{ id: "compacto", icon: "▪️" }, { id: "normal", icon: "◻️" }, { id: "grande", icon: "⬜" }].map((s) => (
+                    <button key={s.id} className={`sw-config-size-btn ${chartSize === s.id ? "activo" : ""}`} onClick={() => setChartSize(s.id)} title={`Tamaño ${s.id}`}>
+                      {s.icon}
+                    </button>
+                  ))}
+                </div>
+                <label className="sw-config-toggle">
+                  <input type="checkbox" checked={showValues} onChange={(e) => setShowValues(e.target.checked)} />
+                  <span>123</span>
+                </label>
+              </div>
               <button className="sw-btn sw-btn-secundario" onClick={exportarCSVActual}>📥 CSV</button>
             </div>
           </div>
@@ -547,7 +788,9 @@ export default function Reportes() {
                       </div>
                     </div>
                     {serieMes.meses.length > 0 ? (
-                      <ChartFinanciero data={dataFinanciero} options={chartOptsBase} />
+                      <div style={{ height: chartHeight }}>
+                        <ChartFinanciero data={dataFinanciero} options={chartOptsBase} plugins={plugins} />
+                      </div>
                     ) : (
                       <div className="sw-empty"><div className="sw-empty-icono">📭</div><div className="sw-empty-texto">No hay movimientos en este período</div></div>
                     )}
@@ -581,6 +824,20 @@ export default function Reportes() {
                       </div>
                     )}
                   </div>
+                  {/* Resumen inteligente - Financiero */}
+                  {resumenFinanciero && (
+                    <div className={`sw-resumen-box ${resumenAbierto.financiero ? "abierto" : ""}`} onClick={() => toggleResumen("financiero")}>
+                      <div className="sw-resumen-header">
+                        <span>📝 Resumen inteligente</span>
+                        <span className="sw-resumen-toggle">{resumenAbierto.financiero ? "▲" : "▼"}</span>
+                      </div>
+                      {resumenAbierto.financiero && (
+                        <div className="sw-resumen-body">
+                          {resumenFinanciero.map((l, i) => <p key={i}>{l}</p>)}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -590,7 +847,9 @@ export default function Reportes() {
                   <div className="sw-chart-wrapper">
                     <h3 className="sw-chart-titulo">Top 10 clientes — Recaudo real (abonos)</h3>
                     {topClientes.length > 0 ? (
-                      <Bar data={dataTopClientes} options={chartOptsH} />
+                      <div style={{ height: chartHeight }}>
+                        <Bar data={dataTopClientes} options={chartOptsH} plugins={plugins} />
+                      </div>
                     ) : (
                       <div className="sw-empty"><div className="sw-empty-icono">👥</div><div className="sw-empty-texto">No hay ingresos de clientes en este período</div></div>
                     )}
@@ -617,6 +876,20 @@ export default function Reportes() {
                       </table>
                     </div>
                   )}
+                  {/* Resumen inteligente - Clientes */}
+                  {resumenClientes && (
+                    <div className={`sw-resumen-box ${resumenAbierto.clientes ? "abierto" : ""}`} onClick={() => toggleResumen("clientes")}>
+                      <div className="sw-resumen-header">
+                        <span>📝 Resumen inteligente</span>
+                        <span className="sw-resumen-toggle">{resumenAbierto.clientes ? "▲" : "▼"}</span>
+                      </div>
+                      {resumenAbierto.clientes && (
+                        <div className="sw-resumen-body">
+                          {resumenClientes.map((l, i) => <p key={i}>{l}</p>)}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -630,13 +903,27 @@ export default function Reportes() {
                   <div className="sw-charts-duo">
                     <div className="sw-chart-wrapper">
                       <h3 className="sw-chart-titulo">Más alquilados ({subTabArt})</h3>
-                      {artD.length > 0 ? <Bar data={dataArtUso} options={chartOptsH} /> : <div className="sw-empty"><div className="sw-empty-texto">Sin datos</div></div>}
+                      {artD.length > 0 ? <div style={{ height: chartHeight }}><Bar data={dataArtUso} options={chartOptsCantH} plugins={plugins} /></div> : <div className="sw-empty"><div className="sw-empty-texto">Sin datos</div></div>}
                     </div>
                     <div className="sw-chart-wrapper">
                       <h3 className="sw-chart-titulo">Mayor valor cotizado ({subTabArt})</h3>
-                      {recD.length > 0 ? <Bar data={dataArtRec} options={chartOptsH} /> : <div className="sw-empty"><div className="sw-empty-texto">Sin datos</div></div>}
+                      {recD.length > 0 ? <div style={{ height: chartHeight }}><Bar data={dataArtRec} options={chartOptsH} plugins={plugins} /></div> : <div className="sw-empty"><div className="sw-empty-texto">Sin datos</div></div>}
                     </div>
                   </div>
+                  {/* Resumen inteligente - Artículos */}
+                  {resumenArticulosTexto && (
+                    <div className={`sw-resumen-box ${resumenAbierto.articulos ? "abierto" : ""}`} onClick={() => toggleResumen("articulos")}>
+                      <div className="sw-resumen-header">
+                        <span>📝 Resumen inteligente</span>
+                        <span className="sw-resumen-toggle">{resumenAbierto.articulos ? "▲" : "▼"}</span>
+                      </div>
+                      {resumenAbierto.articulos && (
+                        <div className="sw-resumen-body">
+                          {resumenArticulosTexto.map((l, i) => <p key={i}>{l}</p>)}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -646,7 +933,7 @@ export default function Reportes() {
                   <div className="sw-charts-duo">
                     <div className="sw-chart-wrapper">
                       <h3 className="sw-chart-titulo">Pagos a proveedores — Dinero real</h3>
-                      {resumenProveedores.length > 0 ? <Bar data={dataProv} options={chartOptsBase} /> : <div className="sw-empty"><div className="sw-empty-icono">🏢</div><div className="sw-empty-texto">No hay proveedores en este período</div></div>}
+                      {resumenProveedores.length > 0 ? <div style={{ height: chartHeight }}><Bar data={dataProv} options={chartOptsBase} plugins={plugins} /></div> : <div className="sw-empty"><div className="sw-empty-icono">🏢</div><div className="sw-empty-texto">No hay proveedores en este período</div></div>}
                     </div>
                     {resumenProveedores.length > 0 && (
                       <div className="sw-chart-wrapper">
@@ -673,6 +960,20 @@ export default function Reportes() {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+                  {/* Resumen inteligente - Proveedores */}
+                  {resumenProveedoresTexto && (
+                    <div className={`sw-resumen-box ${resumenAbierto.proveedores ? "abierto" : ""}`} onClick={() => toggleResumen("proveedores")}>
+                      <div className="sw-resumen-header">
+                        <span>📝 Resumen inteligente</span>
+                        <span className="sw-resumen-toggle">{resumenAbierto.proveedores ? "▲" : "▼"}</span>
+                      </div>
+                      {resumenAbierto.proveedores && (
+                        <div className="sw-resumen-body">
+                          {resumenProveedoresTexto.map((l, i) => <p key={i}>{l}</p>)}
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
@@ -762,6 +1063,88 @@ export default function Reportes() {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ DRAWER DE FILTROS AVANZADOS ═══ */}
+      {drawerOpen && (
+        <div className="sw-drawer-overlay" onClick={() => setDrawerOpen(false)}>
+          <div className="sw-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="sw-drawer-header">
+              <h3>🔍 Filtros avanzados</h3>
+              <button className="sw-modal-dd-cerrar" onClick={() => setDrawerOpen(false)}>✕</button>
+            </div>
+
+            <div className="sw-drawer-body">
+              {/* Tipo */}
+              <div className="sw-drawer-campo">
+                <label className="sw-drawer-label">Tipo de movimiento</label>
+                <div className="sw-drawer-opciones">
+                  {[
+                    { id: "todos", label: "Todos" },
+                    { id: "ingreso", label: "💰 Ingresos" },
+                    { id: "gasto", label: "💸 Gastos" },
+                  ].map((o) => (
+                    <button key={o.id} className={`sw-drawer-opcion ${filtroTipo === o.id ? "activo" : ""}`} onClick={() => setFiltroTipo(o.id)}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cliente */}
+              <div className="sw-drawer-campo">
+                <label className="sw-drawer-label">Cliente</label>
+                <select className="sw-drawer-select" value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)}>
+                  <option value="">— Todos los clientes —</option>
+                  {opcionesFiltro.clientes.map(([id, nombre]) => (
+                    <option key={id} value={id}>{nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Proveedor */}
+              <div className="sw-drawer-campo">
+                <label className="sw-drawer-label">Proveedor</label>
+                <select className="sw-drawer-select" value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)}>
+                  <option value="">— Todos los proveedores —</option>
+                  {opcionesFiltro.proveedores.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Categoría */}
+              <div className="sw-drawer-campo">
+                <label className="sw-drawer-label">Categoría</label>
+                <select className="sw-drawer-select" value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)}>
+                  <option value="">— Todas las categorías —</option>
+                  {opcionesFiltro.categorias.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Rango de montos */}
+              <div className="sw-drawer-campo">
+                <label className="sw-drawer-label">Rango de montos</label>
+                <div className="sw-drawer-rango">
+                  <input type="number" className="sw-drawer-input" placeholder="Mínimo" value={montoMin} onChange={(e) => setMontoMin(e.target.value)} />
+                  <span className="sw-drawer-rango-sep">—</span>
+                  <input type="number" className="sw-drawer-input" placeholder="Máximo" value={montoMax} onChange={(e) => setMontoMax(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="sw-drawer-footer">
+              <button className="sw-btn sw-btn-secundario" onClick={() => { limpiarFiltros(); }}>
+                🗑️ Limpiar
+              </button>
+              <button className="sw-btn" onClick={() => setDrawerOpen(false)}>
+                ✓ Aplicar filtros
+              </button>
+            </div>
           </div>
         </div>
       )}
