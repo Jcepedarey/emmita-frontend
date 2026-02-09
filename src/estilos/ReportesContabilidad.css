@@ -1049,6 +1049,52 @@
   .sw-toggle-grupo { align-self: flex-end; }
 }
 
+/* ========== ANIMACIONES (SESIONES 10-12 CONSOLIDADAS) ========== */
+
+/* Tab content fade-in on switch */
+.sw-report-content {
+  animation: sw-fadeSlideIn 0.25s ease-out;
+}
+
+@keyframes sw-fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* KPI card entrance animation (staggered) */
+.sw-kpi-card {
+  animation: sw-kpiPop 0.35s ease-out both;
+}
+.sw-kpi-card:nth-child(1) { animation-delay: 0s; }
+.sw-kpi-card:nth-child(2) { animation-delay: 0.06s; }
+.sw-kpi-card:nth-child(3) { animation-delay: 0.12s; }
+.sw-kpi-card:nth-child(4) { animation-delay: 0.18s; }
+
+@keyframes sw-kpiPop {
+  from { opacity: 0; transform: scale(0.95) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Chart wrapper subtle entrance */
+.sw-chart-wrapper {
+  animation: sw-fadeIn 0.3s ease-out;
+}
+
+@keyframes sw-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Resumen box smooth expand */
+.sw-resumen-body {
+  animation: sw-expandIn 0.2s ease-out;
+}
+
+@keyframes sw-expandIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ========== FILTROS AVANZADOS (SESIÓN 7) ========== */
 
 /* Botón de filtros */
@@ -1356,30 +1402,6 @@
 .sw-config-size-btn.activo {
   background: var(--sw-cyan, #0077B6);
   color: white;
-}
-
-.sw-config-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--sw-texto-secundario, #4b5563);
-  cursor: pointer;
-  padding: 4px 8px;
-  border: 1px solid var(--sw-borde, #e5e7eb);
-  border-radius: 6px;
-  background: white;
-  transition: all 0.12s ease;
-}
-
-.sw-config-toggle:hover { border-color: var(--sw-cyan, #0077B6); }
-
-.sw-config-toggle input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-  accent-color: var(--sw-cyan, #0077B6);
 }
 
 @media (max-width: 768px) {

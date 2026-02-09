@@ -1,6 +1,6 @@
 // src/pages/Reportes.js — SESIÓN 6: Gráficas avanzadas + drill-down de clientes
 // Datos basados en dinero REAL (movimientos_contables)
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
@@ -12,6 +12,7 @@ import {
 import { exportarCSV } from "../utils/exportarCSV";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
+import { generarPDFDashboard } from "../utils/generarPDFDashboard";
 import Protegido from "../components/Protegido";
 import "../estilos/ReportesContabilidad.css";
 
@@ -144,6 +145,8 @@ export default function Reportes() {
   const [showValues, setShowValues] = useState(() => {
     try { return JSON.parse(localStorage.getItem("sw_showValues")) ?? false; } catch { return false; }
   });
+  const showValuesRef = useRef(showValues);
+  useEffect(() => { showValuesRef.current = showValues; }, [showValues]);
   const [resumenAbierto, setResumenAbierto] = useState({});
 
   useEffect(() => { try { localStorage.setItem("sw_chartSize", JSON.stringify(chartSize)); } catch {} }, [chartSize]);
@@ -525,10 +528,11 @@ export default function Reportes() {
      ═══════════════════════════════════════════════════════════════ */
   const yTickCallback = (v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}K` : v;
 
-  // Plugin inline para mostrar valores encima de barras
-  const datalabelsPlugin = showValues ? {
+  // Plugin inline para mostrar valores encima de barras (usa ref para estado actual)
+  const valuesPlugin = useMemo(() => ({
     id: "swValues",
     afterDatasetsDraw(chart) {
+      if (!showValuesRef.current) return;
       const { ctx } = chart;
       chart.data.datasets.forEach((ds, dsi) => {
         const meta = chart.getDatasetMeta(dsi);
@@ -550,8 +554,8 @@ export default function Reportes() {
         });
       });
     },
-  } : null;
-  const plugins = datalabelsPlugin ? [datalabelsPlugin] : [];
+  }), []);
+  const plugins = [valuesPlugin];
 
   // Tooltip para gráficas VERTICALES (valor en eje Y)
   const tooltipMoneyV = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y)}` } };
@@ -560,14 +564,14 @@ export default function Reportes() {
   // Tooltip para CANTIDADES (sin signo $)
   const tooltipCantH = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.x).toLocaleString("es-CO")}` } };
 
-  const chartOptsBase = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "top" }, tooltip: tooltipMoneyV }, scales: { y: { ticks: { callback: yTickCallback } } } };
+  const chartOptsBase = { responsive: true, maintainAspectRatio: false, animation: { duration: showValues ? 1 : 300 }, plugins: { legend: { position: "top" }, tooltip: tooltipMoneyV }, scales: { y: { ticks: { callback: yTickCallback } } } };
   const chartOptsH = {
-    responsive: true, maintainAspectRatio: false, indexAxis: "y",
+    responsive: true, maintainAspectRatio: false, animation: { duration: showValues ? 1 : 300 }, indexAxis: "y",
     plugins: { legend: { display: false }, tooltip: tooltipMoneyH },
     scales: { x: { ticks: { callback: yTickCallback } } },
   };
   const chartOptsCantH = {
-    responsive: true, maintainAspectRatio: false, indexAxis: "y",
+    responsive: true, maintainAspectRatio: false, animation: { duration: showValues ? 1 : 300 }, indexAxis: "y",
     plugins: { legend: { display: false }, tooltip: tooltipCantH },
     scales: { x: { ticks: { callback: (v) => Number(v).toLocaleString("es-CO") } } },
   };
@@ -588,7 +592,18 @@ export default function Reportes() {
     datasets: [{ data: gastosPorCategoria.map(([, v]) => v), backgroundColor: PALETA.slice(0, gastosPorCategoria.length), borderColor: PALETA_SOLIDA.slice(0, gastosPorCategoria.length), borderWidth: 1 }],
   };
 
-  // ── Clientes ──
+  // ── Clientes (con click para drill-down — Sesión 13) ──
+  const chartOptsHClientes = {
+    ...chartOptsH,
+    onClick: (_evt, elements) => {
+      if (elements.length > 0 && topClientes[elements[0].index]) {
+        abrirModalCliente(topClientes[elements[0].index]);
+      }
+    },
+    onHover: (evt, elements) => {
+      evt.native.target.style.cursor = elements.length > 0 ? "pointer" : "default";
+    },
+  };
   const dataTopClientes = {
     labels: topClientes.map((t) => t.nombre),
     datasets: [{ label: "Recaudo real ($)", data: topClientes.map((t) => t.recaudo), backgroundColor: PALETA.slice(0, topClientes.length), borderColor: PALETA_SOLIDA.slice(0, topClientes.length), borderWidth: 1 }],
@@ -620,6 +635,22 @@ export default function Reportes() {
     else if (tab === "proveedores") exportarCSV(resumenProveedores.map((p) => ({ Proveedor: p.nombre, Adeudado: p.total, "Pagado real": p.pagado, Pendiente: p.pendiente, Órdenes: p.ordenes })), "proveedores_real");
   };
 
+  /* ─── Exportar PDF Dashboard ─── */
+  const exportarPDFDashboard = () => {
+    generarPDFDashboard({
+      desde, hasta, periodoTexto,
+      kpis,
+      serieMes: { meses: serieMes.meses, labels: serieMes.labels, ingresos: serieMes.ingresos, gastos: serieMes.gastos, ganancia: serieMes.ganancia },
+      topClientes,
+      articulosPropios: resumenArticulos.topUsoPropios,
+      articulosProveedor: resumenArticulos.topUsoProveedor,
+      proveedores: resumenProveedores,
+      resumenFinanciero,
+      resumenClientes,
+      resumenProveedoresTexto,
+    });
+  };
+
   /* ─── Trend indicator ─── */
   const renderTrend = (pct, invertir = false) => {
     if (pct === 0) return <span className="sw-kpi-trend neutro">— 0%</span>;
@@ -641,7 +672,7 @@ export default function Reportes() {
 
           {/* ═══ KPIs ═══ */}
           {!loading && (
-            <div className="sw-kpi-grid">
+            <div className="sw-kpi-grid" key={`${desde}-${hasta}`}>
               <div className="sw-kpi-card kpi-ingreso">
                 <div className="sw-kpi-label">INGRESOS REALES</div>
                 <div className="sw-kpi-valor">{money(kpis.ingresos)}</div>
@@ -752,11 +783,16 @@ export default function Reportes() {
                     </button>
                   ))}
                 </div>
-                <label className="sw-config-toggle">
-                  <input type="checkbox" checked={showValues} onChange={(e) => setShowValues(e.target.checked)} />
-                  <span>123</span>
-                </label>
+                <button
+                  className={`sw-config-size-btn ${showValues ? "activo" : ""}`}
+                  onClick={() => setShowValues(!showValues)}
+                  title={showValues ? "Ocultar valores" : "Mostrar valores en gráficas"}
+                  style={{ borderRadius: 6, border: "1px solid var(--sw-borde, #e5e7eb)", padding: "5px 10px", fontSize: 13 }}
+                >
+                  {showValues ? "🔢 On" : "🔢"}
+                </button>
               </div>
+              <button className="sw-btn sw-btn-secundario" onClick={exportarPDFDashboard}>📄 PDF</button>
               <button className="sw-btn sw-btn-secundario" onClick={exportarCSVActual}>📥 CSV</button>
             </div>
           </div>
@@ -767,7 +803,7 @@ export default function Reportes() {
               {[1, 2].map((i) => <div key={i} className="sw-skeleton" style={{ height: 200 }} />)}
             </div>
           ) : (
-            <div className="sw-report-content">
+            <div className="sw-report-content" key={tab}>
 
               {/* ── FINANCIERO ── */}
               {tab === "financiero" && (
@@ -846,9 +882,10 @@ export default function Reportes() {
                 <>
                   <div className="sw-chart-wrapper">
                     <h3 className="sw-chart-titulo">Top 10 clientes — Recaudo real (abonos)</h3>
+                    <div className="sw-tabla-nota" style={{ marginTop: -4, marginBottom: 8 }}>💡 Click en una barra para ver el detalle del cliente.</div>
                     {topClientes.length > 0 ? (
                       <div style={{ height: chartHeight }}>
-                        <Bar data={dataTopClientes} options={chartOptsH} plugins={plugins} />
+                        <Bar data={dataTopClientes} options={chartOptsHClientes} plugins={plugins} />
                       </div>
                     ) : (
                       <div className="sw-empty"><div className="sw-empty-icono">👥</div><div className="sw-empty-texto">No hay ingresos de clientes en este período</div></div>
@@ -946,11 +983,12 @@ export default function Reportes() {
                   </div>
                   {resumenProveedores.length > 0 && (
                     <div className="sw-tabla-resumen">
+                      <div className="sw-tabla-nota">💡 Click en un proveedor para filtrar los movimientos asociados.</div>
                       <table>
                         <thead><tr><th>Proveedor</th><th style={{ textAlign: "center" }}>Órdenes</th><th style={{ textAlign: "right" }}>Adeudado</th><th style={{ textAlign: "right" }}>Pagado real</th><th style={{ textAlign: "right" }}>Pendiente</th></tr></thead>
                         <tbody>
                           {resumenProveedores.map((p, i) => (
-                            <tr key={i}>
+                            <tr key={i} className="sw-row-clickable" onClick={() => { setFiltroProveedor(p.nombre); setTab("financiero"); }}>
                               <td style={{ fontWeight: 500 }}>{p.nombre}</td>
                               <td style={{ textAlign: "center" }}>{p.ordenes}</td>
                               <td style={{ textAlign: "right" }}>{money(p.total)}</td>

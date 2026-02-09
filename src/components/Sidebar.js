@@ -28,11 +28,11 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
     { id: "agenda", titulo: "Agenda", icono: "📅", ruta: "/agenda", color: "#ef4444" },
     { id: "proveedores", titulo: "Proveedores", icono: "🚚", ruta: "/proveedores", color: "#8b5cf6" },
     { id: "buscar-doc", titulo: "Buscar documento", icono: "🔍", ruta: "/buscar-documento", color: "#06b6d4" },
-    { id: "reportes", titulo: "Reportes", icono: "📊", ruta: "/reportes", color: "#ec4899" },
+    { id: "reportes", titulo: "Dashboard", icono: "📊", ruta: "/reportes", color: "#ec4899" },
     { id: "trazabilidad", titulo: "Trazabilidad", icono: "📋", ruta: "/trazabilidad", color: "#14b8a6" },
+    { id: "contabilidad", titulo: "Contabilidad", icono: "💰", ruta: "/contabilidad", color: "#22c55e" },
     { id: "recepcion", titulo: "Recepción", icono: "📥", ruta: "/recepcion", color: "#6366f1" },
     { id: "buscar-recep", titulo: "Buscar recepción", icono: "🔎", ruta: "/buscar-recepcion", color: "#a855f7" },
-    { id: "contabilidad", titulo: "Contabilidad", icono: "💰", ruta: "/contabilidad", color: "#22c55e" },
     { id: "usuarios", titulo: "Usuarios", icono: "👤", ruta: "/usuarios", color: "#64748b" },
   ];
 
