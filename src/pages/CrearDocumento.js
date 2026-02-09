@@ -1440,11 +1440,10 @@ mostrar_notas: mostrarNotas
               🏪 Agregar desde Proveedor
             </button>
 
-            {tieneProductosProveedor && (
-              <button className="cd-btn cd-btn-morado" onClick={() => setModalPagosProveedor(true)}>
-                💰 Pagos a Proveedores
-              </button>
-            )}
+            {/* 👇 SOLUCIÓN: Quitamos la condición para que siempre se vea */}
+            <button className="cd-btn cd-btn-morado" onClick={() => setModalPagosProveedor(true)}>
+              💰 Pagos a Proveedores
+            </button>
           </div>
 
           {/* ========== GARANTÍA Y ABONOS ========== */}
