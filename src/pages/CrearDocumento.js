@@ -14,6 +14,7 @@
 
   import Swal from "sweetalert2";
   import Protegido from "../components/Protegido";
+  import "../estilos/CrearDocumentoEstilo.css";
 
   const CrearDocumento = () => {
     const location = useLocation();
@@ -163,7 +164,7 @@ const [pagosProveedores, setPagosProveedores] = useState([]);
   const norm = (d) => (d ? String(d).slice(0, 10) : "");
 
   // Label + checkbox en una sola línea
-  const labelInline = { display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" };
+  // Removed: labelInline (now using CSS classes)
 
   // ✅ AGREGAR ESTE useEffect
 useEffect(() => {
@@ -216,6 +217,25 @@ useEffect(() => {
       setGarantiaRecibida(!!documento?.garantia_recibida);
       setFechaGarantia(documento?.fecha_garantia || "");
       setMostrarNotas(!!documento?.mostrar_notas);
+
+      // 🔧 FIX: Precargar descuento y retención al editar
+      const descVal = Number(documento.descuento || 0);
+      if (descVal > 0) {
+        setAplicarDescuento(true);
+        setDescuento(String(descVal));
+      } else {
+        setAplicarDescuento(false);
+        setDescuento("");
+      }
+
+      const retVal = Number(documento.retencion || 0);
+      if (retVal > 0) {
+        setAplicarRetencion(true);
+        setRetencion(String(retVal));
+      } else {
+        setAplicarRetencion(false);
+        setRetencion("");
+      }
 
       if (documento.nombre_cliente) {
         setClienteSeleccionado({
@@ -795,9 +815,12 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
 
       const tabla = tipoDocumento === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
       const prefijo = tipoDocumento === "cotizacion" ? "COT" : "OP";
-      const d1 = new Date();
-  const fecha = `${d1.getFullYear()}-${String(d1.getMonth() + 1).padStart(2, "0")}-${String(d1.getDate()).padStart(2, "0")}`;
-      const fechaNumerica = fecha.replaceAll("-", "");
+      // 🔧 FIX: Usar fechaCreacion del estado (puede ser editada por el usuario)
+      const fechaParaNumero = fechaCreacion || (() => {
+        const d1 = new Date();
+        return `${d1.getFullYear()}-${String(d1.getMonth() + 1).padStart(2, "0")}-${String(d1.getDate()).padStart(2, "0")}`;
+      })();
+      const fechaNumerica = fechaParaNumero.replaceAll("-", "");
 
       // ✅ MEJORADO: Usar número existente si ya se guardó antes, o generar uno nuevo
       let numeroDocumento = numeroDocumentoActual || documento?.numero;
@@ -1123,144 +1146,163 @@ mostrar_notas: mostrarNotas
 
     return (
       <Protegido>
-        <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
-          <h2 style={{ textAlign: "center" }}>
-            📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
-          </h2>
-
-          <div style={{ marginBottom: "15px" }}>
-            <label>Tipo de documento: </label>
-            <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
-              <option value="cotizacion">Cotización</option>
-              <option value="orden">Orden de Pedido</option>
-            </select>
-          </div>
-
-          {/* Modo de fechas */}
-          <div style={{ margin: "10px 0" }}>
-    <label style={labelInline}>
-    Alquiler por varios días
-    <input
-      type="checkbox"
-      checked={multiDias}
-      onChange={(e) => onToggleMultiDias(e.target.checked)}   // 👈 usar handler
-      style={{ marginLeft: 6 }}
-    />
-  </label>
-  </div>
-
-          <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
-              <label>Fecha de creación:</label>
-              <input type="date" value={fechaCreacion} disabled style={{ width: "100%" }} />
-            </div>
-
-            {!multiDias ? (
-              <div style={{ flex: 1 }}>
-                <label>Fecha del evento:</label>
-                <input
-                  ref={inputFechaUnDiaRef}
-                  type="date"
-                  value={fechaEvento}
-                  onChange={(e) => setFechaEvento(e.target.value)}
-                  style={{ width: "100%" }}
-                />
-              </div>
-            ) : (
-              <div style={{ flex: 1 }}>
-                <label>Seleccionar día y añadir:</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    type="date"
-                    onChange={(e) => agregarDia(e.target.value)}
-                    style={{ width: "100%" }}
-                  />
-                  {/* botón opcional si prefieres control manual */}
-                </div>
-
-                {fechasEvento.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <small>Días seleccionados ({numeroDias}):</small>
-                    <ul style={{ listStyle: "none", padding: 0, margin: "6px 0 0" }}>
-                      {fechasEvento.map((d) => (
-                        <li key={d} style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span>{d}</span>
-                          <button onClick={() => eliminarDia(d)} title="Quitar">🗑️</button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
+        <div className="cd-page">
+          {/* ========== HEADER ========== */}
+          <div className="cd-header">
+            <h1 className="cd-header-titulo">
+              <span className="cd-header-barra"></span>
+              📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
+            </h1>
+            {esEdicion && (
+              <p className="cd-header-subtipo">Editando: {numeroDocumentoActual}</p>
             )}
           </div>
 
-          <hr style={{ margin: "20px 0" }} />
-
-          {/* Clientes */}
-          <label>Buscar cliente:</label>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <input
-              type="text"
-              placeholder="Nombre, identificación o teléfono"
-              value={busquedaCliente}
-              onChange={(e) => setBusquedaCliente(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button onClick={() => setModalCrearCliente(true)}>➕ Crear cliente</button>
+          {/* ========== TIPO DOCUMENTO ========== */}
+          <div className="cd-tipo-selector">
+            <div
+              className={`cd-tipo-opcion ${tipoDocumento === "cotizacion" ? "activo" : ""}`}
+              onClick={() => setTipoDocumento("cotizacion")}
+            >
+              <span className="cd-tipo-icono">📋</span>
+              Cotización
+            </div>
+            <div
+              className={`cd-tipo-opcion ${tipoDocumento === "orden" ? "activo" : ""}`}
+              onClick={() => setTipoDocumento("orden")}
+            >
+              <span className="cd-tipo-icono">📦</span>
+              Orden de Pedido
+            </div>
           </div>
 
-          {busquedaCliente && clientesFiltrados.length > 0 && (
-            <ul style={{ marginTop: "10px", listStyle: "none", padding: 0 }}>
-              {clientesFiltrados.map((cliente) => (
-                <li key={cliente.id}>
-                  <button
-                    onClick={() => seleccionarCliente(cliente)}
-                    style={{ width: "100%", textAlign: "left" }}
-                  >
-                    {cliente.nombre} - {cliente.identificacion} - {cliente.telefono}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          {/* ========== FECHAS ========== */}
+          <div className="cd-card">
+            <div className="cd-card-header">📅 Fechas</div>
+            <div className="cd-card-body">
+              <label className="cd-multidia-check">
+                <input
+                  type="checkbox"
+                  checked={multiDias}
+                  onChange={(e) => onToggleMultiDias(e.target.checked)}
+                />
+                Alquiler por varios días
+              </label>
 
-          {clienteSeleccionado && (
-            <div style={{ marginTop: "15px", padding: "10px", backgroundColor: "#f1f1f1", borderRadius: "6px" }}>
-              <strong>Cliente seleccionado:</strong><br />
-              🧑 {clienteSeleccionado.nombre || "N/A"}<br />
-              🆔 {clienteSeleccionado.identificacion || "N/A"}<br />
-              📞 {clienteSeleccionado.telefono || "N/A"}<br />
-              📍 {clienteSeleccionado.direccion || "N/A"}<br />
-              ✉️ {clienteSeleccionado.email || "N/A"}
+              <div className="cd-fechas-grid">
+                <div className="cd-campo">
+                  <label>Fecha de creación</label>
+                  <input
+                    type="date"
+                    value={fechaCreacion}
+                    onChange={(e) => setFechaCreacion(e.target.value)}
+                    title="Puedes cambiar la fecha de creación del documento si lo necesitas"
+                  />
+                </div>
+
+                {!multiDias ? (
+                  <div className="cd-campo">
+                    <label>Fecha del evento</label>
+                    <input
+                      ref={inputFechaUnDiaRef}
+                      type="date"
+                      value={fechaEvento}
+                      onChange={(e) => setFechaEvento(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div className="cd-campo">
+                    <label>Seleccionar día y añadir</label>
+                    <input
+                      type="date"
+                      onChange={(e) => agregarDia(e.target.value)}
+                    />
+
+                    {fechasEvento.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <small style={{ color: "#6b7280" }}>Días seleccionados ({numeroDias}):</small>
+                        <div className="cd-dias-lista">
+                          {fechasEvento.map((d) => (
+                            <span key={d} className="cd-dia-tag">
+                              {d}
+                              <button onClick={() => eliminarDia(d)} title="Quitar">✕</button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+          </div>
 
-          <hr style={{ margin: "30px 0" }} />
-<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-  <h3 style={{ margin: 0 }}>Productos o Grupos Agregados</h3>
-  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "13px", whiteSpace: "nowrap" }}>
-    <input
-      type="checkbox"
-      checked={mostrarNotas}
-      onChange={(e) => setMostrarNotas(e.target.checked)}
-    />
-    Añadir nota
-  </label>
-</div>
-          {/* Tabla productos */}
-  <table style={{ width: "100%", marginBottom: "20px", borderCollapse: "collapse" }}>
+          {/* ========== CLIENTE ========== */}
+          <div className="cd-card">
+            <div className="cd-card-header">👤 Cliente</div>
+            <div className="cd-card-body">
+              <div className="cd-buscar-cliente">
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, identificación o teléfono..."
+                  value={busquedaCliente}
+                  onChange={(e) => setBusquedaCliente(e.target.value)}
+                />
+                <button className="cd-btn cd-btn-cyan" onClick={() => setModalCrearCliente(true)}>
+                  ➕ Nuevo
+                </button>
+              </div>
+
+              {busquedaCliente && clientesFiltrados.length > 0 && (
+                <ul className="cd-sugerencias">
+                  {clientesFiltrados.map((cliente) => (
+                    <li key={cliente.id} onClick={() => seleccionarCliente(cliente)}>
+                      <strong>{cliente.nombre}</strong> — {cliente.identificacion} — 📞 {cliente.telefono}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {clienteSeleccionado && (
+                <div className="cd-cliente-card">
+                  <div className="cd-cliente-card-titulo">✅ Cliente seleccionado</div>
+                  <div className="cd-cliente-dato"><span className="icono">🧑</span> {clienteSeleccionado.nombre || "N/A"}</div>
+                  <div className="cd-cliente-dato"><span className="icono">🆔</span> {clienteSeleccionado.identificacion || "N/A"}</div>
+                  <div className="cd-cliente-dato"><span className="icono">📞</span> {clienteSeleccionado.telefono || "N/A"}</div>
+                  <div className="cd-cliente-dato"><span className="icono">📍</span> {clienteSeleccionado.direccion || "N/A"}</div>
+                  <div className="cd-cliente-dato" style={{ gridColumn: "1 / -1" }}><span className="icono">✉️</span> {clienteSeleccionado.email || "N/A"}</div>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* ========== PRODUCTOS ========== */}
+          <div className="cd-card">
+            <div className="cd-card-header cd-card-header-cyan" style={{ justifyContent: "space-between" }}>
+              <span>📦 Productos o Grupos Agregados</span>
+              <label className="cd-nota-check" style={{ color: "white" }}>
+                <input
+                  type="checkbox"
+                  checked={mostrarNotas}
+                  onChange={(e) => setMostrarNotas(e.target.checked)}
+                  style={{ accentColor: "#fff" }}
+                />
+                Notas
+              </label>
+            </div>
+            <div className="cd-card-body" style={{ padding: 0 }}>
+              <div className="cd-tabla-wrap">
+  <table className="cd-tabla">
   <thead>
     <tr>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Cant</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Stock</th>
-      <th style={{ borderBottom: "1px solid #ccc" }}>Descripción</th>
-      {mostrarNotas && <th style={{ borderBottom: "1px solid #ccc" }}>Notas</th>}
-      <th style={{ borderBottom: "1px solid #ccc" }}>V. Unit</th>
-      {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>× días</th>}
-      {multiDias && <th style={{ borderBottom: "1px solid #ccc" }}>V. x Días</th>}
-      <th style={{ borderBottom: "1px solid #ccc" }}>Subtotal</th>
-      <th></th>
+      <th>Cant</th>
+      <th>Stock</th>
+      <th>Descripción</th>
+      {mostrarNotas && <th>Notas</th>}
+      <th>V. Unit</th>
+      {multiDias && <th>× días</th>}
+      {multiDias && <th>V. x Días</th>}
+      <th>Subtotal</th>
+      <th>Acciones</th>
     </tr>
   </thead>
   <tbody>
@@ -1276,10 +1318,9 @@ mostrar_notas: mostrarNotas
         : null;
 
       const isTemporal = !!item.temporal || !!item.es_proveedor;
-      const rowStyle = isTemporal ? { background: "rgba(255, 235, 59, 0.15)" } : undefined;
 
       return (
-        <tr key={index} style={rowStyle}>
+        <tr key={index} className={isTemporal ? "fila-temporal" : ""}>
           <td>
             <input
               type="number"
@@ -1289,12 +1330,11 @@ mostrar_notas: mostrarNotas
               style={{ width: "60px" }}
             />
           </td>
-          <td style={{ textAlign: "center", color: sobrepasado ? "red" : "black" }}>
-            {stockDisp}
+          <td style={{ textAlign: "center" }}>
+            <span className={sobrepasado ? "stock-alerta" : "stock-ok"}>{stockDisp}</span>
           </td>
           <td>{item.nombre}</td>
 
-          {/* ✅ NUEVA COLUMNA DE NOTAS */}
           {mostrarNotas && (
             <td>
               <input
@@ -1305,7 +1345,7 @@ mostrar_notas: mostrarNotas
                   nuevos[index].notas = e.target.value;
                   setProductosAgregados(nuevos);
                 }}
-                placeholder="Nota opcional..."
+                placeholder="Nota..."
                 style={{ width: "100%", padding: "4px" }}
               />
             </td>
@@ -1349,44 +1389,32 @@ mostrar_notas: mostrarNotas
             </td>
           )}
 
-          <td>
+          <td className="td-subtotal">
             ${(item.subtotal ?? 0).toLocaleString("es-CO", {
               maximumFractionDigits: 0
             })}
           </td>
-             <td style={{ whiteSpace: "nowrap" }}>
-            {/* Botones para mover */}
+          <td className="td-acciones" style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+            {/* Botón Subir */}
+            <button onClick={() => moverItem(index, -1)} disabled={index === 0} title="Subir">⬆️</button>
+            
+            {/* Botón Bajar */}
+            <button onClick={() => moverItem(index, 1)} disabled={index === productosAgregados.length - 1} title="Bajar">⬇️</button>
+            
+            {/* CAMBIO CLAVE AQUÍ 👇 */}
+            {/* En lugar de borrar el botón, lo ocultamos con visibility: hidden si no es grupo */}
             <button 
-              onClick={() => moverItem(index, -1)} 
-              disabled={index === 0}
-              title="Subir"
+              onClick={() => item.es_grupo && editarGrupo(index)} 
+              title="Editar grupo"
               style={{ 
-                opacity: index === 0 ? 0.3 : 1,
-                cursor: index === 0 ? "not-allowed" : "pointer",
-                padding: "2px 6px",
-                marginRight: "2px"
+                visibility: item.es_grupo ? "visible" : "hidden", // Si no es grupo, es invisible pero ocupa espacio
+                cursor: item.es_grupo ? "pointer" : "default"
               }}
             >
-              ⬆️
+              ✏️
             </button>
-            <button 
-              onClick={() => moverItem(index, 1)} 
-              disabled={index === productosAgregados.length - 1}
-              title="Bajar"
-              style={{ 
-                opacity: index === productosAgregados.length - 1 ? 0.3 : 1,
-                cursor: index === productosAgregados.length - 1 ? "not-allowed" : "pointer",
-                padding: "2px 6px",
-                marginRight: "4px"
-              }}
-            >
-              ⬇️
-            </button>
-            {item.es_grupo && (
-              <button onClick={() => editarGrupo(index)} title="Editar grupo">
-                ✏️
-              </button>
-            )}
+
+            {/* Botón Eliminar */}
             <button onClick={() => eliminarProducto(index)} title="Eliminar">🗑️</button>
           </td>
         </tr>
@@ -1394,307 +1422,219 @@ mostrar_notas: mostrarNotas
     })}
   </tbody>
 </table>
+              </div>
+            </div>
+          </div>
 
-          {/* Botones para agregar - Estilo unificado */}
-          <div style={{ 
-            marginTop: "20px", 
-            display: "flex", 
-            gap: "10px", 
-            flexWrap: "wrap",
-            justifyContent: "center"
-          }}>
-            {/* Botón Inventario - Azul */}
-            <button 
-              onClick={() => setModalBuscarProducto(true)} 
-              style={{
-                padding: "10px 16px",
-                background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontWeight: "500",
-                fontSize: "14px",
-                transition: "all 0.2s",
-                boxShadow: "0 2px 4px rgba(59, 130, 246, 0.3)"
-              }}
-            >
+          {/* ========== BOTONES AGREGAR ========== */}
+          <div className="cd-botones-agregar">
+            <button className="cd-btn cd-btn-azul" onClick={() => setModalBuscarProducto(true)}>
               🔍 Agregar desde Inventario
             </button>
 
-            {/* Botón Grupos - Naranja */}
-            <button 
-              onClick={() => { setIndiceGrupoEnEdicion(null); setGrupoEnEdicion(null); setModalGrupo(true); }} 
-              style={{
-                padding: "10px 16px",
-                background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontWeight: "500",
-                fontSize: "14px",
-                transition: "all 0.2s",
-                boxShadow: "0 2px 4px rgba(245, 158, 11, 0.3)"
-              }}
-            >
+            <button className="cd-btn cd-btn-naranja" onClick={() => { setIndiceGrupoEnEdicion(null); setGrupoEnEdicion(null); setModalGrupo(true); }}>
               📦 Crear Grupo de Artículos
             </button>
 
-            {/* Botón Proveedor - Rojo */}
-            <button 
-              onClick={() => setModalProveedor(true)} 
-              style={{
-                padding: "10px 16px",
-                background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontWeight: "500",
-                fontSize: "14px",
-                transition: "all 0.2s",
-                boxShadow: "0 2px 4px rgba(239, 68, 68, 0.3)"
-              }}
-            >
+            <button className="cd-btn cd-btn-rojo" onClick={() => setModalProveedor(true)}>
               🏪 Agregar desde Proveedor
             </button>
 
-            {/* Botón Pagos a Proveedores - Morado (solo si hay productos de proveedor) */}
             {tieneProductosProveedor && (
-              <button
-                onClick={() => setModalPagosProveedor(true)}
-                style={{
-                  padding: "10px 16px",
-                  background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontWeight: "500",
-                  fontSize: "14px",
-                  transition: "all 0.2s",
-                  boxShadow: "0 2px 4px rgba(124, 58, 237, 0.3)"
-                }}
-              >
+              <button className="cd-btn cd-btn-morado" onClick={() => setModalPagosProveedor(true)}>
                 💰 Pagos a Proveedores
               </button>
             )}
           </div>
 
-          {/* Garantía y abonos */}
-          <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "20px" }}>
-            <div style={{ flex: "1" }}>
-              <label>Monto de garantía:</label>
-              <input
-                type="number"
-                min="0"
-                value={garantia}
-                onChange={(e) => {
-                  setGarantia(e.target.value);
-                }}
-                style={{ width: "100%" }}
-              />
+          {/* ========== GARANTÍA Y ABONOS ========== */}
+          <div className="cd-card" style={{ marginTop: "16px" }}>
+            <div className="cd-card-header cd-card-header-amber">🛡️ Garantía y Abonos</div>
+            <div className="cd-card-body">
+              <div className="cd-garantia-abonos">
+                {/* Garantía */}
+                <div>
+                  <div className="cd-campo">
+                    <label>Monto de garantía</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={garantia}
+                      onChange={(e) => setGarantia(e.target.value)}
+                      placeholder="$0"
+                    />
+                  </div>
 
-              <div style={{ marginTop: "10px" }}>
-    <label style={labelInline}>
-      ¿Cliente ya entregó la garantía?
-      <input
-        type="checkbox"
-        checked={garantiaRecibida}
-        onChange={(e) => {
-          const checked = e.target.checked;
-          setGarantiaRecibida(checked);
-          if (checked) {
-            const hoy = new Date().toLocaleDateString("es-CO", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric"
-            });
-            setFechaGarantia(hoy);
-          } else {
-            setFechaGarantia("");
-          }
-        }}
-        style={{ marginLeft: 6 }}
-      />
-    </label>
+                  <div className="cd-garantia-recibida">
+                    <input
+                      type="checkbox"
+                      checked={garantiaRecibida}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setGarantiaRecibida(checked);
+                        if (checked) {
+                          const hoy = new Date().toLocaleDateString("es-CO", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric"
+                          });
+                          setFechaGarantia(hoy);
+                        } else {
+                          setFechaGarantia("");
+                        }
+                      }}
+                    />
+                    ¿Ya entregada?
+                  </div>
 
-    {garantiaRecibida && fechaGarantia && (
-      <div style={{ marginTop: 6, fontStyle: "italic", color: "gray" }}>
-        Recibida el: {fechaGarantia}
-      </div>
-    )}
-  </div>
-            </div>
+                  {garantiaRecibida && fechaGarantia && (
+                    <div className="cd-garantia-fecha">
+                      ✅ Recibida el: {fechaGarantia}
+                    </div>
+                  )}
+                </div>
 
-            <div style={{ flex: "2" }}>
-              <label>Abonos ($):</label>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {abonos.map((abono, index) => (
-    <div
-      key={index}
-      style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
-    >
-      <label style={{ minWidth: 80 }}>Abono {index + 1}:</label>
-
-      {/* Valor del abono */}
-      <input
-    type="number"
-    min="0"
-    value={abono.valor}
-    onChange={(e) => {
-      const nuevos = [...abonos];
-      nuevos[index].valor = e.target.value; // guardamos el texto, permite ""
-      setAbonos(nuevos);
-    }}
-    style={{ width: 120 }}
-  />
-
-      {/* Fecha editable (opcional con input date → ISO) */}
-      <input
-        type="date"
-        value={toISO(abono.fecha)}               // el input necesita ISO
-        onChange={(e) => {
-          const nuevos = [...abonos];
-          // guardamos en ISO; si borran la fecha, queda ""
-          nuevos[index].fecha = e.target.value || "";
-          setAbonos(nuevos);
-        }}
-        style={{ width: 150 }}
-        title="Fecha del abono (opcional). Si no la cambias, queda la de hoy."
-      />
-
-      {/* Vista amigable dd/mm/aaaa */}
-      <small style={{ opacity: 0.8 }}>
-        {toDMY(abono.fecha) !== "-" ? `(${toDMY(abono.fecha)})` : ""}
-      </small>
-
-      {/* Eliminar abono */}
-      <button onClick={() => eliminarAbono(index)} title="Eliminar abono">🗑️</button>
-    </div>
-  ))}
-                <button onClick={agregarAbono}>➕ Agregar abono</button>
+                {/* Abonos */}
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: 500, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: "8px", display: "block" }}>Abonos ($)</label>
+                  {abonos.map((abono, index) => (
+                    <div key={index} className="cd-abono-fila">
+                      <span className="cd-abono-label">Abono {index + 1}:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={abono.valor}
+                        onChange={(e) => {
+                          const nuevos = [...abonos];
+                          nuevos[index].valor = e.target.value;
+                          setAbonos(nuevos);
+                        }}
+                        style={{ width: 120 }}
+                        placeholder="$0"
+                      />
+                      <input
+                        type="date"
+                        value={toISO(abono.fecha)}
+                        onChange={(e) => {
+                          const nuevos = [...abonos];
+                          nuevos[index].fecha = e.target.value || "";
+                          setAbonos(nuevos);
+                        }}
+                        style={{ width: 150 }}
+                        title="Fecha del abono (opcional)"
+                      />
+                      <span className="cd-abono-fecha-display">
+                        {toDMY(abono.fecha) !== "-" ? `(${toDMY(abono.fecha)})` : ""}
+                      </span>
+                      <button onClick={() => eliminarAbono(index)} title="Eliminar abono">🗑️</button>
+                    </div>
+                  ))}
+                  <button className="cd-btn-agregar-abono" onClick={agregarAbono}>➕ Agregar abono</button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Ajustes (Descuento/Retención) */}
-          <div style={{ marginTop: 20, padding: 12, background: "#f9fafb", borderRadius: 8 }}>
-            <h4 style={{ marginTop: 0 }}>Ajustes:</h4>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-    <label style={labelInline}>
-      Aplicar descuento
-      <input
-        type="checkbox"
-        checked={aplicarDescuento}
-        onChange={(e) => setAplicarDescuento(e.target.checked)}
-        style={{ marginLeft: 6 }}
-      />
-    </label>
+          {/* ========== AJUSTES ========== */}
+          <div className="cd-card">
+            <div className="cd-card-header">⚙️ Ajustes</div>
+            <div className="cd-card-body">
+              <div className="cd-ajustes-grid">
+                <label className="cd-ajuste-check">
+                  <input
+                    type="checkbox"
+                    checked={aplicarDescuento}
+                    onChange={(e) => setAplicarDescuento(e.target.checked)}
+                  />
+                  Aplicar descuento
+                </label>
+                {aplicarDescuento && (
+                  <input
+                    className="cd-ajuste-input"
+                    type="number"
+                    min="0"
+                    value={descuento}
+                    onChange={(e) => setDescuento(e.target.value)}
+                    placeholder="Valor del descuento"
+                  />
+                )}
 
-    {aplicarDescuento && (
-      <input
-        type="number"
-        min="0"
-        value={descuento}
-        onChange={(e) => setDescuento(e.target.value)}
-        placeholder="Valor del descuento"
-      />
-    )}
-
-    <label style={labelInline}>
-      Aplicar retención
-      <input
-        type="checkbox"
-        checked={aplicarRetencion}
-        onChange={(e) => setAplicarRetencion(e.target.checked)}
-        style={{ marginLeft: 6 }}
-      />
-    </label>
-
-    {aplicarRetencion && (
-      <input
-        type="number"
-        min="0"
-        value={retencion}
-        onChange={(e) => setRetencion(e.target.value)}
-        placeholder="Valor de la retención"
-      />
-    )}
-  </div>
+                <label className="cd-ajuste-check">
+                  <input
+                    type="checkbox"
+                    checked={aplicarRetencion}
+                    onChange={(e) => setAplicarRetencion(e.target.checked)}
+                  />
+                  Aplicar retención
+                </label>
+                {aplicarRetencion && (
+                  <input
+                    className="cd-ajuste-input"
+                    type="number"
+                    min="0"
+                    value={retencion}
+                    onChange={(e) => setRetencion(e.target.value)}
+                    placeholder="Valor de la retención"
+                  />
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Totales */}
-  <div style={{ marginTop: "20px", textAlign: "right" }}>
-    {(aplicarDescuento || aplicarRetencion) ? (
-      <>
-        <p><strong>Total (bruto):</strong> ${totalBruto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-        {aplicarDescuento && (
-          <p>Descuento: ${Number(descuento || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-        )}
-        {aplicarRetencion && (
-          <p>Retención: ${Number(retencion || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-        )}
-        <p><strong>Total (neto):</strong> ${totalNeto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-      </>
-    ) : (
-      <p><strong>Total:</strong> ${totalBruto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-    )}
-    <p><strong>Saldo final:</strong> ${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</p>
-  </div>
+          {/* ========== TOTALES ========== */}
+          <div className="cd-card">
+            <div className="cd-card-body">
+              <div className="cd-totales">
+                {(aplicarDescuento || aplicarRetencion) ? (
+                  <>
+                    <div className="cd-total-fila">
+                      <span>Total (bruto):</span>
+                      <span className="cd-total-valor">${totalBruto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</span>
+                    </div>
+                    {aplicarDescuento && (
+                      <div className="cd-total-fila" style={{ color: "#ef4444" }}>
+                        <span>Descuento:</span>
+                        <span className="cd-total-valor">-${Number(descuento || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</span>
+                      </div>
+                    )}
+                    {aplicarRetencion && (
+                      <div className="cd-total-fila" style={{ color: "#ef4444" }}>
+                        <span>Retención:</span>
+                        <span className="cd-total-valor">-${Number(retencion || 0).toLocaleString("es-CO", { maximumFractionDigits: 0 })}</span>
+                      </div>
+                    )}
+                    <div className="cd-total-fila principal">
+                      <span>Total (neto):</span>
+                      <span className="cd-total-valor">${totalNeto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="cd-total-fila principal">
+                    <span>Total:</span>
+                    <span className="cd-total-valor">${totalBruto.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</span>
+                  </div>
+                )}
+                <div className="cd-total-fila saldo">
+                  <span>Saldo final:</span>
+                  <span className="cd-total-valor">${saldo.toLocaleString("es-CO", { maximumFractionDigits: 0 })}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-          {/* Botones finales - Estilo moderno */}
-          <div style={{ marginTop: "30px", display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center" }}>
+          {/* ========== BOTONES FINALES ========== */}
+          <div className="cd-botones-finales">
             <button 
               onClick={guardarDocumento} 
               disabled={guardando}
-              style={{ 
-                padding: "12px 24px",
-                background: guardando ? "#9ca3af" : "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: guardando ? "not-allowed" : "pointer",
-                fontWeight: "500",
-                fontSize: "14px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                boxShadow: guardando ? "none" : "0 2px 4px rgba(59, 130, 246, 0.3)"
-              }}
+              className={`cd-btn ${guardando ? "cd-btn-disabled" : "cd-btn-azul"}`}
             >
               {guardando ? "⏳ Guardando..." : "💾 Guardar Documento"}
             </button>
 
             <button 
               onClick={() => generarPDF(obtenerDatosPDF(), tipoDocumento)} 
-              style={{ 
-                padding: "12px 24px",
-                background: "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontWeight: "500",
-                fontSize: "14px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                boxShadow: "0 2px 4px rgba(107, 114, 128, 0.3)"
-              }}
+              className="cd-btn cd-btn-gris"
             >
               📄 Descargar PDF
             </button>
@@ -1702,26 +1642,14 @@ mostrar_notas: mostrarNotas
             {tipoDocumento === "orden" && productosAgregados.length > 0 && (
               <button
                 onClick={() => generarRemisionPDF(obtenerDatosPDF())}
-                style={{ 
-                  padding: "12px 24px",
-                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  fontWeight: "500",
-                  fontSize: "14px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  boxShadow: "0 2px 4px rgba(16, 185, 129, 0.3)"
-                }}
+                className="cd-btn cd-btn-verde"
               >
                 📦 Generar Remisión
               </button>
             )}
 
             <button
+              className="cd-btn cd-btn-rojo"
               onClick={() => {
                 setClienteSeleccionado(null);
                 setProductosAgregados([]);
@@ -1735,20 +1663,6 @@ mostrar_notas: mostrarNotas
                 setAplicarDescuento(false); setDescuento("");
                 setAplicarRetencion(false); setRetencion("");
                 setGarantiaRecibida(false); setFechaGarantia("");
-              }}
-              style={{ 
-                padding: "12px 24px",
-                background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontWeight: "500",
-                fontSize: "14px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                boxShadow: "0 2px 4px rgba(239, 68, 68, 0.3)"
               }}
             >
               🧹 Limpiar módulo

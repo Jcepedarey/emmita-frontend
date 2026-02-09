@@ -50,8 +50,8 @@ const procesarImagen = (src, width = 150, calidad = 1.0) =>
   });
 
 // ──────────────── Principal ────────────────
-// 🆕 Agregado parámetro pagosProveedoresRecepcion
-export async function generarPDFRecepcion(revision, clienteInput, productosRecibidos, ingresosAdicionales = [], pagosProveedoresRecepcion = []) {
+// 🆕 Agregado parámetro pagosProveedoresRecepcion y garantiaInfo
+export async function generarPDFRecepcion(revision, clienteInput, productosRecibidos, ingresosAdicionales = [], pagosProveedoresRecepcion = [], garantiaInfo = {}) {
   const doc = new jsPDF();
 
   // Recursos gráficos (MISMO tratamiento que Remisión)
@@ -146,6 +146,62 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
   // ─── RESUMEN FINANCIERO ───
   let y = (doc.lastAutoTable?.finalY || 100) + 10;
 
+  // ─── SECCIÓN DE GARANTÍA ───
+  const garantiaTotal = Number(garantiaInfo.garantiaTotal || revision?.garantia || 0);
+  const garantiaRetenidaVal = Number(garantiaInfo.garantiaRetenida || 0);
+  const garantiaDevuelta = Math.max(0, garantiaTotal - garantiaRetenidaVal);
+
+  if (garantiaTotal > 0) {
+    // Verificar si hay espacio en la página
+    if (y + 45 > doc.internal.pageSize.getHeight() - 20) {
+      doc.addPage();
+      insertarFondo();
+      y = 20;
+    }
+
+    autoTable(doc, {
+      startY: y,
+      theme: "plain",
+      head: [["Concepto", "Valor ($)"]],
+      body: [
+        ["Garantía entregada por el cliente", money(garantiaTotal)],
+        ["Monto retenido (daños/demora)", garantiaRetenidaVal > 0 ? money(garantiaRetenidaVal) : "$0"],
+        ["Devuelto al cliente", money(garantiaDevuelta)],
+      ],
+      styles: { font: "helvetica", fontSize: 10 },
+      headStyles: {
+        fillColor: [245, 158, 11],
+        textColor: 255,
+        halign: "center",
+        valign: "middle",
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 130 },
+        1: { cellWidth: 60, halign: "center" },
+      },
+      didParseCell: (data) => {
+        const { section, row, column, cell } = data;
+        if (section === "body") {
+          cell.styles.fillColor = [255, 251, 235]; // amber-50
+          // Highlight retained row in red
+          if (row.index === 1 && garantiaRetenidaVal > 0) {
+            cell.styles.textColor = [220, 38, 38];
+            cell.styles.fontStyle = "bold";
+          }
+          // Highlight returned row in green
+          if (row.index === 2) {
+            cell.styles.textColor = [22, 163, 74];
+            cell.styles.fontStyle = "bold";
+          }
+        }
+      },
+      margin: { left: 10, right: 10 },
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+  }
+
   // ===== INGRESOS =====
   const abonos = Array.isArray(revision?.abonos) ? revision.abonos : [];
   let totalIngresos = 0;
@@ -169,6 +225,16 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
       totalIngresos += valor;
     }
   });
+
+  // 🛡️ Garantía retenida como ingreso
+  if (garantiaRetenidaVal > 0) {
+    ingresosRows.push([
+      "Garantía retenida (daños/demora)",
+      soloFecha(new Date()),
+      money(garantiaRetenidaVal),
+    ]);
+    totalIngresos += garantiaRetenidaVal;
+  }
 
   // ✅ TABLA DE INGRESOS
   zebraIndex = 0;

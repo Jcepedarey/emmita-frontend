@@ -17,8 +17,14 @@ const Recepcion = () => {
   const [gastosExtras, setGastosExtras] = useState([{ motivo: "", valor: "" }]);
   const [ingresosAdicionales, setIngresosAdicionales] = useState([]);
 
+  // 🛡️ Garantía
+  const [garantiaRetenida, setGarantiaRetenida] = useState("");  // monto retenido por daños/demora
+
   // Pagos a proveedores
 const [pagosProveedoresRecepcion, setPagosProveedoresRecepcion] = useState([]);
+
+  // 🔒 Protección contra doble clic
+  const [guardando, setGuardando] = useState(false);
 
   const queryParams = new URLSearchParams(location.search);
   const ordenId = queryParams.get("id");
@@ -242,6 +248,13 @@ useEffect(() => {
     return;
   }
 
+  // 🔒 Protección contra doble clic
+  if (guardando) {
+    console.log("⚠️ Ya se está guardando, ignorando clic adicional");
+    return;
+  }
+  setGuardando(true);
+
   try {
     // ✅ Cerrar y marcar como revisada EN UNA SOLA OPERACIÓN
     await supabase
@@ -325,6 +338,39 @@ useEffect(() => {
         }
       }
 
+      // 🛡️ Registrar garantía retenida como INGRESO
+      const valorGarantiaRetenida = Number(garantiaRetenida || 0);
+      const garantiaTotal = Number(ordenSeleccionada.garantia || 0);
+      const garantiaDevuelta = Math.max(0, garantiaTotal - valorGarantiaRetenida);
+
+      if (valorGarantiaRetenida > 0) {
+        await insertMC(
+          {
+            orden_id: ordenSeleccionada.id,
+            cliente_id: ordenSeleccionada.cliente_id,
+            fecha: new Date().toISOString().split("T")[0],
+            tipo: "ingreso",
+            monto: valorGarantiaRetenida,
+            descripcion: `[${numeroLimpio}] Garantía retenida por daños/demora`,
+            categoria: "Garantía retenida",
+            estado: "activo",
+            usuario: usuario?.nombre || "Administrador",
+            fecha_modificacion: null,
+          },
+          "garantía retenida"
+        );
+      }
+
+      // 💾 Guardar info de garantía en la orden
+      if (garantiaTotal > 0) {
+        await supabase
+          .from("ordenes_pedido")
+          .update({
+            garantia_devuelta: garantiaDevuelta,
+          })
+          .eq("id", ordenSeleccionada.id);
+      }
+
       // 🆕 Registrar pagos a proveedores realizados en recepción
 for (const pago of pagosProveedoresRecepcion) {
   const valorAbono = Number(pago.abono_recepcion || 0);
@@ -379,6 +425,9 @@ for (const pago of pagosProveedoresRecepcion) {
     } catch (error) {
       console.error("❌ Error general:", error);
       Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
+    } finally {
+      // 🔓 Siempre liberar el bloqueo al terminar
+      setGuardando(false);
     }
   };
 
@@ -606,6 +655,71 @@ for (const pago of pagosProveedoresRecepcion) {
 </div>
             </div>
 
+            {/* 🛡️ GARANTÍA */}
+            {Number(ordenSeleccionada.garantia || 0) > 0 && (
+              <div className="mt-6 bg-amber-50 border border-amber-200 p-4 rounded-lg shadow">
+                <h3 className="text-lg font-semibold mb-3 text-amber-800">
+                  🛡️ Garantía del Cliente
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                  {/* Monto total de garantía */}
+                  <div className="bg-white p-3 rounded-lg border border-amber-100">
+                    <p className="text-xs text-gray-500 mb-1">Garantía entregada</p>
+                    <p className="text-lg font-bold text-amber-700">
+                      ${Number(ordenSeleccionada.garantia).toLocaleString("es-CO")}
+                    </p>
+                    {ordenSeleccionada.garantia_recibida && (
+                      <span className="text-xs text-green-600">✓ Recibida{ordenSeleccionada.fecha_garantia ? ` el ${ordenSeleccionada.fecha_garantia}` : ""}</span>
+                    )}
+                  </div>
+
+                  {/* Retener por daños */}
+                  <div className="bg-white p-3 rounded-lg border border-red-100">
+                    <p className="text-xs text-gray-500 mb-1">Retener por daños/demora</p>
+                    <input
+                      type="number"
+                      min="0"
+                      max={Number(ordenSeleccionada.garantia || 0)}
+                      placeholder="$0"
+                      value={garantiaRetenida}
+                      onChange={(e) => {
+                        const val = Number(e.target.value || 0);
+                        const max = Number(ordenSeleccionada.garantia || 0);
+                        setGarantiaRetenida(val > max ? String(max) : e.target.value);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm font-semibold"
+                    />
+                    {Number(garantiaRetenida || 0) > 0 && (
+                      <span className="text-xs text-red-600 mt-1 block">
+                        💰 Se registrará como ingreso
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Devolución calculada */}
+                  <div className="bg-white p-3 rounded-lg border border-green-100">
+                    <p className="text-xs text-gray-500 mb-1">Devolver al cliente</p>
+                    <p className={`text-lg font-bold ${
+                      (Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)) > 0
+                        ? "text-green-700"
+                        : "text-gray-400"
+                    }`}>
+                      ${Math.max(0, Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)).toLocaleString("es-CO")}
+                    </p>
+                  </div>
+                </div>
+
+                {Number(garantiaRetenida || 0) > 0 && (
+                  <div className="bg-red-50 border border-red-200 p-2 rounded text-sm text-red-700">
+                    ⚠️ Se retendrán <strong>${Number(garantiaRetenida).toLocaleString("es-CO")}</strong> de la garantía.
+                    Se devolverán <strong>${Math.max(0, Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)).toLocaleString("es-CO")}</strong> al cliente.
+                    El monto retenido se registrará como <strong>ingreso</strong> en contabilidad.
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 💵 INGRESOS ADICIONALES */}
             <div className="mt-6 bg-gray-50 p-4 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-2">
@@ -803,10 +917,11 @@ for (const pago of pagosProveedoresRecepcion) {
             <div className="flex flex-col md:flex-row gap-4 mt-6">
               <button
                 onClick={guardarRevision}
-                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105"
+                disabled={guardando}
+                className={`flex items-center justify-center gap-2 ${guardando ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white py-3 px-6 rounded-xl shadow-lg transition-transform ${!guardando ? 'transform hover:scale-105' : ''}`}
               >
-                <span className="text-xl">💾</span>
-                <span className="font-semibold text-lg">Guardar Revisión</span>
+                <span className="text-xl">{guardando ? '⏳' : '💾'}</span>
+                <span className="font-semibold text-lg">{guardando ? 'Guardando...' : 'Guardar Revisión'}</span>
               </button>
 
               <button
@@ -823,7 +938,11 @@ for (const pago of pagosProveedoresRecepcion) {
                     ordenSeleccionada.clientes,
                     productosParaPDF,
                     ingresosAdicionales,
-                    pagosProveedoresRecepcion  // 🆕 Agregar pagos a proveedores
+                    pagosProveedoresRecepcion,  // 🆕 Agregar pagos a proveedores
+                    {                            // 🛡️ Info de garantía
+                      garantiaTotal: Number(ordenSeleccionada.garantia || 0),
+                      garantiaRetenida: Number(garantiaRetenida || 0),
+                    }
                   );
                 }}
                 className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105"
