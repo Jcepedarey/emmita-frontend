@@ -4,6 +4,7 @@ import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
 import { useNavigate } from "react-router-dom";
 import Protegido from "../components/Protegido";
+import "../estilos/CrearDocumentoEstilo.css";
 import Swal from "sweetalert2";
 import { useNavigationState } from "../context/NavigationContext";
 
@@ -274,119 +275,124 @@ export default function BuscarDocumento() {
 
   return (
     <Protegido>
-      <div style={{ padding: "1rem", maxWidth: "750px", margin: "auto" }}>
-        <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Buscar Documento</h2>
+      <div className="cd-page">
+        {/* ========== HEADER ========== */}
+        <div className="cd-header">
+          <h1 className="cd-header-titulo" style={{ fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
+            <span className="cd-header-barra"></span>
+            📂 Buscar Documento
+          </h1>
+        </div>
 
-        <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ width: "100%", marginBottom: "10px" }}>
-          <option value="cotizaciones">Cotización</option>
-          <option value="ordenes_pedido">Orden de Pedido</option>
-        </select>
-
-        <input
-          type="text"
-          placeholder="Buscar cliente por nombre"
-          value={clienteBusqueda}
-          onChange={manejarCambioCliente}
-          style={{ width: "100%", marginBottom: "4px", padding: "8px" }}
-        />
-
-        {sugerenciasClientes.length > 0 && (
-          <ul
-            style={{
-              listStyle: "none",
-              padding: 4,
-              border: "1px solid #ccc",
-              borderRadius: 4,
-              maxHeight: 120,
-              overflowY: "auto",
-              marginBottom: 10,
-            }}
-          >
-            {sugerenciasClientes.map((c) => (
-              <li
-                key={c.id}
-                onClick={() => {
-                  setClienteBusqueda(c.nombre);
-                  setClienteSeleccionado(c);
-                  setSugerenciasClientes([]);
-                }}
-                style={{ padding: 4, cursor: "pointer" }}
+        {/* ========== FILTROS ========== */}
+        <div className="cd-card">
+          <div className="cd-card-header cd-card-header-cyan">🔍 Filtros de búsqueda</div>
+          <div className="cd-card-body">
+            {/* Tipo documento */}
+            <div className="cd-tipo-selector" style={{ marginBottom: "12px" }}>
+              <div
+                className={`cd-tipo-opcion ${tipo === "cotizaciones" ? "activo" : ""}`}
+                onClick={() => setTipo("cotizaciones")}
               >
-                {c.nombre}
-                {c.identificacion ? ` - ${c.identificacion}` : ""}
-              </li>
-            ))}
-          </ul>
-        )}
+                <span className="cd-tipo-icono">📋</span>
+                Cotización
+              </div>
+              <div
+                className={`cd-tipo-opcion ${tipo === "ordenes_pedido" ? "activo" : ""}`}
+                onClick={() => setTipo("ordenes_pedido")}
+              >
+                <span className="cd-tipo-icono">📦</span>
+                Orden de Pedido
+              </div>
+            </div>
 
-        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: "12px" }}>📅 Filtrar por fecha de creación (inicio):</label>
-            <input
-              type="date"
-              value={fechaInicioCreacion}
-              onChange={(e) => setFechaInicioCreacion(e.target.value)}
-              style={{ width: "100%", padding: "8px" }}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: "12px" }}>📅 Fecha creación (fin):</label>
-            <input
-              type="date"
-              value={fechaFinCreacion}
-              onChange={(e) => setFechaFinCreacion(e.target.value)}
-              style={{ width: "100%", padding: "8px" }}
-            />
-          </div>
-        </div>
-
-        {tipo === "ordenes_pedido" && (
-          <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: "12px" }}>📅 Fecha evento (inicio):</label>
+            {/* Cliente */}
+            <div className="cd-campo" style={{ marginBottom: "12px" }}>
+              <label>Buscar cliente por nombre</label>
               <input
-                type="date"
-                value={fechaInicioEvento}
-                onChange={(e) => setFechaInicioEvento(e.target.value)}
-                style={{ width: "100%", padding: "8px" }}
+                type="text"
+                placeholder="Nombre del cliente..."
+                value={clienteBusqueda}
+                onChange={manejarCambioCliente}
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: "12px" }}>📅 Fecha evento (fin):</label>
-              <input
-                type="date"
-                value={fechaFinEvento}
-                onChange={(e) => setFechaFinEvento(e.target.value)}
-                style={{ width: "100%", padding: "8px" }}
-              />
+            {sugerenciasClientes.length > 0 && (
+              <ul className="cd-sugerencias" style={{ marginBottom: "12px" }}>
+                {sugerenciasClientes.map((c) => (
+                  <li
+                    key={c.id}
+                    onClick={() => {
+                      setClienteBusqueda(c.nombre);
+                      setClienteSeleccionado(c);
+                      setSugerenciasClientes([]);
+                    }}
+                  >
+                    <strong>{c.nombre}</strong>
+                    {c.identificacion ? ` — ${c.identificacion}` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Fechas creación */}
+            <div className="cd-fechas-grid" style={{ marginBottom: "12px" }}>
+              <div className="cd-campo">
+                <label>📅 Fecha creación (inicio)</label>
+                <input type="date" value={fechaInicioCreacion} onChange={(e) => setFechaInicioCreacion(e.target.value)} />
+              </div>
+              <div className="cd-campo">
+                <label>📅 Fecha creación (fin)</label>
+                <input type="date" value={fechaFinCreacion} onChange={(e) => setFechaFinCreacion(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Fechas evento (solo órdenes) */}
+            {tipo === "ordenes_pedido" && (
+              <div className="cd-fechas-grid" style={{ marginBottom: "12px" }}>
+                <div className="cd-campo">
+                  <label>📅 Fecha evento (inicio)</label>
+                  <input type="date" value={fechaInicioEvento} onChange={(e) => setFechaInicioEvento(e.target.value)} />
+                </div>
+                <div className="cd-campo">
+                  <label>📅 Fecha evento (fin)</label>
+                  <input type="date" value={fechaFinEvento} onChange={(e) => setFechaFinEvento(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {/* Ordenar */}
+            <div className="cd-campo" style={{ marginBottom: "16px" }}>
+              <label>Ordenar por</label>
+              <select value={ordenarPor} onChange={(e) => setOrdenarPor(e.target.value)}>
+                <option value="fecha_evento">📅 Fecha del evento</option>
+                <option value="fecha_creacion">🗓️ Fecha de creación</option>
+              </select>
+            </div>
+
+            {/* Botones */}
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button className="cd-btn cd-btn-cyan" style={{ flex: 1 }} onClick={cargarDocumentos}>
+                🔍 Buscar
+              </button>
+              <button className="cd-btn cd-btn-gris" style={{ flex: 1 }} onClick={limpiarFiltros}>
+                🧹 Limpiar
+              </button>
+              <button
+                className="cd-btn cd-btn-outline"
+                style={{ flex: 1 }}
+                onClick={() => setMostrarResultados(!mostrarResultados)}
+              >
+                {mostrarResultados ? "👁️ Ocultar" : "👁️ Mostrar"}
+              </button>
             </div>
           </div>
-        )}
-
-        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-          <button onClick={cargarDocumentos} style={{ flex: 1 }}>🔍 Buscar</button>
-          <button onClick={limpiarFiltros} style={{ flex: 1 }}>🧹 Limpiar</button>
-          <button onClick={() => setMostrarResultados(!mostrarResultados)} style={{ flex: 1 }}>
-            {mostrarResultados ? "Ocultar Resultados" : "Mostrar Resultados"}
-          </button>
         </div>
 
-        <div style={{ marginBottom: "15px" }}>
-          <label>Ordenar por:</label>
-          <select
-            value={ordenarPor}
-            onChange={(e) => setOrdenarPor(e.target.value)}
-            style={{ width: "100%", padding: "8px" }}
-          >
-            <option value="fecha_evento">Fecha del evento</option>
-            <option value="fecha_creacion">Fecha de creación</option>
-          </select>
-        </div>
-
+        {/* ========== RESULTADOS ========== */}
         {mostrarResultados && documentos.length > 0 && (
-          <>
-            <h3>Resultados</h3>
-            <ul style={{ listStyle: "none", padding: 0 }}>
+          <div className="cd-card">
+            <div className="cd-card-header">📋 Resultados ({documentos.length})</div>
+            <div className="cd-card-body" style={{ padding: 0 }}>
               {documentos.map((doc) => {
                 const cliente = clientes.find(c => c.id === doc.cliente_id);
                 const docConCliente = {
@@ -402,37 +408,40 @@ export default function BuscarDocumento() {
                 const fechaEvento = doc.fecha_evento?.split("T")[0] || "-";
 
                 return (
-                  <li key={doc.id} style={{
-                    marginBottom: "1rem",
-                    border: "1px solid #ccc",
-                    borderRadius: "10px",
-                    padding: "10px",
-                    background: "#fdfdfd"
-                  }}>
-                    <strong>Cliente:</strong> {docConCliente.nombre_cliente}<br />
-                    <strong>Total:</strong> ${Number(doc.total).toLocaleString("es-CO")}<br />
-                    <strong>Fecha creación:</strong> {fechaCreacion}<br />
-                    {doc.fecha_evento && <><strong>Fecha evento:</strong> {fechaEvento}<br /></>}
-
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px" }}>
-                      <button onClick={() => cargarEnCrear(doc)}>Editar</button>
-                      <button onClick={() => eliminarDocumento(doc.id)}>Eliminar</button>
-                      <button onClick={() =>
-                        generarPDF(docConCliente, tipo === "cotizaciones" ? "cotizacion" : "orden")
-                      }>
-                        📄 PDF
-                      </button>
+                  <div
+                    key={doc.id}
+                    style={{
+                      padding: "14px 16px",
+                      borderBottom: "1px solid #f3f4f6",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "10px"
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "14px", color: "#111827" }}>
+                        {docConCliente.nombre_cliente || "Sin cliente"} — ${Number(doc.total).toLocaleString("es-CO")}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>
+                        Creación: {fechaCreacion}
+                        {doc.fecha_evento && ` · Evento: ${fechaEvento}`}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <button className="cd-btn cd-btn-azul" style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }} onClick={() => cargarEnCrear(doc)}>✏️ Editar</button>
+                      <button className="cd-btn cd-btn-rojo" style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }} onClick={() => eliminarDocumento(doc.id)}>🗑️</button>
+                      <button className="cd-btn cd-btn-gris" style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }} onClick={() => generarPDF(docConCliente, tipo === "cotizaciones" ? "cotizacion" : "orden")}>📄 PDF</button>
                       {tipo === "ordenes_pedido" && (
-                        <button onClick={() => generarRemision(docConCliente)}>
-                          🚚 Remisión
-                        </button>
+                        <button className="cd-btn cd-btn-verde" style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }} onClick={() => generarRemision(docConCliente)}>🚚 Remisión</button>
                       )}
                     </div>
-                  </li>
+                  </div>
                 );
               })}
-            </ul>
-          </>
+            </div>
+          </div>
         )}
       </div>
     </Protegido>

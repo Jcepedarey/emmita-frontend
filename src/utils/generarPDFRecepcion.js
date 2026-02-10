@@ -181,7 +181,7 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
         1: { cellWidth: 60, halign: "center" },
       },
       didParseCell: (data) => {
-        const { section, row, column, cell } = data;
+        const { section, row, cell } = data;
         if (section === "body") {
           cell.styles.fillColor = [255, 251, 235]; // amber-50
           // Highlight retained row in red

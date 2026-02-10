@@ -1395,26 +1395,18 @@ mostrar_notas: mostrarNotas
             })}
           </td>
           <td className="td-acciones" style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-            {/* Botón Subir */}
             <button onClick={() => moverItem(index, -1)} disabled={index === 0} title="Subir">⬆️</button>
-            
-            {/* Botón Bajar */}
             <button onClick={() => moverItem(index, 1)} disabled={index === productosAgregados.length - 1} title="Bajar">⬇️</button>
-            
-            {/* CAMBIO CLAVE AQUÍ 👇 */}
-            {/* En lugar de borrar el botón, lo ocultamos con visibility: hidden si no es grupo */}
             <button 
               onClick={() => item.es_grupo && editarGrupo(index)} 
               title="Editar grupo"
               style={{ 
-                visibility: item.es_grupo ? "visible" : "hidden", // Si no es grupo, es invisible pero ocupa espacio
+                visibility: item.es_grupo ? "visible" : "hidden",
                 cursor: item.es_grupo ? "pointer" : "default"
               }}
             >
               ✏️
             </button>
-
-            {/* Botón Eliminar */}
             <button onClick={() => eliminarProducto(index)} title="Eliminar">🗑️</button>
           </td>
         </tr>
@@ -1440,7 +1432,6 @@ mostrar_notas: mostrarNotas
               🏪 Agregar desde Proveedor
             </button>
 
-            {/* 👇 SOLUCIÓN: Quitamos la condición para que siempre se vea */}
             <button className="cd-btn cd-btn-morado" onClick={() => setModalPagosProveedor(true)}>
               💰 Pagos a Proveedores
             </button>

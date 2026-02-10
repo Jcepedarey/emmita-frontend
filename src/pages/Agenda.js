@@ -8,6 +8,7 @@ import Swal from "sweetalert2";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
 import Protegido from "../components/Protegido";
+import "../estilos/CrearDocumentoEstilo.css";
 import { useNavigationState } from "../context/NavigationContext";
 
 // ✅ NUEVO: Componente IconoPago - Muestra $ verde (pagado) o rojo (pendiente)
@@ -227,154 +228,167 @@ const handleFechaChange = (fecha) => {
 
   return (
     <Protegido>
-      <div style={{ padding: "1rem", maxWidth: "1000px", margin: "auto" }}>
-        <h2 style={{ textAlign: "center", marginBottom: "20px" }}>📅 Calendario y Agenda</h2>
+      <div className="cd-page" style={{ maxWidth: "1000px" }}>
+        {/* ========== HEADER ========== */}
+        <div className="cd-header">
+          <h1 className="cd-header-titulo" style={{ fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
+            <span className="cd-header-barra"></span>
+            📅 Calendario y Agenda
+          </h1>
+        </div>
 
-        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-          {/* Calendario */}
-          <div style={{ flex: "1" }}>
-            <Calendar
-  onChange={handleFechaChange}  // ← Usa la función nueva que guarda
-  value={fechaSeleccionada}
-  className="react-calendar"
-/>
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-start" }}>
+          {/* ========== CALENDARIO ========== */}
+          <div style={{ flex: "1", minWidth: "280px" }}>
+            <div className="cd-card">
+              <div className="cd-card-body" style={{ padding: "12px" }}>
+                <Calendar
+                  onChange={handleFechaChange}
+                  value={fechaSeleccionada}
+                  className="react-calendar"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Notas */}
-          <div style={{ flex: "2" }}>
-            <textarea
-              value={nuevaNota}
-              onChange={(e) => setNuevaNota(e.target.value)}
-              placeholder="Escribe una nota o recordatorio..."
-              rows={3}
-              style={{ width: "100%", marginBottom: "10px", padding: "8px" }}
-            />
-            <button
-              onClick={guardarNota}
-              style={{ width: "100%", backgroundColor: "#388e3c", color: "white", padding: "10px", borderRadius: "6px" }}
-            >
-              Guardar Nota
-            </button>
+          {/* ========== NOTAS ========== */}
+          <div style={{ flex: "2", minWidth: "300px" }}>
+            <div className="cd-card">
+              <div className="cd-card-header">📝 Notas</div>
+              <div className="cd-card-body">
+                <textarea
+                  value={nuevaNota}
+                  onChange={(e) => setNuevaNota(e.target.value)}
+                  placeholder="Escribe una nota o recordatorio..."
+                  rows={3}
+                  style={{ width: "100%", marginBottom: "10px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "14px", resize: "vertical" }}
+                />
+                <button className="cd-btn cd-btn-verde" style={{ width: "100%" }} onClick={guardarNota}>
+                  💾 Guardar Nota
+                </button>
 
-            <div style={{ backgroundColor: "#f1f1f1", padding: "10px", marginTop: "20px", borderRadius: "6px" }}>
-              <h4>📝 Notas</h4>
-              {notas.length === 0 && <p>No hay notas para este día.</p>}
-              {notas.map((nota) => (
-                <div key={nota.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", padding: "8px", marginTop: "5px", borderRadius: "4px" }}>
-                  <span>{nota.descripcion}</span>
-                  <div>
-                    <button onClick={() => borrarNota(nota.id)} style={{ marginLeft: "10px", color: "red", border: "none", background: "none", cursor: "pointer" }}>
-                      ❌
-                    </button>
-                  </div>
+                <div style={{ marginTop: "16px" }}>
+                  {notas.length === 0 && (
+                    <div style={{ textAlign: "center", color: "#9ca3af", padding: "16px", fontSize: "13px" }}>
+                      No hay notas para este día.
+                    </div>
+                  )}
+                  {notas.map((nota) => (
+                    <div
+                      key={nota.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        background: "#f8fafc",
+                        padding: "10px 12px",
+                        marginBottom: "6px",
+                        borderRadius: "8px",
+                        border: "1px solid #f3f4f6",
+                        fontSize: "13px"
+                      }}
+                    >
+                      <span>{nota.descripcion}</span>
+                      <button
+                        onClick={() => borrarNota(nota.id)}
+                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", padding: "4px", borderRadius: "4px", minHeight: "auto", color: "#ef4444" }}
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Pedidos y Cotizaciones */}
-        <div style={{ display: "flex", marginTop: "30px", gap: "20px", flexWrap: "wrap" }}>
+        {/* ========== PEDIDOS Y COTIZACIONES ========== */}
+        <div style={{ display: "flex", marginTop: "16px", gap: "16px", flexWrap: "wrap" }}>
           {/* Pedidos */}
-          <div style={{ flex: "1", backgroundColor: "#e3f2fd", padding: "10px", borderRadius: "8px", minHeight: "200px", overflowY: "auto" }}>
-            <h4>📦 Órdenes de Pedido</h4>
-            {ordenes.length === 0 && <p>No hay pedidos para este día.</p>}
-            {ordenes.map((orden) => (
-              <div
-                key={orden.id}
-                style={{
-                  backgroundColor: "#fff",
-                  padding: "10px",
-                  margin: "5px 0",
-                  borderRadius: "8px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                }}
-              >
-                <div>
-                  <p style={{ fontWeight: "bold", color: "#1976d2", margin: 0 }}>
-                    {orden.numero || "OP-???"}
-                  </p>
-                  <p style={{ margin: 0 }}>{orden.clientes?.nombre || "Cliente"}</p>
-                  <p style={{ margin: 0, fontSize: "12px", color: "gray" }}>
-                    {new Date(orden.fecha_evento).toLocaleDateString()}
-                  </p>
-                </div>
-                <div style={{ display: "flex", gap: "8px", fontSize: "18px", alignItems: "center" }}>
-                  <IconoPago orden={orden} />
-                  <button
-                    onClick={() => editarOrden(orden)}
-                    title="Editar"
-                    style={{ border: "none", background: "none", cursor: "pointer" }}
+          <div style={{ flex: "1", minWidth: "300px" }}>
+            <div className="cd-card">
+              <div className="cd-card-header cd-card-header-cyan">📦 Órdenes de Pedido</div>
+              <div className="cd-card-body" style={{ padding: ordenes.length === 0 ? "16px" : 0, minHeight: "120px" }}>
+                {ordenes.length === 0 && (
+                  <div style={{ textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>
+                    No hay pedidos para este día.
+                  </div>
+                )}
+                {ordenes.map((orden) => (
+                  <div
+                    key={orden.id}
+                    style={{
+                      padding: "12px 16px",
+                      borderBottom: "1px solid #f3f4f6",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
                   >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => manejarPDF(orden)}
-                    title="PDF"
-                    style={{ border: "none", background: "none", cursor: "pointer" }}
-                  >
-                    📄
-                  </button>
-                  <button
-                    onClick={() => manejarRemision(orden)}
-                    title="Remisión"
-                    style={{ border: "none", background: "none", cursor: "pointer" }}
-                  >
-                    🚚
-                  </button>
-                </div>
+                    <div>
+                      <div style={{ fontWeight: 600, color: "#0077B6", fontSize: "14px" }}>
+                        {orden.numero || "OP-???"}
+                      </div>
+                      <div style={{ fontSize: "13px", color: "#111827" }}>
+                        {orden.clientes?.nombre || "Cliente"}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+                        {new Date(orden.fecha_evento).toLocaleDateString("es-CO")}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <IconoPago orden={orden} />
+                      <button onClick={() => editarOrden(orden)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", padding: "4px", minHeight: "auto" }}>✏️</button>
+                      <button onClick={() => manejarPDF(orden)} title="PDF" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", padding: "4px", minHeight: "auto" }}>📄</button>
+                      <button onClick={() => manejarRemision(orden)} title="Remisión" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", padding: "4px", minHeight: "auto" }}>🚚</button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
 
           {/* Cotizaciones */}
-          <div style={{ flex: "1", backgroundColor: "#ffebee", padding: "10px", borderRadius: "8px", minHeight: "200px", overflowY: "auto" }}>
-            <h4>📄 Cotizaciones</h4>
-            {cotizaciones.length === 0 && <p>No hay cotizaciones para este día.</p>}
-            {cotizaciones.map((cot) => (
-              <div
-                key={cot.id}
-                style={{
-                  backgroundColor: "#fff",
-                  padding: "10px",
-                  margin: "5px 0",
-                  borderRadius: "8px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                }}
-              >
-                <div>
-                  <p style={{ fontWeight: "bold", color: "#c62828", margin: 0 }}>
-                    {cot.numero || "COT-???"}
-                  </p>
-                  <p style={{ margin: 0 }}>{cot.clientes?.nombre || "Cliente"}</p>
-                  <p style={{ margin: 0, fontSize: "12px", color: "gray" }}>
-                    {cot.fecha_evento ? new Date(cot.fecha_evento).toLocaleDateString() : "Sin fecha"}
-                  </p>
-                </div>
-                <div style={{ display: "flex", gap: "8px", fontSize: "18px" }}>
-                  <button
-                    onClick={() => editarCotizacion(cot)}
-                    title="Editar"
-                    style={{ border: "none", background: "none", cursor: "pointer" }}
+          <div style={{ flex: "1", minWidth: "300px" }}>
+            <div className="cd-card">
+              <div className="cd-card-header cd-card-header-amber">📋 Cotizaciones</div>
+              <div className="cd-card-body" style={{ padding: cotizaciones.length === 0 ? "16px" : 0, minHeight: "120px" }}>
+                {cotizaciones.length === 0 && (
+                  <div style={{ textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>
+                    No hay cotizaciones para este día.
+                  </div>
+                )}
+                {cotizaciones.map((cot) => (
+                  <div
+                    key={cot.id}
+                    style={{
+                      padding: "12px 16px",
+                      borderBottom: "1px solid #f3f4f6",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
                   >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => manejarPDFCotizacion(cot)}
-                    title="PDF"
-                    style={{ border: "none", background: "none", cursor: "pointer" }}
-                  >
-                    📄
-                  </button>
-                </div>
+                    <div>
+                      <div style={{ fontWeight: 600, color: "#b91c1c", fontSize: "14px" }}>
+                        {cot.numero || "COT-???"}
+                      </div>
+                      <div style={{ fontSize: "13px", color: "#111827" }}>
+                        {cot.clientes?.nombre || "Cliente"}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+                        {cot.fecha_evento ? new Date(cot.fecha_evento).toLocaleDateString("es-CO") : "Sin fecha"}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button onClick={() => editarCotizacion(cot)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", padding: "4px", minHeight: "auto" }}>✏️</button>
+                      <button onClick={() => manejarPDFCotizacion(cot)} title="PDF" style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", padding: "4px", minHeight: "auto" }}>📄</button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemision } from "../utils/generarRemision";
 import Protegido from "../components/Protegido";
+import "../estilos/CrearDocumentoEstilo.css";
 import { useNavigationState } from "../context/NavigationContext";
 
 export default function Trazabilidad() {
@@ -230,222 +231,197 @@ export default function Trazabilidad() {
 
   return (
     <Protegido>
-      <div style={{ padding: "1rem", maxWidth: "750px", margin: "auto" }}>
-        <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
-          Trazabilidad de Artículos
-        </h2>
-
-        <label style={{ fontSize: "12px" }}>Nombre del producto:</label>
-        <input
-          type="text"
-          value={productoBuscar}
-          onChange={manejarCambioProducto}
-          placeholder="Ej: silla rimax"
-          style={{ width: "100%", marginBottom: "4px", padding: "8px" }}
-        />
-        {sugerenciasProductos.length > 0 && (
-          <ul
-            style={{
-              listStyle: "none",
-              padding: 4,
-              border: "1px solid #ccc",
-              borderRadius: 4,
-              maxHeight: 120,
-              overflowY: "auto",
-              marginBottom: 10
-            }}
-          >
-            {sugerenciasProductos.map((p, index) => (
-              <li
-                key={index}
-                onClick={() => {
-                  setProductoBuscar(p.nombre);
-                  setSugerenciasProductos([]);
-                }}
-                style={{ padding: 4, cursor: "pointer" }}
-              >
-                {p.nombre}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <label style={{ fontSize: "12px" }}>Filtrar por cliente (opcional):</label>
-        <input
-          type="text"
-          value={clienteFiltro}
-          onChange={manejarCambioCliente}
-          placeholder="Nombre del cliente"
-          style={{ width: "100%", marginBottom: "4px", padding: "8px" }}
-        />
-        {sugerenciasClientes.length > 0 && (
-          <ul
-            style={{
-              listStyle: "none",
-              padding: 4,
-              border: "1px solid #ccc",
-              borderRadius: 4,
-              maxHeight: 120,
-              overflowY: "auto",
-              marginBottom: 10
-            }}
-          >
-            {sugerenciasClientes.map((c, index) => (
-              <li
-                key={index}
-                onClick={() => {
-                  setClienteFiltro(c.nombre);
-                  setSugerenciasClientes([]);
-                }}
-                style={{ padding: 4, cursor: "pointer" }}
-              >
-                {c.nombre}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div style={{ marginBottom: "10px" }}>
-          <label style={{ fontSize: "12px" }}>Tipo de documento:</label>
-          <select
-            value={tipoDocumento}
-            onChange={(e) => setTipoDocumento(e.target.value)}
-            style={{ width: "100%", padding: "8px" }}
-          >
-            <option value="todos">📄 Todos los documentos</option>
-            <option value="cotizacion">💰 Solo cotizaciones</option>
-            <option value="orden">📦 Solo órdenes de pedido</option>
-          </select>
+      <div className="cd-page">
+        {/* ========== HEADER ========== */}
+        <div className="cd-header">
+          <h1 className="cd-header-titulo" style={{ fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
+            <span className="cd-header-barra"></span>
+            🔎 Trazabilidad de Artículos
+          </h1>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            marginBottom: "10px",
-            padding: "10px",
-            backgroundColor: "#f3f4f6",
-            borderRadius: "6px",
-            flexWrap: "wrap"
-          }}
-        >
-          <label style={{ fontSize: "12px", fontWeight: "500" }}>Filtrar por:</label>
-          <button
-            onClick={() => setUsarFechaEvento(!usarFechaEvento)}
-            style={{
-              padding: "6px 12px",
-              background: usarFechaEvento ? "#3b82f6" : "#6b7280",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "14px"
-            }}
-          >
-            {usarFechaEvento ? "📅 Fecha del evento" : "🗓️ Fecha de creación"}
-          </button>
-          <small style={{ color: "#6b7280", fontSize: "12px" }}>
-            {usarFechaEvento
-              ? "(Día del alquiler/servicio)"
-              : "(Cuándo se registró el documento)"}
-          </small>
-        </div>
+        {/* ========== FILTROS ========== */}
+        <div className="cd-card">
+          <div className="cd-card-header cd-card-header-cyan">🔍 Filtros de búsqueda</div>
+          <div className="cd-card-body">
+            {/* Producto */}
+            <div className="cd-campo" style={{ marginBottom: "12px" }}>
+              <label>Nombre del producto</label>
+              <input
+                type="text"
+                value={productoBuscar}
+                onChange={manejarCambioProducto}
+                placeholder="Ej: silla rimax"
+              />
+            </div>
+            {sugerenciasProductos.length > 0 && (
+              <ul className="cd-sugerencias" style={{ marginBottom: "12px" }}>
+                {sugerenciasProductos.map((p, index) => (
+                  <li
+                    key={index}
+                    onClick={() => {
+                      setProductoBuscar(p.nombre);
+                      setSugerenciasProductos([]);
+                    }}
+                  >
+                    {p.nombre}
+                  </li>
+                ))}
+              </ul>
+            )}
 
-        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: "12px" }}>Desde:</label>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              style={{ width: "100%", padding: "8px" }}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: "12px" }}>Hasta:</label>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              style={{ width: "100%", padding: "8px" }}
-            />
+            {/* Cliente */}
+            <div className="cd-campo" style={{ marginBottom: "12px" }}>
+              <label>Filtrar por cliente (opcional)</label>
+              <input
+                type="text"
+                value={clienteFiltro}
+                onChange={manejarCambioCliente}
+                placeholder="Nombre del cliente"
+              />
+            </div>
+            {sugerenciasClientes.length > 0 && (
+              <ul className="cd-sugerencias" style={{ marginBottom: "12px" }}>
+                {sugerenciasClientes.map((c, index) => (
+                  <li
+                    key={index}
+                    onClick={() => {
+                      setClienteFiltro(c.nombre);
+                      setSugerenciasClientes([]);
+                    }}
+                  >
+                    {c.nombre}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Tipo documento */}
+            <div className="cd-campo" style={{ marginBottom: "12px" }}>
+              <label>Tipo de documento</label>
+              <select
+                value={tipoDocumento}
+                onChange={(e) => setTipoDocumento(e.target.value)}
+              >
+                <option value="todos">📄 Todos los documentos</option>
+                <option value="cotizacion">💰 Solo cotizaciones</option>
+                <option value="orden">📦 Solo órdenes de pedido</option>
+              </select>
+            </div>
+
+            {/* Toggle fecha */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px", padding: "10px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e5e7eb", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "12px", fontWeight: 500, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.3px" }}>Filtrar por:</span>
+              <button
+                className={`cd-btn ${usarFechaEvento ? "cd-btn-azul" : "cd-btn-gris"}`}
+                onClick={() => setUsarFechaEvento(!usarFechaEvento)}
+                style={{ padding: "6px 14px", fontSize: "13px", minHeight: "auto" }}
+              >
+                {usarFechaEvento ? "📅 Fecha del evento" : "🗓️ Fecha de creación"}
+              </button>
+              <small style={{ color: "#9ca3af", fontSize: "12px" }}>
+                {usarFechaEvento ? "(Día del alquiler/servicio)" : "(Cuándo se registró el documento)"}
+              </small>
+            </div>
+
+            {/* Fechas */}
+            <div className="cd-fechas-grid" style={{ marginBottom: "12px" }}>
+              <div className="cd-campo">
+                <label>Desde</label>
+                <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+              </div>
+              <div className="cd-campo">
+                <label>Hasta</label>
+                <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Ordenar */}
+            <div className="cd-campo" style={{ marginBottom: "16px" }}>
+              <label>Ordenar por</label>
+              <select
+                value={ordenDescendente ? "desc" : "asc"}
+                onChange={(e) => setOrdenDescendente(e.target.value === "desc")}
+              >
+                <option value="desc">⬇️ Más reciente primero</option>
+                <option value="asc">⬆️ Más antiguo primero</option>
+              </select>
+            </div>
+
+            {/* Botones */}
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button className="cd-btn cd-btn-cyan" style={{ flex: 1 }} onClick={buscarDocumentos}>
+                🔍 Buscar
+              </button>
+              <button className="cd-btn cd-btn-gris" style={{ flex: 1 }} onClick={limpiar}>
+                🧹 Limpiar
+              </button>
+              <button
+                className="cd-btn cd-btn-outline"
+                style={{ flex: 1 }}
+                onClick={() => setMostrarResultados(!mostrarResultados)}
+              >
+                {mostrarResultados ? "👁️ Ocultar" : "👁️ Mostrar"}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div style={{ marginBottom: "15px" }}>
-          <label style={{ fontSize: "12px" }}>Ordenar por:</label>
-          <select
-            value={ordenDescendente ? "desc" : "asc"}
-            onChange={(e) => setOrdenDescendente(e.target.value === "desc")}
-            style={{ width: "100%", padding: "8px" }}
-          >
-            <option value="desc">⬇️ Más reciente primero</option>
-            <option value="asc">⬆️ Más antiguo primero</option>
-          </select>
-        </div>
-
-        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-          <button onClick={buscarDocumentos} style={{ flex: 1 }}>
-            🔍 Buscar
-          </button>
-          <button onClick={limpiar} style={{ flex: 1 }}>
-            🧹 Limpiar
-          </button>
-          <button
-            onClick={() => setMostrarResultados(!mostrarResultados)}
-            style={{ flex: 1 }}
-          >
-            {mostrarResultados ? "Ocultar Resultados" : "Mostrar Resultados"}
-          </button>
-        </div>
-
+        {/* ========== RESULTADOS ========== */}
         {mostrarResultados && resultados.length > 0 && (
-          <>
-            <h3>Resultados</h3>
-            <ul style={{ listStyle: "none", padding: 0 }}>
+          <div className="cd-card">
+            <div className="cd-card-header">📋 Resultados ({resultados.length})</div>
+            <div className="cd-card-body" style={{ padding: 0 }}>
               {resultados.map((doc) => {
                 const tipo = doc.numero?.startsWith("COT") ? "cotizacion" : "orden";
                 const fecha = doc.fecha || doc.fecha_creacion || "-";
                 const fechaEvento = doc.fecha_evento?.split("T")[0] || "-";
 
                 return (
-                  <li
+                  <div
                     key={doc.id}
                     style={{
-                      marginBottom: "1rem",
-                      border: "1px solid #ccc",
-                      borderRadius: "10px",
-                      padding: "10px",
-                      background: "#fdfdfd"
+                      padding: "14px 16px",
+                      borderBottom: "1px solid #f3f4f6",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "10px"
                     }}
                   >
-                    <strong>Documento:</strong> {doc.numero || "-"}<br />
-                    <strong>Cliente:</strong> {doc.nombre_cliente || "Sin cliente"}<br />
-                    <strong>Total:</strong> ${Number(doc.total || 0).toLocaleString("es-CO")}<br />
-                    <strong>Fecha creación:</strong> {fecha?.split("T")[0] || "-"}<br />
-                    {doc.fecha_evento && (
-                      <>
-                        <strong>Fecha evento:</strong> {fechaEvento}<br />
-                      </>
-                    )}
-
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px" }}>
-                      <button onClick={() => editarDocumento(doc, tipo)}>Editar</button>
-                      <button onClick={() => generarPDF(doc, tipo)}>📄 PDF</button>
+                    <div>
+                      <div style={{ fontWeight: 600, color: tipo === "cotizacion" ? "#b91c1c" : "#1d4ed8", fontSize: "14px" }}>
+                        {doc.numero || "-"}
+                      </div>
+                      <div style={{ fontSize: "13px", color: "#111827" }}>
+                        {doc.nombre_cliente || "Sin cliente"} — ${Number(doc.total || 0).toLocaleString("es-CO")}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>
+                        Creación: {fecha?.split("T")[0] || "-"}
+                        {doc.fecha_evento && ` · Evento: ${fechaEvento}`}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <button className="cd-btn cd-btn-azul" style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }} onClick={() => editarDocumento(doc, tipo)}>✏️ Editar</button>
+                      <button className="cd-btn cd-btn-gris" style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }} onClick={() => generarPDF(doc, tipo)}>📄 PDF</button>
                       {tipo === "orden" && (
-                        <button onClick={() => generarRemision(doc)}>🚚 Remisión</button>
+                        <button className="cd-btn cd-btn-verde" style={{ padding: "6px 12px", fontSize: "12px", minHeight: "auto" }} onClick={() => generarRemision(doc)}>🚚 Remisión</button>
                       )}
                     </div>
-                  </li>
+                  </div>
                 );
               })}
-            </ul>
-          </>
+            </div>
+          </div>
         )}
 
         {mostrarResultados && resultados.length === 0 && (
-          <p>No se encontraron documentos con ese producto.</p>
+          <div className="cd-card">
+            <div className="cd-card-body" style={{ textAlign: "center", color: "#9ca3af", padding: "30px" }}>
+              No se encontraron documentos con ese producto.
+            </div>
+          </div>
         )}
       </div>
     </Protegido>

@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 import { generarPDFRecepcion } from "../utils/generarPDFRecepcion";
 import { useLocation } from "react-router-dom";
 import Protegido from "../components/Protegido";
+import "../estilos/CrearDocumentoEstilo.css";
 
 const Recepcion = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -516,309 +517,324 @@ for (const pago of pagosProveedoresRecepcion) {
 
   return (
     <Protegido>
-      <div className="p-4">
-        <h2 className="text-xl font-semibold mb-4">📦 Recepción de pedidos</h2>
+      <div className="cd-page">
+        {/* ========== HEADER ========== */}
+        <div className="cd-header">
+          <h1 className="cd-header-titulo">
+            <span className="cd-header-barra"></span>
+            📦 Recepción de Pedidos
+          </h1>
+        </div>
 
         {!ordenSeleccionada ? (
-          <div>
-            <p>Selecciona una orden para revisar:</p>
-            <ul className="mt-2">
-              <ul className="space-y-3">
-                {ordenes.map((orden) => (
-                  <li
+          <div className="cd-card">
+            <div className="cd-card-header">🔍 Selecciona una orden para revisar</div>
+            <div className="cd-card-body" style={{ padding: 0 }}>
+              {ordenes.length === 0 ? (
+                <div style={{ padding: "24px", textAlign: "center", color: "#9ca3af" }}>
+                  No hay órdenes pendientes de revisión
+                </div>
+              ) : (
+                ordenes.map((orden) => (
+                  <div
                     key={orden.id}
-                    className="bg-red-50 p-3 rounded-lg shadow flex justify-between items-center hover:bg-red-100 transition"
+                    onClick={() => seleccionarOrden(orden)}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "14px 16px",
+                      borderBottom: "1px solid #f3f4f6",
+                      cursor: "pointer",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "#fff7ed"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                   >
                     <div>
-                      <p className="font-bold text-red-700">{orden.numero || "OP-???"}</p>
-                      <p className="text-gray-800">{orden.clientes?.nombre || "Cliente"}</p>
-                      <p className="text-gray-500 text-sm">
-                        {new Date(orden.fecha_evento).toLocaleDateString()}
-                      </p>
+                      <div style={{ fontWeight: 600, color: "#dc2626", fontSize: "14px" }}>
+                        {orden.numero || "OP-???"}
+                      </div>
+                      <div style={{ fontSize: "14px", color: "#111827", marginTop: "2px" }}>
+                        {orden.clientes?.nombre || "Cliente"}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>
+                        📅 {new Date(orden.fecha_evento).toLocaleDateString("es-CO")}
+                      </div>
                     </div>
-                    <div className="text-lg">
-                      <button
-                        onClick={() => seleccionarOrden(orden)}
-                        title="Revisar"
-                        className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded"
-                      >
-                        🔍
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </ul>
+                    <span style={{ fontSize: "20px" }}>→</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         ) : (
-          <div className="bg-white p-4 rounded shadow mt-4">
-            <h3 className="text-lg font-semibold mb-3">
-              {ordenSeleccionada.clientes?.nombre || "Sin cliente"} —{" "}
-              {new Date(ordenSeleccionada.fecha_evento).toLocaleDateString()}
-            </h3>
-
-            <table className="w-full mb-4 border text-sm">
-              <thead>
-                <tr>
-                  <th className="border px-2 py-1">Producto</th>
-                  <th className="border px-2 py-1">Esperado</th>
-                  <th className="border px-2 py-1">Recibido</th>
-                  <th className="border px-2 py-1">Daño ($)</th>
-                  <th className="border px-2 py-1">Observación</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productosRevisados.map((item, index) => (
-                  <tr key={index}>
-                    <td className="border px-2 py-1">
-                      <span className={item.proveedor_id ? "font-bold" : ""}>{item.nombre}</span>
-                      {item.proveedor && (
-                        <span className="text-gray-500 ml-1">[{item.proveedor}]</span>
-                      )}
-                    </td>
-                    <td className="border px-2 py-1 text-center">{item.esperado}</td>
-                    <td className="border px-2 py-1 text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.recibido}
-                        onChange={(e) => actualizarCampo(index, "recibido", e.target.value)}
-                        className="w-16 text-center"
-                      />
-                    </td>
-                    <td className="border px-2 py-1 text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="$"
-                        value={danos[index]?.monto || ""}
-                        onChange={(e) => actualizarDano(index, e.target.value)}
-                        className="w-24 text-center"
-                      />
-                    </td>
-                    <td className="border px-2 py-1">
-                      <input
-                        type="text"
-                        placeholder="Opcional"
-                        value={item.observacion}
-                        onChange={(e) => actualizarCampo(index, "observacion", e.target.value)}
-                        className="w-full"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div>
+            {/* Info del pedido */}
+            <div className="cd-card">
+              <div className="cd-card-header cd-card-header-cyan" style={{ justifyContent: "space-between" }}>
+                <span>
+                  {ordenSeleccionada.numero || "OP-???"} — {ordenSeleccionada.clientes?.nombre || "Sin cliente"}
+                </span>
+                <span style={{ fontSize: "12px", opacity: 0.85 }}>
+                  📅 {new Date(ordenSeleccionada.fecha_evento).toLocaleDateString("es-CO")}
+                </span>
+              </div>
+              <div className="cd-card-body" style={{ padding: 0 }}>
+                <div className="cd-tabla-wrap">
+                  <table className="cd-tabla">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Esperado</th>
+                        <th>Recibido</th>
+                        <th>Daño ($)</th>
+                        <th>Observación</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productosRevisados.map((item, index) => (
+                        <tr key={index}>
+                          <td>
+                            <span style={{ fontWeight: item.proveedor_id ? 600 : 400 }}>{item.nombre}</span>
+                            {item.proveedor && (
+                              <span style={{ color: "#9ca3af", marginLeft: "4px", fontSize: "12px" }}>[{item.proveedor}]</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: "center" }}>{item.esperado}</td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.recibido}
+                              onChange={(e) => actualizarCampo(index, "recibido", e.target.value)}
+                              style={{ width: "64px", textAlign: "center", padding: "6px", border: "1px solid #e5e7eb", borderRadius: "6px" }}
+                            />
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="$"
+                              value={danos[index]?.monto || ""}
+                              onChange={(e) => actualizarDano(index, e.target.value)}
+                              style={{ width: "90px", textAlign: "center", padding: "6px", border: "1px solid #e5e7eb", borderRadius: "6px" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              placeholder="Opcional"
+                              value={item.observacion}
+                              onChange={(e) => actualizarCampo(index, "observacion", e.target.value)}
+                              style={{ width: "100%", padding: "6px", border: "1px solid #e5e7eb", borderRadius: "6px" }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
 
             {/* 📊 RESUMEN DE PAGOS */}
-            <div className="bg-blue-50 p-4 rounded-lg shadow mt-6">
-              <h3 className="text-lg font-semibold mb-3">💰 Resumen de Pagos</h3>
-
-              {/* Abonos previos */}
-              {ordenSeleccionada.abonos && ordenSeleccionada.abonos.length > 0 && (
-                <div className="mb-4">
-                  <p className="font-medium text-gray-700 mb-2">Abonos registrados:</p>
-                  <ul className="space-y-1">
+            <div className="cd-card">
+              <div className="cd-card-header">💰 Resumen de Pagos</div>
+              <div className="cd-card-body">
+                {/* Abonos previos */}
+                {ordenSeleccionada.abonos && ordenSeleccionada.abonos.length > 0 && (
+                  <div style={{ marginBottom: "14px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 500, color: "#4b5563", marginBottom: "6px" }}>Abonos registrados:</div>
                     {ordenSeleccionada.abonos.map((abono, i) => (
-                      <li key={i} className="text-sm text-gray-600">
+                      <div key={i} style={{ fontSize: "13px", color: "#6b7280", padding: "4px 0" }}>
                         • Abono {i + 1}: ${Number(abono.valor || 0).toLocaleString("es-CO")}
-                        {abono.fecha &&
-                          ` - ${new Date(abono.fecha).toLocaleDateString("es-CO")}`}
-                      </li>
+                        {abono.fecha && ` — ${new Date(abono.fecha).toLocaleDateString("es-CO")}`}
+                      </div>
                     ))}
-                  </ul>
-                  <p className="font-bold text-green-700 mt-2">
-                    Total abonado: $
-                    {ordenSeleccionada.abonos
-                      .reduce((sum, a) => sum + Number(a.valor || 0), 0)
-                      .toLocaleString("es-CO")}
-                  </p>
-                </div>
-              )}
+                    <div style={{ fontWeight: 700, color: "#15803d", marginTop: "8px", fontSize: "14px" }}>
+                      Total abonado: ${ordenSeleccionada.abonos.reduce((sum, a) => sum + Number(a.valor || 0), 0).toLocaleString("es-CO")}
+                    </div>
+                  </div>
+                )}
 
-              {/* Saldo pendiente */}
-<div className="bg-yellow-100 p-3 rounded">
-  <p className="font-bold text-lg">
-    Saldo pendiente: $
-    {(
-      Number(ordenSeleccionada.total_neto || 0) -
-      (ordenSeleccionada.abonos || []).reduce(
-        (sum, a) => sum + Number(a.valor || 0),
-        0
-      ) -
-      ingresosAdicionales.reduce(
-        (sum, ing) => sum + Number(ing.valor || 0),
-        0
-      )
-    ).toLocaleString("es-CO")}
-  </p>
-</div>
+                {/* Saldo pendiente */}
+                <div style={{ background: "#fef9c3", padding: "12px", borderRadius: "8px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>
+                    Saldo pendiente: ${(
+                      Number(ordenSeleccionada.total_neto || 0) -
+                      (ordenSeleccionada.abonos || []).reduce((sum, a) => sum + Number(a.valor || 0), 0) -
+                      ingresosAdicionales.reduce((sum, ing) => sum + Number(ing.valor || 0), 0)
+                    ).toLocaleString("es-CO")}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* 🛡️ GARANTÍA */}
             {Number(ordenSeleccionada.garantia || 0) > 0 && (
-              <div className="mt-6 bg-amber-50 border border-amber-200 p-4 rounded-lg shadow">
-                <h3 className="text-lg font-semibold mb-3 text-amber-800">
-                  🛡️ Garantía del Cliente
-                </h3>
+              <div className="cd-card">
+                <div className="cd-card-header cd-card-header-amber">🛡️ Garantía del Cliente</div>
+                <div className="cd-card-body">
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "12px" }}>
+                    {/* Monto total */}
+                    <div style={{ background: "#fffbeb", padding: "12px", borderRadius: "8px", border: "1px solid #fde68a" }}>
+                      <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "4px" }}>Garantía entregada</div>
+                      <div style={{ fontSize: "18px", fontWeight: 700, color: "#b45309" }}>
+                        ${Number(ordenSeleccionada.garantia).toLocaleString("es-CO")}
+                      </div>
+                      {ordenSeleccionada.garantia_recibida && (
+                        <div style={{ fontSize: "11px", color: "#16a34a", marginTop: "4px" }}>
+                          ✓ Recibida{ordenSeleccionada.fecha_garantia ? ` el ${ordenSeleccionada.fecha_garantia}` : ""}
+                        </div>
+                      )}
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                  {/* Monto total de garantía */}
-                  <div className="bg-white p-3 rounded-lg border border-amber-100">
-                    <p className="text-xs text-gray-500 mb-1">Garantía entregada</p>
-                    <p className="text-lg font-bold text-amber-700">
-                      ${Number(ordenSeleccionada.garantia).toLocaleString("es-CO")}
-                    </p>
-                    {ordenSeleccionada.garantia_recibida && (
-                      <span className="text-xs text-green-600">✓ Recibida{ordenSeleccionada.fecha_garantia ? ` el ${ordenSeleccionada.fecha_garantia}` : ""}</span>
-                    )}
+                    {/* Retener */}
+                    <div style={{ background: "#fef2f2", padding: "12px", borderRadius: "8px", border: "1px solid #fecaca" }}>
+                      <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "4px" }}>Retener por daños/demora</div>
+                      <input
+                        type="number"
+                        min="0"
+                        max={Number(ordenSeleccionada.garantia || 0)}
+                        placeholder="$0"
+                        value={garantiaRetenida}
+                        onChange={(e) => {
+                          const val = Number(e.target.value || 0);
+                          const max = Number(ordenSeleccionada.garantia || 0);
+                          setGarantiaRetenida(val > max ? String(max) : e.target.value);
+                        }}
+                        style={{ width: "100%", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: "6px", fontSize: "14px", fontWeight: 600 }}
+                      />
+                      {Number(garantiaRetenida || 0) > 0 && (
+                        <div style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px" }}>
+                          💰 Se registrará como ingreso
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Devolver */}
+                    <div style={{ background: "#f0fdf4", padding: "12px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
+                      <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "4px" }}>Devolver al cliente</div>
+                      <div style={{
+                        fontSize: "18px",
+                        fontWeight: 700,
+                        color: (Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)) > 0 ? "#15803d" : "#9ca3af"
+                      }}>
+                        ${Math.max(0, Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)).toLocaleString("es-CO")}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Retener por daños */}
-                  <div className="bg-white p-3 rounded-lg border border-red-100">
-                    <p className="text-xs text-gray-500 mb-1">Retener por daños/demora</p>
-                    <input
-                      type="number"
-                      min="0"
-                      max={Number(ordenSeleccionada.garantia || 0)}
-                      placeholder="$0"
-                      value={garantiaRetenida}
-                      onChange={(e) => {
-                        const val = Number(e.target.value || 0);
-                        const max = Number(ordenSeleccionada.garantia || 0);
-                        setGarantiaRetenida(val > max ? String(max) : e.target.value);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm font-semibold"
-                    />
-                    {Number(garantiaRetenida || 0) > 0 && (
-                      <span className="text-xs text-red-600 mt-1 block">
-                        💰 Se registrará como ingreso
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Devolución calculada */}
-                  <div className="bg-white p-3 rounded-lg border border-green-100">
-                    <p className="text-xs text-gray-500 mb-1">Devolver al cliente</p>
-                    <p className={`text-lg font-bold ${
-                      (Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)) > 0
-                        ? "text-green-700"
-                        : "text-gray-400"
-                    }`}>
-                      ${Math.max(0, Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)).toLocaleString("es-CO")}
-                    </p>
-                  </div>
+                  {Number(garantiaRetenida || 0) > 0 && (
+                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", padding: "10px", borderRadius: "6px", fontSize: "13px", color: "#b91c1c" }}>
+                      ⚠️ Se retendrán <strong>${Number(garantiaRetenida).toLocaleString("es-CO")}</strong> de la garantía.
+                      Se devolverán <strong>${Math.max(0, Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)).toLocaleString("es-CO")}</strong> al cliente.
+                      El monto retenido se registrará como <strong>ingreso</strong> en contabilidad.
+                    </div>
+                  )}
                 </div>
-
-                {Number(garantiaRetenida || 0) > 0 && (
-                  <div className="bg-red-50 border border-red-200 p-2 rounded text-sm text-red-700">
-                    ⚠️ Se retendrán <strong>${Number(garantiaRetenida).toLocaleString("es-CO")}</strong> de la garantía.
-                    Se devolverán <strong>${Math.max(0, Number(ordenSeleccionada.garantia || 0) - Number(garantiaRetenida || 0)).toLocaleString("es-CO")}</strong> al cliente.
-                    El monto retenido se registrará como <strong>ingreso</strong> en contabilidad.
-                  </div>
-                )}
               </div>
             )}
 
             {/* 💵 INGRESOS ADICIONALES */}
-            <div className="mt-6 bg-gray-50 p-4 rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-2">
-                💵 Ingresos adicionales (pagos recibidos en recepción)
-              </h3>
-              <p className="text-sm text-gray-600 mb-3">
-                Registra aquí abonos o pagos que el cliente hizo después del evento o que olvidaste
-                registrar antes.
-              </p>
-
-              {ingresosAdicionales.map((ingreso, index) => (
-                <div key={index} className="flex items-center gap-4 mb-2">
-                  <input
-                    type="number"
-                    placeholder="Monto"
-                    value={ingreso.valor}
-                    onChange={(e) => {
-                      const nuevos = [...ingresosAdicionales];
-                      nuevos[index].valor = e.target.value;
-                      setIngresosAdicionales(nuevos);
-                    }}
-                    className="w-32 px-3 py-2 border border-gray-300 rounded"
-                  />
-                  <input
-                    type="date"
-                    value={ingreso.fecha}
-                    onChange={(e) => {
-                      const nuevos = [...ingresosAdicionales];
-                      nuevos[index].fecha = e.target.value;
-                      setIngresosAdicionales(nuevos);
-                    }}
-                    className="px-3 py-2 border border-gray-300 rounded"
-                  />
-                  <button
-                    onClick={() => {
-                      const nuevos = [...ingresosAdicionales];
-                      nuevos.splice(index, 1);
-                      setIngresosAdicionales(nuevos);
-                    }}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    🗑️
-                  </button>
+            <div className="cd-card">
+              <div className="cd-card-header">💵 Ingresos adicionales</div>
+              <div className="cd-card-body">
+                <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "12px" }}>
+                  Registra aquí abonos o pagos que el cliente hizo después del evento o que olvidaste registrar antes.
                 </div>
-              ))}
 
-              <button
-                onClick={() =>
-                  setIngresosAdicionales([
-                    ...ingresosAdicionales,
-                    { valor: "", fecha: new Date().toISOString().slice(0, 10) },
-                  ])
-                }
-                className="text-sm text-blue-600 hover:underline mt-2"
-              >
-                ➕ Agregar ingreso adicional
-              </button>
+                {ingresosAdicionales.map((ingreso, index) => (
+                  <div key={index} className="cd-abono-fila">
+                    <input
+                      type="number"
+                      placeholder="Monto"
+                      value={ingreso.valor}
+                      onChange={(e) => {
+                        const nuevos = [...ingresosAdicionales];
+                        nuevos[index].valor = e.target.value;
+                        setIngresosAdicionales(nuevos);
+                      }}
+                      style={{ width: "120px" }}
+                    />
+                    <input
+                      type="date"
+                      value={ingreso.fecha}
+                      onChange={(e) => {
+                        const nuevos = [...ingresosAdicionales];
+                        nuevos[index].fecha = e.target.value;
+                        setIngresosAdicionales(nuevos);
+                      }}
+                      style={{ width: "150px" }}
+                    />
+                    <button
+                      onClick={() => {
+                        const nuevos = [...ingresosAdicionales];
+                        nuevos.splice(index, 1);
+                        setIngresosAdicionales(nuevos);
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  className="cd-btn-agregar-abono"
+                  onClick={() =>
+                    setIngresosAdicionales([
+                      ...ingresosAdicionales,
+                      { valor: "", fecha: new Date().toISOString().slice(0, 10) },
+                    ])
+                  }
+                >
+                  ➕ Agregar ingreso adicional
+                </button>
+              </div>
             </div>
 
             {/* 💰 PAGOS A PROVEEDORES */}
 {pagosProveedoresRecepcion.length > 0 && (
-  <div className="mt-6 bg-purple-50 p-4 rounded-lg shadow">
-    <h3 className="text-lg font-semibold mb-3 text-purple-800">
+  <div className="cd-card">
+    <div className="cd-card-header" style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white", borderBottom: "none" }}>
       💰 Pagos a Proveedores
-    </h3>
-    <p className="text-sm text-gray-600 mb-4">
-      Registra aquí los pagos pendientes a proveedores. Los pagos previos ya están registrados en contabilidad.
-    </p>
+    </div>
+    <div className="cd-card-body">
+      <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "12px" }}>
+        Registra aquí los pagos pendientes a proveedores. Los pagos previos ya están registrados en contabilidad.
+      </div>
 
-    {pagosProveedoresRecepcion.map((pago, index) => (
-      <div
-        key={pago.proveedor_nombre}
-        className="bg-white border border-purple-200 rounded-lg p-4 mb-4"
-      >
-        {/* Header del proveedor */}
-        <div className="flex justify-between items-center mb-3">
-          <h4 className="font-semibold text-gray-800">
-            🏢 {pago.proveedor_nombre}
-          </h4>
-          {pago.saldo_pendiente <= 0 ? (
-            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-              ✓ Pagado
-            </span>
-          ) : (
-            <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
-              Pendiente: ${Number(pago.saldo_pendiente).toLocaleString("es-CO")}
-            </span>
-          )}
-        </div>
-
-        {/* Productos */}
-        <div className="text-sm text-gray-600 mb-3">
-          {pago.productos.map((prod, i) => (
-            <div key={i} className="flex justify-between py-1 border-b border-gray-100">
-              <span>{prod.nombre} ({prod.cantidad} × ${Number(prod.precio_compra).toLocaleString("es-CO")})</span>
-              <span className="font-medium">${Number(prod.subtotal).toLocaleString("es-CO")}</span>
+      {pagosProveedoresRecepcion.map((pago, index) => (
+        <div
+          key={pago.proveedor_nombre}
+          style={{ background: "white", border: "1px solid #e9d5ff", borderRadius: "10px", padding: "14px", marginBottom: "12px" }}
+        >
+          {/* Header del proveedor */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <div style={{ fontWeight: 600, fontSize: "14px", color: "#111827" }}>
+              🏢 {pago.proveedor_nombre}
             </div>
+            {pago.saldo_pendiente <= 0 ? (
+              <span style={{ background: "#dcfce7", color: "#166534", fontSize: "11px", padding: "3px 8px", borderRadius: "10px" }}>
+                ✓ Pagado
+              </span>
+            ) : (
+              <span style={{ background: "#fef9c3", color: "#854d0e", fontSize: "11px", padding: "3px 8px", borderRadius: "10px" }}>
+                Pendiente: ${Number(pago.saldo_pendiente).toLocaleString("es-CO")}
+              </span>
+            )}
+          </div>
+
+          {/* Productos */}
+          <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "10px" }}>
+            {pago.productos.map((prod, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f3f4f6" }}>
+                <span>{prod.nombre} ({prod.cantidad} × ${Number(prod.precio_compra).toLocaleString("es-CO")})</span>
+                <span style={{ fontWeight: 500 }}>${Number(prod.subtotal).toLocaleString("es-CO")}</span>
+              </div>
           ))}
-          <div className="flex justify-between py-2 font-semibold text-gray-800">
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontWeight: 600, color: "#111827" }}>
             <span>Total:</span>
             <span>${Number(pago.total).toLocaleString("es-CO")}</span>
           </div>
@@ -826,15 +842,15 @@ for (const pago of pagosProveedoresRecepcion) {
 
         {/* Abonos previos */}
         {pago.abonos_previos.length > 0 && (
-          <div className="mb-3 p-2 bg-green-50 rounded">
-            <p className="text-xs font-medium text-green-700 mb-1">Abonos previos:</p>
+          <div style={{ marginBottom: "10px", padding: "8px", background: "#f0fdf4", borderRadius: "6px" }}>
+            <div style={{ fontSize: "11px", fontWeight: 500, color: "#15803d", marginBottom: "4px" }}>Abonos previos:</div>
             {pago.abonos_previos.map((ab, i) => (
-              <div key={i} className="text-xs text-green-600 flex justify-between">
+              <div key={i} style={{ fontSize: "11px", color: "#16a34a", display: "flex", justifyContent: "space-between" }}>
                 <span>{ab.fecha ? new Date(ab.fecha).toLocaleDateString("es-CO") : "Sin fecha"}</span>
                 <span>${Number(ab.valor).toLocaleString("es-CO")}</span>
               </div>
             ))}
-            <div className="text-xs font-semibold text-green-800 mt-1 pt-1 border-t border-green-200 flex justify-between">
+            <div style={{ fontSize: "11px", fontWeight: 600, color: "#166534", marginTop: "4px", paddingTop: "4px", borderTop: "1px solid #bbf7d0", display: "flex", justifyContent: "space-between" }}>
               <span>Total abonado:</span>
               <span>${Number(pago.total_abonado_previo).toLocaleString("es-CO")}</span>
             </div>
@@ -843,8 +859,8 @@ for (const pago of pagosProveedoresRecepcion) {
 
         {/* Abono en recepción */}
         {pago.saldo_pendiente > 0 && (
-          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-200">
-            <span className="text-sm text-gray-600 whitespace-nowrap">Pagar ahora:</span>
+          <div className="cd-abono-fila" style={{ marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #e5e7eb" }}>
+            <span style={{ fontSize: "13px", color: "#6b7280", whiteSpace: "nowrap" }}>Pagar ahora:</span>
             <input
               type="number"
               placeholder="Monto"
@@ -852,7 +868,7 @@ for (const pago of pagosProveedoresRecepcion) {
               onChange={(e) =>
                 actualizarPagoProveedorRecepcion(index, "abono_recepcion", e.target.value)
               }
-              className="w-32 px-3 py-2 border border-gray-300 rounded text-sm"
+              style={{ width: "120px" }}
             />
             <input
               type="date"
@@ -860,71 +876,81 @@ for (const pago of pagosProveedoresRecepcion) {
               onChange={(e) =>
                 actualizarPagoProveedorRecepcion(index, "fecha_abono_recepcion", e.target.value)
               }
-              className="px-3 py-2 border border-gray-300 rounded text-sm"
+              style={{ width: "150px" }}
             />
           </div>
         )}
       </div>
     ))}
+    </div>
   </div>
 )}
 
-            <label className="block mt-4">Comentario general (opcional):</label>
-            <textarea
-              className="w-full mb-2 p-2 border rounded"
-              rows={3}
-              value={comentarioGeneral}
-              onChange={(e) => setComentarioGeneral(e.target.value)}
-            />
-
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-2">🧾 Gastos adicionales (opcional)</h3>
-              {gastosExtras.map((gasto, index) => (
-                <div key={index} className="flex items-center gap-4 mb-2">
-                  <input
-                    type="text"
-                    placeholder="Motivo del gasto"
-                    value={gasto.motivo}
-                    onChange={(e) => {
-                      const nuevosGastos = [...gastosExtras];
-                      nuevosGastos[index].motivo = e.target.value;
-                      setGastosExtras(nuevosGastos);
-                    }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Valor"
-                    value={gasto.valor}
-                    onChange={(e) => {
-                      const nuevosGastos = [...gastosExtras];
-                      nuevosGastos[index].valor = e.target.value;
-                      setGastosExtras(nuevosGastos);
-                    }}
-                    className="w-32 px-3 py-2 border border-gray-300 rounded"
-                  />
-                </div>
-              ))}
-              <button
-                onClick={() => setGastosExtras([...gastosExtras, { motivo: "", valor: "" }])}
-                className="text-sm text-blue-600 hover:underline"
-              >
-                ➕ Agregar otro gasto
-              </button>
+            {/* 🧾 GASTOS ADICIONALES */}
+            <div className="cd-card">
+              <div className="cd-card-header">🧾 Gastos adicionales (opcional)</div>
+              <div className="cd-card-body">
+                {gastosExtras.map((gasto, index) => (
+                  <div key={index} className="cd-abono-fila">
+                    <input
+                      type="text"
+                      placeholder="Motivo del gasto"
+                      value={gasto.motivo}
+                      onChange={(e) => {
+                        const nuevosGastos = [...gastosExtras];
+                        nuevosGastos[index].motivo = e.target.value;
+                        setGastosExtras(nuevosGastos);
+                      }}
+                      style={{ flex: 1, minWidth: "140px" }}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Valor"
+                      value={gasto.valor}
+                      onChange={(e) => {
+                        const nuevosGastos = [...gastosExtras];
+                        nuevosGastos[index].valor = e.target.value;
+                        setGastosExtras(nuevosGastos);
+                      }}
+                      style={{ width: "120px" }}
+                    />
+                  </div>
+                ))}
+                <button
+                  className="cd-btn-agregar-abono"
+                  onClick={() => setGastosExtras([...gastosExtras, { motivo: "", valor: "" }])}
+                >
+                  ➕ Agregar otro gasto
+                </button>
+              </div>
             </div>
 
-            {/* ✅ Botones rediseñados */}
-            <div className="flex flex-col md:flex-row gap-4 mt-6">
+            {/* 💬 COMENTARIO */}
+            <div className="cd-card">
+              <div className="cd-card-header">💬 Comentario general (opcional)</div>
+              <div className="cd-card-body">
+                <textarea
+                  rows={3}
+                  value={comentarioGeneral}
+                  onChange={(e) => setComentarioGeneral(e.target.value)}
+                  placeholder="Escribe observaciones generales sobre la recepción..."
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "14px", resize: "vertical" }}
+                />
+              </div>
+            </div>
+
+            {/* ========== BOTONES FINALES ========== */}
+            <div className="cd-botones-finales">
               <button
                 onClick={guardarRevision}
                 disabled={guardando}
-                className={`flex items-center justify-center gap-2 ${guardando ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white py-3 px-6 rounded-xl shadow-lg transition-transform ${!guardando ? 'transform hover:scale-105' : ''}`}
+                className={`cd-btn ${guardando ? "cd-btn-disabled" : "cd-btn-verde"}`}
               >
-                <span className="text-xl">{guardando ? '⏳' : '💾'}</span>
-                <span className="font-semibold text-lg">{guardando ? 'Guardando...' : 'Guardar Revisión'}</span>
+                {guardando ? "⏳ Guardando..." : "💾 Guardar Revisión"}
               </button>
 
               <button
+                className="cd-btn cd-btn-gris"
                 onClick={() => {
                   const productosParaPDF = productosRevisados.map((p) => ({
                     descripcion: p.nombre,
@@ -938,17 +964,15 @@ for (const pago of pagosProveedoresRecepcion) {
                     ordenSeleccionada.clientes,
                     productosParaPDF,
                     ingresosAdicionales,
-                    pagosProveedoresRecepcion,  // 🆕 Agregar pagos a proveedores
-                    {                            // 🛡️ Info de garantía
+                    pagosProveedoresRecepcion,
+                    {
                       garantiaTotal: Number(ordenSeleccionada.garantia || 0),
                       garantiaRetenida: Number(garantiaRetenida || 0),
                     }
                   );
                 }}
-                className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105"
               >
-                <span className="text-xl">🧾</span>
-                <span className="font-semibold text-lg">Descargar PDF</span>
+                🧾 Descargar PDF
               </button>
             </div>
           </div>
