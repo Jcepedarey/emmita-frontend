@@ -845,6 +845,8 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
     total_neto: totalNeto,
     descuento: aplicarDescuento ? Number(descuento || 0) : 0,
     retencion: aplicarRetencion ? Number(retencion || 0) : 0,
+    aplicar_descuento: aplicarDescuento,
+    aplicar_retencion: aplicarRetencion,
     abonos,
     // 🔧 CORREGIDO: pagos_proveedores solo existe en ordenes_pedido, NO en cotizaciones
     ...(tipoDocumento !== "cotizacion" && { pagos_proveedores: pagosProveedores }),

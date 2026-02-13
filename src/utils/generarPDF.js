@@ -1,4 +1,4 @@
-  import jsPDF from "jspdf";
+import jsPDF from "jspdf";
   import autoTable from "jspdf-autotable";
   import { generarNombreArchivo } from "./nombrePDF";
 
@@ -290,8 +290,8 @@ let y = (doc.lastAutoTable?.finalY || 100) + 10;
   const safeBottom0 = pageHeight0 - bottomMargin - footerHeight;
 
   // Flags para totales (las usamos también para calcular altura)
-  const flagDesc = Boolean(documento.aplicar_descuento);
-  const flagRet  = Boolean(documento.aplicar_retencion);
+  const flagDesc = Boolean(documento.aplicar_descuento) || num(documento.descuento, 0) > 0;
+  const flagRet  = Boolean(documento.aplicar_retencion) || num(documento.retencion, 0) > 0;
 
   // Altura estimada del bloque "contenido final"
   let needed = 0;
