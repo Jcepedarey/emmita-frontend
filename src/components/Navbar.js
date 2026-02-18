@@ -5,6 +5,7 @@ import supabase from "../supabaseClient";
 import { useNavigationState } from "../context/NavigationContext";
 import "../estilos/EstilosGlobales.css";
 import { useTenant } from "../context/TenantContext";
+import { limpiarCacheTenant } from "../utils/tenantPDF";
 
 const Navbar = ({ onMenuClick }) => {
   const location = useLocation();
@@ -18,6 +19,7 @@ const Navbar = ({ onMenuClick }) => {
     await supabase.auth.signOut();
     localStorage.removeItem("usuario");
     localStorage.removeItem("sesion");
+    limpiarCacheTenant();
     clearAllStates();
     navigate("/");
   };

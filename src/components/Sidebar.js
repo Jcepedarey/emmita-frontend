@@ -38,6 +38,8 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
     { id: "recepcion", titulo: "Recepción", icono: "📥", ruta: "/recepcion", color: "#6366f1" },
     { id: "buscar-recep", titulo: "Buscar recepción", icono: "🔎", ruta: "/buscar-recepcion", color: "#a855f7" },
     { id: "usuarios", titulo: "Usuarios", icono: "👤", ruta: "/usuarios", color: "#64748b" },
+    // ✅ NUEVO MÓDULO AL FINAL
+    { id: "mi-empresa", titulo: "Mi Empresa", icono: "🏢", ruta: "/mi-empresa", color: "#0077B6" },
   ];
 
   const handleNavegar = (ruta) => {
@@ -204,7 +206,7 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
             }}
           />
 
-          {/* ✅ TEXTO DINÁMICO (Cambia según la empresa logueada) */}
+          {/* Texto dinámico */}
           {(!isCollapsed || isMobile) && (
             <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#374151" }}>
@@ -281,7 +283,7 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
                   {mod.icono}
                 </span>
 
-                {/* Texto (ocultar si colapsado en PC) */}
+                {/* Texto */}
                 {(!isCollapsed || isMobile) && (
                   <span
                     style={{

@@ -29,6 +29,7 @@ import Inventario from "./pages/Inventario";
 import Reportes from "./pages/Reportes";
 import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
+import MiEmpresa from "./pages/MiEmpresa"; // ✅ NUEVO IMPORT
 
 function App() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -130,6 +131,8 @@ function App() {
               <Route path="/reportes" element={<Reportes />} />
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/exportar" element={<Exportar />} />
+              {/* ✅ NUEVA RUTA */}
+              <Route path="/mi-empresa" element={<MiEmpresa />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </Suspense>
