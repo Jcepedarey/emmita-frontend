@@ -131,7 +131,7 @@ export async function consultarIA(mensajeOriginal) {
         messages: [
           {
             role: "system",
-            content: `Eres un asistente del sistema de alquiler llamado Emmita. Si no entiendes algo, responde de forma neutral o pregunta por más información.`,
+            content: `Eres un asistente del sistema de gestión de alquileres SwAlquiler. Ayudas a gestionar inventario, cotizaciones, pedidos y clientes. Si no entiendes algo, responde de forma neutral o pregunta por más información.`,
           },
           {
             role: "user",

@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import { useNavigationState } from "../context/NavigationContext";
 import "../estilos/EstilosGlobales.css";
+import { useTenant } from "../context/TenantContext";
 
 const Navbar = ({ onMenuClick }) => {
   const location = useLocation();
@@ -11,10 +12,12 @@ const Navbar = ({ onMenuClick }) => {
   const usuario = JSON.parse(localStorage.getItem("usuario"));
   const esLogin = location.pathname === "/" || location.pathname === "/login";
   const { clearAllStates } = useNavigationState();
+  const { tenant } = useTenant();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem("usuario");
+    localStorage.removeItem("sesion");
     clearAllStates();
     navigate("/");
   };
@@ -76,7 +79,7 @@ const Navbar = ({ onMenuClick }) => {
             <div>
               <h1 className="sw-navbar-titulo">SwAlquiler</h1>
               {!esLogin && (
-                <p className="sw-navbar-subtitulo">Alquiler y eventos Emmita</p>
+                <p className="sw-navbar-subtitulo">{tenant?.nombre || "Cargando..."}</p>
               )}
             </div>
           </Link>

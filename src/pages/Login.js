@@ -3,12 +3,14 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import supabase from "../supabaseClient";
+import { useTenant } from "../context/TenantContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const navigate = useNavigate();
+  const { recargar } = useTenant();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -23,19 +25,21 @@ export default function Login() {
         password
       });
 
-      setCargando(false);
-
       if (error || !data.session) {
+        setCargando(false);
         return Swal.fire("Acceso denegado", error?.message || "Email o contraseña incorrectos", "error");
       }
 
-      // ✅ Guarda la sesión COMPLETA (incluye refresh token)
+      // ✅ Guardar sesión (compatibilidad con el resto del frontend)
       localStorage.setItem("sesion", JSON.stringify(data.session));
-
-      // ✅ (Compatibilidad con el resto del frontend)
       localStorage.setItem("usuario", JSON.stringify(data.session.user));
 
+      // ✅ NUEVO: Cargar datos del tenant y perfil
+      await recargar();
+
+      setCargando(false);
       navigate("/inicio");
+
     } catch (err) {
       setCargando(false);
       Swal.fire("Error de conexión", "No se pudo conectar a Supabase", "error");
@@ -44,18 +48,17 @@ export default function Login() {
 
   return (
     <div style={{ textAlign: "center", marginTop: "100px" }}>
-      {/* Logo grande centrado con sombra suave */}
-<img
-  src="/icons/swalquiler-logo.png"
-  alt="SwAlquiler"
-  className="app-logo-login"
-  style={{
-  width: "145px",  // o prueba con "140px" si aún se ve pequeño
-  display: "block",
-  margin: "0 auto 16px",
-  filter: "drop-shadow(0 2px 6px rgba(0,0,0,.1))"
-}}
-/>
+      <img
+        src="/icons/swalquiler-logo.png"
+        alt="SwAlquiler"
+        className="app-logo-login"
+        style={{
+          width: "145px",
+          display: "block",
+          margin: "0 auto 16px",
+          filter: "drop-shadow(0 2px 6px rgba(0,0,0,.1))"
+        }}
+      />
 
       <h2>Iniciar sesión</h2>
 
@@ -72,6 +75,7 @@ export default function Login() {
         placeholder="Contraseña"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && handleLogin()}
         style={{ padding: "10px", marginBottom: "20px", width: "250px" }}
       /><br />
 

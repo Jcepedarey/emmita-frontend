@@ -1,6 +1,7 @@
   import { jsPDF } from "jspdf";
   import autoTable from "jspdf-autotable";
   import { generarNombreArchivo } from "./nombrePDF";
+  import { obtenerDatosTenantPDF } from "./tenantPDF";
 
   // 🖼️ Optimización de imagen
   const procesarImagen = (src, width = 150, calidad = 1.0) =>
@@ -61,8 +62,9 @@
 
   export const generarRemisionPDF = async (documento) => {
     const doc = new jsPDF();
-    const logo = await procesarImagen("/icons/logo.png", 250, 1.0);
-    const fondo = await procesarImagen("/icons/fondo_emmita.png", 300, 0.9);
+    const emp = await obtenerDatosTenantPDF();
+    const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
+    const fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
 
     // Marca de agua
     const insertarFondo = () => {
@@ -86,12 +88,12 @@
   const fechaEvento   = documento.fecha_evento   ? soloFecha(documento.fecha_evento)   : "-";
 
     // ─── Encabezado ──────────────────────────────────────────────────────────────
-    doc.addImage(logo, "PNG", 10, 10, 30, 30); // ancho=alto → círculo perfecto
+    doc.addImage(logo, "PNG", 10, 10, 30, 30);
     doc.setFontSize(16);
-    doc.text("Alquiler & Eventos Emmita", 50, 20);
+    doc.text(emp.nombre, 50, 20);
     doc.setFontSize(10);
-    doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio, Meta", 50, 26);
-    doc.text("Cel-Whatsapp 3166534685 - 3118222934", 50, 31);
+    doc.text(emp.direccion, 50, 26);
+    doc.text(emp.telefono ? `Cel-Whatsapp ${emp.telefono}` : "", 50, 31);
     doc.setLineWidth(0.5);
     doc.line(10, 42, 200, 42);
 

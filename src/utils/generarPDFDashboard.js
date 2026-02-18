@@ -2,6 +2,7 @@
 // NOTA: jsPDF no soporta emojis Unicode — todos los textos usan caracteres ASCII/Latin-1
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { obtenerDatosTenantPDF } from "./tenantPDF"; // ✅ Import correcto
 
 /* ─── Constantes ─── */
 const BLUE = [41, 128, 185];
@@ -59,10 +60,26 @@ export async function generarPDFDashboard(data) {
 
   // Recursos graficos
   let logo = null, fondo = null;
+  // ✅ CORRECCIÓN: Declaramos 'emp' aquí afuera con valores por defecto
+  let emp = { 
+    nombre: "Alquiler & Eventos Emmita", 
+    direccion: "Villavicencio, Meta",
+    telefono: "",
+    logoUrl: "/icons/logo.png",
+    fondoUrl: "/icons/fondo_emmita.png"
+  };
+
   try {
-    logo = await procesarImagen("/icons/logo.png", 250, 1.0);
-    fondo = await procesarImagen("/icons/fondo_emmita.png", 300, 0.9);
-  } catch {}
+    // Intentamos cargar los datos reales del tenant
+    const datosTenant = await obtenerDatosTenantPDF();
+    if (datosTenant) {
+        emp = datosTenant; // Si existen, sobrescribimos los valores por defecto
+    }
+    logo = await procesarImagen(emp.logoUrl, 250, 1.0);
+    fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
+  } catch (error) {
+    console.error("Error cargando recursos PDF:", error);
+  }
 
   const insertarFondo = () => {
     if (!fondo) return;
@@ -121,12 +138,12 @@ export async function generarPDFDashboard(data) {
   if (logo) doc.addImage(logo, "PNG", 10, 10, 30, 30);
   doc.setFontSize(16);
   doc.setTextColor(30);
-  doc.text("Alquiler & Eventos Emmita", 50, 20);
+  // ✅ Ahora sí 'emp' existe aquí
+  doc.text(emp.nombre || "Empresa", 50, 20); 
   doc.setFontSize(10);
   doc.setTextColor(80);
-  doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio, Meta", 50, 26);
-  doc.text("Cel-Whatsapp 3166534685 - 3118222934", 50, 31);
-
+  doc.text(emp.direccion || "", 50, 26);
+  doc.text(emp.telefono ? `Cel-Whatsapp ${emp.telefono}` : "", 50, 31);
   doc.setDrawColor(...BLUE);
   doc.setLineWidth(0.8);
   doc.line(10, 40, pageW - 10, 40);
@@ -346,7 +363,8 @@ export async function generarPDFDashboard(data) {
     doc.setTextColor(150);
     doc.text(`Pagina ${i} de ${pages}`, pageW / 2, pageH - 8, { align: "center" });
     doc.text(`Generado: ${new Date().toLocaleString("es-CO")}`, pageW - 14, pageH - 8, { align: "right" });
-    doc.text("Swalquiler - Alquiler & Eventos Emmita", 14, pageH - 8);
+    // ✅ 'emp' también existe aquí y funciona
+    doc.text(`Swalquiler - ${emp.nombre || ""}`, 14, pageH - 8);
   }
 
   // ═══════════════════════════════════════════════════════════

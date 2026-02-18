@@ -1,6 +1,7 @@
 // src/utils/generarPDFContable.js — SESIÓN 4: PDF profesional de contabilidad
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { obtenerDatosTenantPDF } from "./tenantPDF";
 
 // ─────────────────── Constantes ───────────────────
 const BLUE_HEAD = [41, 128, 185];
@@ -64,8 +65,9 @@ export async function generarPDFContable(movimientos, opciones = {}) {
   const { desde, hasta, filtroCategoria, filtroOrigen } = opciones;
 
   // Recursos gráficos
-  const logo = await procesarImagen("/icons/logo.png", 250, 1.0);
-  const fondo = await procesarImagen("/icons/fondo_emmita.png", 300, 0.9);
+  const emp = await obtenerDatosTenantPDF();
+  const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
+  const fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
 
   // Marca de agua en cada página
   const insertarFondo = () => {
@@ -82,10 +84,10 @@ export async function generarPDFContable(movimientos, opciones = {}) {
   // ─── Encabezado (mismo estilo que Recepción y Remisión) ───
   if (logo) doc.addImage(logo, "PNG", 10, 10, 30, 30);
   doc.setFontSize(16);
-  doc.text("Alquiler & Eventos Emmita", 50, 20);
+  doc.text(emp.nombre, 50, 20);
   doc.setFontSize(10);
-  doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio, Meta", 50, 26);
-  doc.text("Cel-Whatsapp 3166534685 - 3118222934", 50, 31);
+  doc.text(emp.direccion, 50, 26);
+  doc.text(emp.telefono ? `Cel-Whatsapp ${emp.telefono}` : "", 50, 31);
   doc.setLineWidth(0.5);
   doc.line(10, 42, 200, 42);
 
@@ -299,7 +301,7 @@ export async function generarPDFContable(movimientos, opciones = {}) {
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.text(
-      `Alquiler & Eventos Emmita — Informe Contable — Página ${i} de ${totalPages}`,
+      `${emp.nombre} — Informe Contable — Página ${i} de ${totalPages}`,
       doc.internal.pageSize.getWidth() / 2,
       doc.internal.pageSize.getHeight() - 8,
       { align: "center" }

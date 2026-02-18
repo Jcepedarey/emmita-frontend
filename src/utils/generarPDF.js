@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
   import autoTable from "jspdf-autotable";
   import { generarNombreArchivo } from "./nombrePDF";
+  import { obtenerDatosTenantPDF } from "./tenantPDF";
 
   // ─── Paleta de colores por tipo ──────────────────────────────────────────────
   const PALETTE = {
@@ -83,11 +84,10 @@ import jsPDF from "jspdf";
   export async function generarPDF(documento, tipo = "cotizacion") {
     const doc = new jsPDF();
 
-    // ─── Recursos gráficos ───────────────────────────────────────────────────────
-    const logoUrl = "/icons/logo.png";
-    const fondoUrl = "/icons/fondo_emmita.png";
-    const logo = await procesarImagen(logoUrl, 250, 1.0);
-    const fondo = await procesarImagen(fondoUrl, 300, 0.9);
+    // ─── Datos de la empresa (dinámico) ──────────────────────────────────────────
+    const emp = await obtenerDatosTenantPDF();
+    const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
+    const fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
 
     const insertarFondo = () => {
       const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
@@ -100,12 +100,12 @@ import jsPDF from "jspdf";
     insertarFondo();
 
     // ─── Encabezado ──────────────────────────────────────────────────────────────
-    doc.addImage(logo, "PNG", 10, 10, 30, 30); // ancho=alto → círculo perfecto
+    doc.addImage(logo, "PNG", 10, 10, 30, 30);
     doc.setFontSize(16);
-    doc.text("Alquiler & Eventos Emmita", 50, 20);
+    doc.text(emp.nombre, 50, 20);
     doc.setFontSize(10);
-    doc.text("Calle 40A No. 26 - 34 El Emporio - Villavicencio, Meta", 50, 26);
-    doc.text("Cel-Whatsapp 3166534685 - 3118222934", 50, 31);
+    doc.text(emp.direccion, 50, 26);
+    doc.text(emp.telefono ? `Cel-Whatsapp ${emp.telefono}` : "", 50, 31);
     doc.setLineWidth(0.5);
     doc.line(10, 42, 200, 42);
 
@@ -445,9 +445,9 @@ let y = (doc.lastAutoTable?.finalY || 100) + 10;
   const yFooter2    = pageHeight2 - bottomMargin - footerHeight;
 
   doc.setFontSize(10);
-  doc.text("Instagram: @alquileryeventosemmita", 10, yFooter2);
-  doc.text("Facebook: Facebook.com/alquileresemmita", 10, yFooter2 + 5);
-  doc.text("Email: alquileresemmita@hotmail.com", 10, yFooter2 + 10);
+  if (emp.instagram) doc.text(`Instagram: ${emp.instagram}`, 10, yFooter2);
+  if (emp.facebook) doc.text(`Facebook: ${emp.facebook}`, 10, yFooter2 + 5);
+  if (emp.email) doc.text(`Email: ${emp.email}`, 10, yFooter2 + 10);
 
   // ─── Guardar PDF ─────────────────────────────────────────────────────────────
   const fechaSegura = documento.fecha_creacion || new Date();

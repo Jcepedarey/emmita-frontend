@@ -1,6 +1,7 @@
 // src/components/Sidebar.js
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTenant } from "../context/TenantContext"; // ✅ IMPORT NUEVO
 
 const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
   const navigate = useNavigate();
@@ -11,6 +12,9 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
   // 🆕 Para mostrar tooltip cuando está colapsado
   const [hoveredModulo, setHoveredModulo] = useState(null);
   const [tooltipTop, setTooltipTop] = useState(0);
+
+  // ✅ CONEXIÓN AL TENANT (Para saber el nombre de la empresa)
+  const { tenant } = useTenant();
 
   // Detectar cambio de tamaño
   useEffect(() => {
@@ -75,7 +79,7 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
   return (
     <>
       {/* ========== OVERLAY (solo móvil) ========== */}
-      {isMobile && (
+      {isMobile && isOpen && (
         <div
           onClick={onClose}
           style={{
@@ -200,14 +204,14 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
             }}
           />
 
-          {/* Texto (ocultar si colapsado en PC) */}
+          {/* ✅ TEXTO DINÁMICO (Cambia según la empresa logueada) */}
           {(!isCollapsed || isMobile) && (
             <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#374151" }}>
-                SwAlquiler
+                {tenant?.nombre || "SwAlquiler"}
               </div>
               <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                Gestión de alquileres
+                {tenant ? "Panel de gestión" : "Cargando..."}
               </div>
             </div>
           )}
