@@ -13,6 +13,7 @@ import { useNavigationState } from "./context/NavigationContext";
 
 // 📦 Páginas principales
 import Login from "./pages/Login";
+import Register from "./pages/Register"; // ✅ NUEVO IMPORT
 import Inicio from "./pages/Inicio";
 import CrearDocumento from "./pages/CrearDocumento";
 import Clientes from "./pages/Clientes";
@@ -29,7 +30,7 @@ import Inventario from "./pages/Inventario";
 import Reportes from "./pages/Reportes";
 import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
-import MiEmpresa from "./pages/MiEmpresa"; // ✅ NUEVO IMPORT
+import MiEmpresa from "./pages/MiEmpresa";
 
 function App() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -115,6 +116,9 @@ function App() {
           <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
             <Routes>
               <Route path="/" element={<Login />} />
+              {/* ✅ NUEVA RUTA DE REGISTRO */}
+              <Route path="/registro" element={<Register />} />
+              
               <Route path="/inicio" element={<Inicio />} />
               <Route path="/crear-documento" element={<CrearDocumento />} />
               <Route path="/clientes" element={<Clientes />} />
@@ -131,7 +135,6 @@ function App() {
               <Route path="/reportes" element={<Reportes />} />
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/exportar" element={<Exportar />} />
-              {/* ✅ NUEVA RUTA */}
               <Route path="/mi-empresa" element={<MiEmpresa />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>

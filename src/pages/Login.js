@@ -1,6 +1,6 @@
 // src/pages/Login.js
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // ✅ Agregado Link
 import Swal from "sweetalert2";
 import supabase from "../supabaseClient";
 import { useTenant } from "../context/TenantContext";
@@ -10,6 +10,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const navigate = useNavigate();
+  
+  // Función para recargar los datos de la empresa al entrar
   const { recargar } = useTenant();
 
   const handleLogin = async () => {
@@ -34,7 +36,7 @@ export default function Login() {
       localStorage.setItem("sesion", JSON.stringify(data.session));
       localStorage.setItem("usuario", JSON.stringify(data.session.user));
 
-      // ✅ NUEVO: Cargar datos del tenant y perfil
+      // ✅ CLAVE: Forzar la carga de la empresa antes de entrar
       await recargar();
 
       setCargando(false);
@@ -86,6 +88,14 @@ export default function Login() {
       >
         {cargando ? "Cargando..." : "Entrar"}
       </button>
+
+      {/* ✅ ENLACE DE REGISTRO NUEVO */}
+      <p style={{ marginTop: 20, fontSize: 14, color: "#6b7280" }}>
+        ¿No tienes cuenta?{" "}
+        <Link to="/registro" style={{ color: "#0077B6", fontWeight: 600 }}>
+          Registra tu empresa
+        </Link>
+      </p>
     </div>
   );
 }

@@ -41,6 +41,7 @@ app.use("/api/proveedores", require("./routes/proveedores"));
 app.use("/api/trazabilidad", require("./routes/trazabilidad"));
 app.use("/api/usuarios", require("./routes/usuarios")); // /login queda pública dentro del router
 app.use("/api/ia", require("./routes/ia")); // ✅ Proxy seguro para OpenAI
+app.use("/api/registro", require("./routes/registro"));
 
 // Ruta 404
 app.use((req, res) => {
