@@ -16,7 +16,7 @@ function getSupabase() {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
-        storageKey: "emmita-auth", // tu storageKey
+        storageKey: "swalquiler-auth",
       },
     });
   }

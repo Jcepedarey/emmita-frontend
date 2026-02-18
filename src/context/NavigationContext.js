@@ -6,7 +6,7 @@ export const NavigationProvider = ({ children }) => {
   // ✅ Cargar estados desde localStorage al iniciar
   const [moduleStates, setModuleStates] = useState(() => {
     try {
-      const saved = localStorage.getItem("emmita_module_states");
+      const saved = localStorage.getItem("swalquiler_module_states");
       return saved ? JSON.parse(saved) : {};
     } catch (error) {
       console.error("Error cargando estados guardados:", error);
@@ -30,7 +30,7 @@ export const NavigationProvider = ({ children }) => {
 
     saveTimeoutRef.current = setTimeout(() => {
       try {
-        localStorage.setItem("emmita_module_states", JSON.stringify(moduleStates));
+        localStorage.setItem("swalquiler_module_states", JSON.stringify(moduleStates));
       } catch (error) {
         console.error("Error guardando estados:", error);
       }
@@ -95,7 +95,7 @@ export const NavigationProvider = ({ children }) => {
 
   const clearAllStates = useCallback(() => {
     setModuleStates({});
-    localStorage.removeItem("emmita_module_states");
+    localStorage.removeItem("swalquiler_module_states");
   }, []);
 
   const clearModuleState = useCallback((route) => {

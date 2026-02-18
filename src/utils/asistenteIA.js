@@ -1,4 +1,4 @@
-import axios from "axios";
+import { fetchAPI } from "./api";
 import {
   obtenerPedidosPorFecha,
   obtenerStockBajoParaFecha,
@@ -123,12 +123,11 @@ export async function consultarIA(mensajeOriginal) {
     return "⚠️ Error al consultar la base de datos.";
   }
 
-  // 🧠 Fallback a OpenAI si no se reconoce el patrón
+  // 🧠 Fallback a OpenAI (a través del backend seguro)
   try {
-    const respuesta = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4o",
+    const data = await fetchAPI(`${process.env.REACT_APP_API_URL}/api/ia/chat`, {
+      method: "POST",
+      body: JSON.stringify({
         messages: [
           {
             role: "system",
@@ -139,20 +138,13 @@ export async function consultarIA(mensajeOriginal) {
             content: mensajeOriginal,
           },
         ],
-        temperature: 0.4,
-        max_tokens: 800,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.REACT_APP_OPENAI_KEY}`,
-        },
-      }
-    );
+        model: "gpt-4o",
+      }),
+    });
 
-    return respuesta.data.choices[0].message.content.trim();
+    return data.choices[0].message.content.trim();
   } catch (error) {
-    console.error("❌ Error al consultar OpenAI:", error.message);
+    console.error("❌ Error al consultar IA:", error.message);
     return "⚠️ Hubo un error al procesar tu solicitud. Intenta nuevamente.";
   }
 }
