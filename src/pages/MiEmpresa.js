@@ -1,13 +1,53 @@
 // src/pages/MiEmpresa.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import supabase from "../supabaseClient";
 import { useTenant } from "../context/TenantContext";
 import { limpiarCacheTenant } from "../utils/tenantPDF";
 import Protegido from "../components/Protegido";
 
+// ─── Comprime imagen en el navegador antes de subir ───────────────────
+function comprimirImagen(file, maxAncho, maxAlto, calidad = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+
+        // Redimensionar proporcionalmente
+        if (w > maxAncho || h > maxAlto) {
+          const ratio = Math.min(maxAncho / w, maxAlto / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error("Error comprimiendo imagen"));
+            resolve(blob);
+          },
+          "image/webp",
+          calidad
+        );
+      };
+      img.onerror = () => reject(new Error("No se pudo leer la imagen"));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error("Error leyendo archivo"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function MiEmpresa() {
-  const { tenant, perfil, esAdmin, recargar } = useTenant();
+  const { tenant, esAdmin, recargar } = useTenant();
   const [form, setForm] = useState({
     nombre: "",
     direccion: "",
@@ -18,6 +58,12 @@ export default function MiEmpresa() {
     nit: "",
   });
   const [guardando, setGuardando] = useState(false);
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const [subiendoFondo, setSubiendoFondo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [fondoPreview, setFondoPreview] = useState(null);
+  const logoInputRef = useRef(null);
+  const fondoInputRef = useRef(null);
 
   // Cargar datos actuales del tenant
   useEffect(() => {
@@ -31,11 +77,102 @@ export default function MiEmpresa() {
         facebook: tenant.facebook || "",
         nit: tenant.nit || "",
       });
+      setLogoPreview(tenant.logo_url || null);
+      setFondoPreview(tenant.fondo_url || null);
     }
   }, [tenant]);
 
   const handleChange = (campo, valor) => {
     setForm((prev) => ({ ...prev, [campo]: valor }));
+  };
+
+  // ─── Subir imagen a Supabase Storage ─────────────────────────────
+  const subirImagen = async (file, tipo) => {
+    // tipo: "logo" o "fondo"
+    const esLogo = tipo === "logo";
+    const setter = esLogo ? setSubiendoLogo : setSubiendoFondo;
+
+    // Validar tipo de archivo
+    const tiposPermitidos = ["image/png", "image/jpeg", "image/webp"];
+    if (!tiposPermitidos.includes(file.type)) {
+      Swal.fire("Formato no válido", "Solo se permiten imágenes PNG, JPG o WEBP", "warning");
+      return;
+    }
+
+    // Validar tamaño original (máx 5 MB antes de comprimir)
+    if (file.size > 5 * 1024 * 1024) {
+      Swal.fire("Archivo muy grande", "La imagen no debe superar los 5 MB", "warning");
+      return;
+    }
+
+    try {
+      setter(true);
+
+      // Comprimir: logo 400x400, fondo 800x800
+      const maxDim = esLogo ? 400 : 800;
+      const blob = await comprimirImagen(file, maxDim, maxDim, 0.8);
+
+      const fileName = `${tenant.id}/${tipo}.webp`;
+
+      // Subir a Storage (upsert reemplaza si ya existe)
+      const { error: uploadError } = await supabase.storage
+        .from("tenant-assets")
+        .upload(fileName, blob, {
+          contentType: "image/webp",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Error subiendo imagen:", uploadError);
+        Swal.fire("Error", "No se pudo subir la imagen: " + uploadError.message, "error");
+        setter(false);
+        return;
+      }
+
+      // Obtener URL pública
+      const { data: urlData } = supabase.storage
+        .from("tenant-assets")
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData.publicUrl + "?v=" + Date.now(); // cache-bust
+
+      // Guardar URL en la tabla tenants
+      const campo = esLogo ? "logo_url" : "fondo_url";
+      const { error: dbError } = await supabase
+        .from("tenants")
+        .update({ [campo]: publicUrl })
+        .eq("id", tenant.id);
+
+      if (dbError) {
+        console.error("Error guardando URL:", dbError);
+        Swal.fire("Error", "Imagen subida pero no se pudo guardar la referencia", "error");
+        setter(false);
+        return;
+      }
+
+      // Actualizar preview y caché
+      if (esLogo) setLogoPreview(publicUrl);
+      else setFondoPreview(publicUrl);
+
+      limpiarCacheTenant();
+      await recargar();
+
+      setter(false);
+
+      const tamKB = (blob.size / 1024).toFixed(0);
+      Swal.fire({
+        icon: "success",
+        title: esLogo ? "Logo actualizado" : "Marca de agua actualizada",
+        text: `Imagen comprimida a ${tamKB} KB y guardada correctamente.`,
+        timer: 2500,
+        showConfirmButton: false,
+      });
+
+    } catch (err) {
+      console.error("Error en subida:", err);
+      setter(false);
+      Swal.fire("Error", "No se pudo procesar la imagen", "error");
+    }
   };
 
   const guardar = async () => {
@@ -66,7 +203,6 @@ export default function MiEmpresa() {
         return;
       }
 
-      // Limpiar caché de PDFs y recargar contexto
       limpiarCacheTenant();
       await recargar();
 
@@ -80,7 +216,7 @@ export default function MiEmpresa() {
     }
   };
 
-  // Estilos
+  // ─── Estilos ─────────────────────────────────────────────────────
   const card = {
     maxWidth: 600,
     margin: "20px auto",
@@ -118,6 +254,46 @@ export default function MiEmpresa() {
     cursor: guardando ? "not-allowed" : "pointer",
     opacity: guardando ? 0.7 : 1,
   };
+  const imgBox = {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    border: "2px dashed #d1d5db",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    cursor: "pointer",
+    background: "#f9fafb",
+    flexShrink: 0,
+  };
+  const imgPreview = {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+  };
+  const uploadRow = {
+    display: "flex",
+    gap: 16,
+    alignItems: "center",
+    marginTop: 8,
+  };
+  const uploadInfo = {
+    fontSize: 12,
+    color: "#6b7280",
+    lineHeight: "1.4",
+    flex: 1,
+  };
+  const sectionTitle = {
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#0077B6",
+    marginTop: 20,
+    marginBottom: 4,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  };
 
   if (!esAdmin) {
     return (
@@ -144,6 +320,83 @@ export default function MiEmpresa() {
         </p>
 
         <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: 8 }} />
+
+        {/* ─── SECCIÓN: Imágenes para PDFs ───────────────────────── */}
+        <div style={sectionTitle}>🖼️ Imágenes para documentos PDF</div>
+        <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 8px 0" }}>
+          Formatos: PNG, JPG o WEBP · Máx 5 MB · Se comprimen automáticamente
+        </p>
+
+        {/* Logo */}
+        <label style={label}>Logo (encabezado del PDF)</label>
+        <div style={uploadRow}>
+          <div
+            style={imgBox}
+            onClick={() => !subiendoLogo && logoInputRef.current?.click()}
+            title="Click para subir logo"
+          >
+            {subiendoLogo ? (
+              <span style={{ fontSize: 12, color: "#9ca3af" }}>Subiendo...</span>
+            ) : logoPreview ? (
+              <img src={logoPreview} alt="Logo" style={imgPreview} />
+            ) : (
+              <span style={{ fontSize: 24, color: "#d1d5db" }}>+</span>
+            )}
+          </div>
+          <div style={uploadInfo}>
+            <strong>Recomendado:</strong> imagen cuadrada (ej: 400×400 px).
+            <br />Se muestra en la esquina superior izquierda de todos los PDFs.
+            <br />El sistema la comprime a máx 400×400 px automáticamente.
+          </div>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              if (e.target.files[0]) subirImagen(e.target.files[0], "logo");
+              e.target.value = "";
+            }}
+          />
+        </div>
+
+        {/* Marca de agua / Fondo */}
+        <label style={{ ...label, marginTop: 16 }}>Marca de agua (fondo del PDF)</label>
+        <div style={uploadRow}>
+          <div
+            style={imgBox}
+            onClick={() => !subiendoFondo && fondoInputRef.current?.click()}
+            title="Click para subir marca de agua"
+          >
+            {subiendoFondo ? (
+              <span style={{ fontSize: 12, color: "#9ca3af" }}>Subiendo...</span>
+            ) : fondoPreview ? (
+              <img src={fondoPreview} alt="Fondo" style={imgPreview} />
+            ) : (
+              <span style={{ fontSize: 24, color: "#d1d5db" }}>+</span>
+            )}
+          </div>
+          <div style={uploadInfo}>
+            <strong>Recomendado:</strong> imagen horizontal o cuadrada (ej: 800×600 px).
+            <br />Se muestra como marca de agua semitransparente de fondo.
+            <br /><em>No necesitas hacerla transparente, el sistema lo hace solo.</em>
+          </div>
+          <input
+            ref={fondoInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              if (e.target.files[0]) subirImagen(e.target.files[0], "fondo");
+              e.target.value = "";
+            }}
+          />
+        </div>
+
+        <div style={{ borderBottom: "1px solid #e5e7eb", marginTop: 20, marginBottom: 4 }} />
+
+        {/* ─── SECCIÓN: Datos de la empresa ──────────────────────── */}
+        <div style={sectionTitle}>📋 Datos de la empresa</div>
 
         <label style={label}>Nombre de la empresa *</label>
         <input

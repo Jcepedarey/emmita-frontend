@@ -36,6 +36,7 @@ export async function obtenerDatosTenantPDF() {
       instagram: tenant.instagram || "",
       facebook: tenant.facebook || "",
       nit: tenant.nit || "",
+      // Usar URLs de Storage si existen, si no usar imágenes estáticas locales
       logoUrl: tenant.logo_url || "/icons/logo.png",
       fondoUrl: tenant.fondo_url || "/icons/fondo_emmita.png",
     };
@@ -63,7 +64,7 @@ function datosPorDefecto() {
   };
 }
 
-// Limpiar caché al cerrar sesión
+// Limpiar caché (llamar al cerrar sesión o al cambiar datos de empresa)
 export function limpiarCacheTenant() {
   _cachedTenant = null;
 }
