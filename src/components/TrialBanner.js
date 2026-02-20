@@ -4,9 +4,10 @@ import React from "react";
 import useLimites from "../hooks/useLimites";
 
 export default function TrialBanner() {
-  const { plan, diasRestantes, trialVencido, tenantInactivo } = useLimites();
+  const { plan, diasRestantes, trialVencido, tenantInactivo, cargando } = useLimites();
 
-  // No mostrar nada si es plan pago y activo
+  // No mostrar nada mientras carga o si es plan pago y activo
+  if (cargando) return null;
   if (plan !== "trial" && !tenantInactivo) return null;
 
   // Cuenta suspendida

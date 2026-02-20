@@ -51,7 +51,7 @@ export default function useLimites() {
         supabase.from("productos").select("id", { count: "exact", head: true }),
         supabase.from("clientes").select("id", { count: "exact", head: true }),
         supabase.from("cotizaciones").select("id", { count: "exact", head: true }),
-        supabase.from("ordenes").select("id", { count: "exact", head: true }),
+        supabase.from("ordenes_pedido").select("id", { count: "exact", head: true }),
         supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenant.id),
       ]);
 
