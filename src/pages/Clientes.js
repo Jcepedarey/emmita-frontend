@@ -5,6 +5,7 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 import Papa from "papaparse";
 import Protegido from "../components/Protegido";
 import { useNavigationState } from "../context/NavigationContext";
+import useLimites from "../hooks/useLimites";
 
 export default function Clientes() {
   const { saveModuleState, getModuleState } = useNavigationState();
@@ -23,6 +24,7 @@ export default function Clientes() {
   });
   const [editando, setEditando] = useState(estadoGuardado?.editando || null);
   const [mostrarFormulario, setMostrarFormulario] = useState(estadoGuardado?.mostrarFormulario || false);
+const { puedeCrearCliente, mensajeBloqueo } = useLimites();
 
   // ✅ GUARDAR ESTADO
   useEffect(() => {
@@ -67,6 +69,12 @@ export default function Clientes() {
   };
 
   const guardarCliente = async () => {
+    // ✅ Verificar límites del plan
+    if (!editando && !puedeCrearCliente()) {
+      const msg = mensajeBloqueo("cliente");
+      return Swal.fire(msg.titulo, msg.mensaje, msg.icono);
+    }
+    
     const { nombre, identificacion, telefono, direccion, email } = form;
 
     if (!nombre.trim()) {

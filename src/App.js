@@ -7,13 +7,14 @@ import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import BotonIAFlotante from "./components/BotonIAFlotante";
 import AsistenteModal from "./components/AsistenteModal";
+import TrialBanner from "./components/TrialBanner"; // ✅ NUEVO IMPORT DEL BANNER
 import "./swal.css";
 import "./App.css";
 import { useNavigationState } from "./context/NavigationContext";
 
 // 📦 Páginas principales
 import Login from "./pages/Login";
-import Register from "./pages/Register"; // ✅ NUEVO IMPORT
+import Register from "./pages/Register";
 import Inicio from "./pages/Inicio";
 import CrearDocumento from "./pages/CrearDocumento";
 import Clientes from "./pages/Clientes";
@@ -113,10 +114,13 @@ function App() {
           transition: 'margin-left 0.25s ease',
           paddingBottom: window.innerWidth <= 768 ? 80 : 20,
         }}>
+          
+          {/* ✅ BANNER DE PRUEBA AÑADIDO AQUÍ */}
+          <TrialBanner />
+
           <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
             <Routes>
               <Route path="/" element={<Login />} />
-              {/* ✅ NUEVA RUTA DE REGISTRO */}
               <Route path="/registro" element={<Register />} />
               
               <Route path="/inicio" element={<Inicio />} />

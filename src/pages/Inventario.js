@@ -7,6 +7,8 @@ import Papa from "papaparse";
 import Protegido from "../components/Protegido";
 import { useNavigationState } from "../context/NavigationContext";
 
+import useLimites from "../hooks/useLimites";
+
 export default function Inventario() {
   const { saveModuleState, getModuleState } = useNavigationState();
 
@@ -26,6 +28,7 @@ export default function Inventario() {
   const [editandoId, setEditandoId] = useState(estadoGuardado?.editandoId || null);
   const [mostrarFormulario, setMostrarFormulario] = useState(estadoGuardado?.mostrarFormulario || false);
   const [mostrarTodo, setMostrarTodo] = useState(estadoGuardado?.mostrarTodo || false);
+  const { puedeCrearProducto, mensajeBloqueo } = useLimites();
 
   // ✅ GUARDAR ESTADO - Convertir objetos a string para evitar bucles
   useEffect(() => {
@@ -60,6 +63,11 @@ export default function Inventario() {
   };
 
   const guardarProducto = async () => {
+    // ✅ Verificar límites del plan
+    if (!editandoId && !puedeCrearProducto()) {
+      const msg = mensajeBloqueo("producto");
+      return Swal.fire(msg.titulo, msg.mensaje, msg.icono);
+    }
     const { nombre, descripcion, precio, stock, categoria } = form;
     if (!nombre || !precio || !stock) {
       return Swal.fire("Campos requeridos", "Nombre, precio y stock son obligatorios.", "warning");

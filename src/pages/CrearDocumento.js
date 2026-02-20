@@ -3,6 +3,8 @@
   import { useLocation } from "react-router-dom";
   import supabase from "../supabaseClient";
 
+  import useLimites from "../hooks/useLimites";
+
   import BuscarProductoModal from "../components/BuscarProductoModal";
   import AgregarGrupoModal from "../components/AgregarGrupoModal";
   import CrearClienteModal from "../components/CrearClienteModal";
@@ -19,6 +21,8 @@
   const CrearDocumento = () => {
     const location = useLocation();
     const { documento, tipo } = location.state || {};
+
+    const { puedeCrearDocumento, mensajeBloqueo, trialVencido } = useLimites();
     
     // ✅ CONVERTIR A ESTADOS para poder actualizar después de guardar
     const [esEdicion, setEsEdicion] = useState(documento?.esEdicion || false);
@@ -777,6 +781,14 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
         console.log("⚠️ Ya se está guardando, ignorando clic adicional");
         return;
       }
+
+      // 🛑 AQUÍ PONEMOS LA VERIFICACIÓN DEL PLAN DE PRUEBA 🛑
+      // Solo lo bloqueamos si es un documento nuevo (!esEdicion)
+      if (!esEdicion && !puedeCrearDocumento()) {
+        const msg = mensajeBloqueo("documento");
+        return Swal.fire(msg.titulo, msg.mensaje, msg.icono);
+      }
+
       setGuardando(true);
 
       try {

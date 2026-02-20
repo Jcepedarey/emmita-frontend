@@ -11,7 +11,11 @@ app.set("trust proxy", 1); // ✅ para que el rate-limit identifique bien la IP 
 
 // ✅ Middleware CORS para permitir acceso solo desde tu frontend
 app.use(cors({
-  origin: "https://emmita-frontend.vercel.app",
+  origin: [
+    "https://swalquiler.com",
+    "https://www.swalquiler.com",
+    "https://emmita-frontend.vercel.app"
+  ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
 }));
@@ -32,16 +36,24 @@ app.get("/api/test", (req, res) => {
   res.json({ message: "✅ El backend funciona correctamente" });
 });
 
-// Rutas
-app.use("/api/cotizaciones", require("./routes/cotizaciones"));
-app.use("/api/clientes", require("./routes/clientes"));
-app.use("/api/productos", require("./routes/productos"));
-app.use("/api/ordenes", require("./routes/ordenes"));
-app.use("/api/proveedores", require("./routes/proveedores"));
-app.use("/api/trazabilidad", require("./routes/trazabilidad"));
-app.use("/api/usuarios", require("./routes/usuarios")); // /login queda pública dentro del router
+// ==========================================
+// 🚨 RUTAS ANTIGUAS DESACTIVADAS (ZOMBIES) 🚨
+// El frontend ahora se conecta directo a Supabase con RLS para estas operaciones.
+// Se comentan para evitar fugas de datos multi-tenant.
+// ==========================================
+// app.use("/api/cotizaciones", require("./routes/cotizaciones"));
+// app.use("/api/clientes", require("./routes/clientes"));
+// app.use("/api/productos", require("./routes/productos"));
+// app.use("/api/ordenes", require("./routes/ordenes"));
+// app.use("/api/proveedores", require("./routes/proveedores"));
+// app.use("/api/trazabilidad", require("./routes/trazabilidad"));
+
+// ==========================================
+// ✅ RUTAS SEGURAS Y EN USO ✅
+// ==========================================
+app.use("/api/usuarios", require("./routes/usuarios")); // /login queda pública dentro del router y cambio de password
 app.use("/api/ia", require("./routes/ia")); // ✅ Proxy seguro para OpenAI
-app.use("/api/registro", require("./routes/registro"));
+app.use("/api/registro", require("./routes/registro")); // ✅ Registro Multi-Tenant seguro
 
 // Ruta 404
 app.use((req, res) => {
