@@ -1,16 +1,16 @@
 // src/components/TrialBanner.js
-// Banner que muestra los días restantes del trial
 import React from "react";
 import useLimites from "../hooks/useLimites";
+import { useTenant } from "../context/TenantContext";
 
 export default function TrialBanner() {
+  const { tenant } = useTenant();
   const { plan, diasRestantes, trialVencido, tenantInactivo, cargando } = useLimites();
 
-  // No mostrar nada mientras carga o si es plan pago y activo
+  if (!tenant) return null;
   if (cargando) return null;
   if (plan !== "trial" && !tenantInactivo) return null;
 
-  // Cuenta suspendida
   if (tenantInactivo) {
     return (
       <div style={estilos.banner("#ef4444")}>
@@ -19,7 +19,6 @@ export default function TrialBanner() {
     );
   }
 
-  // Trial vencido
   if (trialVencido) {
     return (
       <div style={estilos.banner("#ef4444")}>
@@ -36,7 +35,6 @@ export default function TrialBanner() {
     );
   }
 
-  // Trial activo
   if (plan === "trial" && diasRestantes !== null) {
     const color = diasRestantes <= 2 ? "#f59e0b" : "#0077B6";
     const emoji = diasRestantes <= 2 ? "⚡" : "🎉";

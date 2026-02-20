@@ -1,13 +1,13 @@
 // src/App.js
 import React, { Suspense, useState, useEffect } from "react";
-import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { CssBaseline, CircularProgress, Container } from "@mui/material";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import BotonIAFlotante from "./components/BotonIAFlotante";
 import AsistenteModal from "./components/AsistenteModal";
-import TrialBanner from "./components/TrialBanner"; // ✅ NUEVO IMPORT DEL BANNER
+import TrialBanner from "./components/TrialBanner";
 import "./swal.css";
 import "./App.css";
 import { useNavigationState } from "./context/NavigationContext";
@@ -33,13 +33,18 @@ import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
 import MiEmpresa from "./pages/MiEmpresa";
 
-function App() {
+// ✅ Componente interno que tiene acceso a useLocation
+function AppContent() {
+  const location = useLocation();
   const [modalVisible, setModalVisible] = useState(false);
   const { clearAllStates } = useNavigationState();
   
   // 🆕 Estados para el sidebar
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
   const [sidebarColapsado, setSidebarColapsado] = useState(false);
+
+  // ✅ Detectar si estamos en páginas públicas (sin sesión)
+  const esPaginaPublica = location.pathname === "/" || location.pathname === "/registro";
 
   // 🔐 Cierre de sesión por inactividad
   useEffect(() => {
@@ -78,7 +83,6 @@ function App() {
   // 🆕 Función para el botón hamburguesa
   const toggleSidebar = () => {
     const esMobile = window.innerWidth <= 768;
-    console.log("Toggle sidebar - esMobile:", esMobile, "sidebarAbierto:", sidebarAbierto);
     
     if (esMobile) {
       setSidebarAbierto(prev => !prev);
@@ -89,68 +93,77 @@ function App() {
 
   // 🆕 Función para cerrar sidebar
   const cerrarSidebar = () => {
-    console.log("Cerrando sidebar");
     setSidebarAbierto(false);
   };
 
   return (
     <>
+      {/* ✅ Solo mostrar navegación si NO estamos en login/registro */}
+      {!esPaginaPublica && (
+        <>
+          <Navbar onMenuClick={toggleSidebar} />
+          <Sidebar 
+            isOpen={sidebarAbierto}
+            isCollapsed={sidebarColapsado}
+            onClose={cerrarSidebar}
+            onToggleCollapse={() => setSidebarColapsado(prev => !prev)}
+          />
+        </>
+      )}
+
+      {/* Contenido principal */}
+      <Container style={{ 
+        marginLeft: !esPaginaPublica && window.innerWidth > 768 ? (sidebarColapsado ? 68 : 240) : 0,
+        transition: 'margin-left 0.25s ease',
+        paddingBottom: !esPaginaPublica && window.innerWidth <= 768 ? 80 : 20,
+      }}>
+        
+        {/* ✅ Banner solo cuando hay sesión activa */}
+        {!esPaginaPublica && <TrialBanner />}
+
+        <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/registro" element={<Register />} />
+            
+            <Route path="/inicio" element={<Inicio />} />
+            <Route path="/crear-documento" element={<CrearDocumento />} />
+            <Route path="/clientes" element={<Clientes />} />
+            <Route path="/buscar-documento" element={<BuscarDocumento />} />
+            <Route path="/buscar-recepcion" element={<BuscarRecepcion />} />
+            <Route path="/cotizacionesguardadas" element={<CotizacionesGuardadas />} />
+            <Route path="/ordenesguardadas" element={<OrdenesGuardadas />} />
+            <Route path="/trazabilidad" element={<Trazabilidad />} />
+            <Route path="/proveedores" element={<Proveedores />} />
+            <Route path="/agenda" element={<Agenda />} />
+            <Route path="/recepcion" element={<Recepcion />} />
+            <Route path="/contabilidad" element={<Contabilidad />} />
+            <Route path="/inventario" element={<Inventario />} />
+            <Route path="/reportes" element={<Reportes />} />
+            <Route path="/usuarios" element={<Usuarios />} />
+            <Route path="/exportar" element={<Exportar />} />
+            <Route path="/mi-empresa" element={<MiEmpresa />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </Suspense>
+      </Container>
+
+      {/* ✅ Barra inferior y asistente IA solo con sesión */}
+      {!esPaginaPublica && <BottomNav />}
+      
+      <AsistenteModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+      {!esPaginaPublica && <BotonIAFlotante onClick={() => setModalVisible(true)} />}
+    </>
+  );
+}
+
+// ✅ App principal solo maneja el Router
+function App() {
+  return (
+    <>
       <CssBaseline />
       <Router>
-        {/* Navbar con botón hamburguesa */}
-        <Navbar onMenuClick={toggleSidebar} />
-        
-        {/* 🆕 Sidebar */}
-        <Sidebar 
-          isOpen={sidebarAbierto}
-          isCollapsed={sidebarColapsado}
-          onClose={cerrarSidebar}
-          onToggleCollapse={() => setSidebarColapsado(prev => !prev)}
-        />
-
-        {/* Contenido principal */}
-        <Container style={{ 
-          marginLeft: window.innerWidth > 768 ? (sidebarColapsado ? 68 : 240) : 0,
-          transition: 'margin-left 0.25s ease',
-          paddingBottom: window.innerWidth <= 768 ? 80 : 20,
-        }}>
-          
-          {/* ✅ BANNER DE PRUEBA AÑADIDO AQUÍ */}
-          <TrialBanner />
-
-          <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
-            <Routes>
-              <Route path="/" element={<Login />} />
-              <Route path="/registro" element={<Register />} />
-              
-              <Route path="/inicio" element={<Inicio />} />
-              <Route path="/crear-documento" element={<CrearDocumento />} />
-              <Route path="/clientes" element={<Clientes />} />
-              <Route path="/buscar-documento" element={<BuscarDocumento />} />
-              <Route path="/buscar-recepcion" element={<BuscarRecepcion />} />
-              <Route path="/cotizacionesguardadas" element={<CotizacionesGuardadas />} />
-              <Route path="/ordenesguardadas" element={<OrdenesGuardadas />} />
-              <Route path="/trazabilidad" element={<Trazabilidad />} />
-              <Route path="/proveedores" element={<Proveedores />} />
-              <Route path="/agenda" element={<Agenda />} />
-              <Route path="/recepcion" element={<Recepcion />} />
-              <Route path="/contabilidad" element={<Contabilidad />} />
-              <Route path="/inventario" element={<Inventario />} />
-              <Route path="/reportes" element={<Reportes />} />
-              <Route path="/usuarios" element={<Usuarios />} />
-              <Route path="/exportar" element={<Exportar />} />
-              <Route path="/mi-empresa" element={<MiEmpresa />} />
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-          </Suspense>
-        </Container>
-
-        {/* 🆕 Barra inferior (solo móvil) */}
-        <BottomNav />
-
-        {/* Asistente IA */}
-        <AsistenteModal visible={modalVisible} onClose={() => setModalVisible(false)} />
-        <BotonIAFlotante onClick={() => setModalVisible(true)} />
+        <AppContent />
       </Router>
     </>
   );
