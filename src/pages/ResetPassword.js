@@ -1,5 +1,5 @@
 // src/pages/ResetPassword.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import supabase from "../supabaseClient";
@@ -8,7 +8,24 @@ export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [sesionLista, setSesionLista] = useState(false);
   const navigate = useNavigate();
+
+  // ✅ Esperar a que Supabase procese el token de recovery de la URL
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+        setSesionLista(true);
+      }
+    });
+
+    // También verificar si ya hay sesión activa
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setSesionLista(true);
+    });
+
+    return () => subscription?.unsubscribe();
+  }, []);
 
   const handleReset = async () => {
     if (!password || password.length < 6) {
@@ -16,6 +33,9 @@ export default function ResetPassword() {
     }
     if (password !== passwordConfirm) {
       return Swal.fire("No coinciden", "Las contraseñas no coinciden", "warning");
+    }
+    if (!sesionLista) {
+      return Swal.fire("Error", "La sesión de recuperación no está lista. Intenta abrir el enlace del correo de nuevo.", "error");
     }
 
     try {
@@ -80,6 +100,12 @@ export default function ResetPassword() {
           Ingresa tu nueva contraseña
         </p>
 
+        {!sesionLista && (
+          <p style={{ color: "#f59e0b", fontSize: 13, marginBottom: 16 }}>
+            ⏳ Verificando enlace de recuperación...
+          </p>
+        )}
+
         <input
           type="password"
           placeholder="Nueva contraseña (mínimo 6 caracteres)"
@@ -115,7 +141,7 @@ export default function ResetPassword() {
 
         <button
           onClick={handleReset}
-          disabled={cargando}
+          disabled={cargando || !sesionLista}
           style={{
             width: "100%",
             padding: 12,
@@ -125,8 +151,8 @@ export default function ResetPassword() {
             borderRadius: 8,
             fontSize: 15,
             fontWeight: 600,
-            cursor: cargando ? "not-allowed" : "pointer",
-            opacity: cargando ? 0.7 : 1,
+            cursor: cargando || !sesionLista ? "not-allowed" : "pointer",
+            opacity: cargando || !sesionLista ? 0.7 : 1,
           }}
         >
           {cargando ? "Actualizando..." : "Cambiar contraseña"}
