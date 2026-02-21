@@ -1,6 +1,6 @@
 // src/App.js
 import React, { Suspense, useState, useEffect } from "react";
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { CssBaseline, CircularProgress, Container } from "@mui/material";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
@@ -51,14 +51,15 @@ function AppContent() {
   const esPaginaPublica = ["/", "/registro", "/terminos", "/reset-password"].includes(location.pathname);
 
   // ✅ Detectar recovery de contraseña desde email de Supabase
+  const navigate = useNavigate();
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
-        window.location.href = "/reset-password";
+        navigate("/reset-password");
       }
     });
     return () => subscription?.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   // 🔐 Cierre de sesión por inactividad
   useEffect(() => {
