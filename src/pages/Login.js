@@ -72,9 +72,16 @@ export default function Login() {
 
     if (!emailRecuperar) return;
 
+    // ✅ NUEVO: Validar que el CAPTCHA esté completado antes de enviar la petición
+    if (!captchaToken) {
+      return Swal.fire("Verificación requerida", "Completa primero la verificación de seguridad (abajo) y luego intenta recuperar tu contraseña", "info");
+    }
+
     try {
+      // ✅ NUEVO: Enviar el captchaToken a Supabase
       const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperar, {
         redirectTo: `${window.location.origin}/`,
+        captchaToken,
       });
 
       if (error) {
