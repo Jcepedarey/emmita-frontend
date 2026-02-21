@@ -138,17 +138,6 @@ export default function Login() {
         </span>
       </p>
 
-      {/* ✅ CAPTCHA Cloudflare Turnstile */}
-      <div style={{ display: "inline-block", marginBottom: 16 }}>
-        <Turnstile
-          sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
-          onVerify={(token) => setCaptchaToken(token)}
-          onExpire={() => setCaptchaToken(null)}
-          theme="light"
-        />
-      </div>
-      <br />
-
       <button
         onClick={handleLogin}
         disabled={cargando || !captchaToken}
@@ -167,6 +156,16 @@ export default function Login() {
           Registra tu empresa
         </Link>
       </p>
+
+      {/* ✅ CAPTCHA Cloudflare Turnstile */}
+      <div style={{ display: "inline-block", marginTop: 8 }}>
+        <Turnstile
+          sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
+          onVerify={(token) => setCaptchaToken(token)}
+          onExpire={() => setCaptchaToken(null)}
+          theme="light"
+        />
+      </div>
     </div>
   );
 }

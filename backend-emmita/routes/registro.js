@@ -9,9 +9,37 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_KEY // service_role key
 );
 
+// ✅ Verificar token de Turnstile con Cloudflare
+async function verificarCaptcha(token) {
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret: process.env.TURNSTILE_SECRET_KEY,
+        response: token,
+      }),
+    });
+    const data = await response.json();
+    return data.success === true;
+  } catch (err) {
+    console.error("Error verificando CAPTCHA:", err);
+    return false;
+  }
+}
+
 // POST /api/registro — Crear empresa + usuario administrador
 router.post("/", async (req, res) => {
-  const { empresa, usuario } = req.body;
+  const { empresa, usuario, captchaToken } = req.body;
+
+  // ─── Verificar CAPTCHA ────────────────────────────
+  if (!captchaToken) {
+    return res.status(400).json({ error: "Verificación de seguridad requerida" });
+  }
+  const captchaValido = await verificarCaptcha(captchaToken);
+  if (!captchaValido) {
+    return res.status(403).json({ error: "Verificación de seguridad fallida. Intenta de nuevo." });
+  }
 
   // ─── Validaciones ─────────────────────────────────
   if (!empresa?.nombre?.trim() || !empresa?.slug?.trim()) {
@@ -72,7 +100,7 @@ router.post("/", async (req, res) => {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: usuario.email.trim().toLowerCase(),
       password: usuario.password,
-      email_confirm: true, // confirmar email automáticamente
+      email_confirm: true,
       user_metadata: {
         tenant_id: nuevoTenant.id,
         nombre: usuario.nombre.trim(),
