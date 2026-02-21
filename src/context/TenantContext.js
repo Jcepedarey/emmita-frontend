@@ -75,6 +75,8 @@ export const TenantProvider = ({ children }) => {
       if (event === "SIGNED_OUT") {
         setTenant(null);
         setPerfil(null);
+        setCargando(false);
+        setError(null);
       }
     });
 

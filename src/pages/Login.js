@@ -1,22 +1,26 @@
 // src/pages/Login.js
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom"; // ✅ Agregado Link
+import { useNavigate, Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import supabase from "../supabaseClient";
 import { useTenant } from "../context/TenantContext";
+import { Turnstile } from "react-turnstile";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
   const navigate = useNavigate();
   
-  // Función para recargar los datos de la empresa al entrar
   const { recargar } = useTenant();
 
   const handleLogin = async () => {
     if (!email || !password) {
       return Swal.fire("Campos requeridos", "Debes ingresar email y contraseña", "warning");
+    }
+    if (!captchaToken) {
+      return Swal.fire("Verificación requerida", "Completa la verificación de seguridad", "warning");
     }
 
     try {
@@ -24,7 +28,8 @@ export default function Login() {
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
+        options: { captchaToken }
       });
 
       if (error || !data.session) {
@@ -32,11 +37,9 @@ export default function Login() {
         return Swal.fire("Acceso denegado", error?.message || "Email o contraseña incorrectos", "error");
       }
 
-      // ✅ Guardar sesión (compatibilidad con el resto del frontend)
       localStorage.setItem("sesion", JSON.stringify(data.session));
       localStorage.setItem("usuario", JSON.stringify(data.session.user));
 
-      // ✅ CLAVE: Forzar la carga de la empresa antes de entrar
       await recargar();
 
       setCargando(false);
@@ -45,6 +48,50 @@ export default function Login() {
     } catch (err) {
       setCargando(false);
       Swal.fire("Error de conexión", "No se pudo conectar a Supabase", "error");
+    }
+  };
+
+  // ✅ Recuperar contraseña
+  const handleRecuperarPassword = async () => {
+    const { value: emailRecuperar } = await Swal.fire({
+      title: "Recuperar contraseña",
+      input: "email",
+      inputLabel: "Ingresa el correo de tu cuenta",
+      inputPlaceholder: "tu@email.com",
+      inputValue: email || "",
+      showCancelButton: true,
+      confirmButtonText: "Enviar enlace",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#0077B6",
+      inputValidator: (value) => {
+        if (!value || !value.includes("@")) {
+          return "Ingresa un correo electrónico válido";
+        }
+      },
+    });
+
+    if (!emailRecuperar) return;
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperar, {
+        redirectTo: `${window.location.origin}/`,
+      });
+
+      if (error) {
+        return Swal.fire("Error", error.message, "error");
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Correo enviado",
+        html: `
+          <p>Si existe una cuenta con <strong>${emailRecuperar}</strong>, recibirás un enlace para restablecer tu contraseña.</p>
+          <p style="margin-top:8px; color:#6b7280; font-size:13px;">Revisa tu bandeja de entrada y la carpeta de spam.</p>
+        `,
+        confirmButtonColor: "#0077B6",
+      });
+    } catch (err) {
+      Swal.fire("Error", "No se pudo enviar el correo. Intenta de nuevo.", "error");
     }
   };
 
@@ -78,18 +125,42 @@ export default function Login() {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-        style={{ padding: "10px", marginBottom: "20px", width: "250px" }}
+        style={{ padding: "10px", marginBottom: "10px", width: "250px" }}
       /><br />
+
+      {/* ✅ Enlace de recuperar contraseña */}
+      <p style={{ margin: "0 0 16px 0", fontSize: 13 }}>
+        <span
+          onClick={handleRecuperarPassword}
+          style={{ color: "#0077B6", cursor: "pointer", textDecoration: "underline" }}
+        >
+          ¿Olvidaste tu contraseña?
+        </span>
+      </p>
+
+      {/* ✅ CAPTCHA Cloudflare Turnstile */}
+      <div style={{ display: "inline-block", marginBottom: 16 }}>
+        <Turnstile
+          sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
+          onVerify={(token) => setCaptchaToken(token)}
+          onExpire={() => setCaptchaToken(null)}
+          theme="light"
+        />
+      </div>
+      <br />
 
       <button
         onClick={handleLogin}
-        disabled={cargando}
-        style={{ padding: "10px 30px" }}
+        disabled={cargando || !captchaToken}
+        style={{ 
+          padding: "10px 30px",
+          opacity: cargando || !captchaToken ? 0.5 : 1,
+          cursor: cargando || !captchaToken ? "not-allowed" : "pointer",
+        }}
       >
         {cargando ? "Cargando..." : "Entrar"}
       </button>
 
-      {/* ✅ ENLACE DE REGISTRO NUEVO */}
       <p style={{ marginTop: 20, fontSize: 14, color: "#6b7280" }}>
         ¿No tienes cuenta?{" "}
         <Link to="/registro" style={{ color: "#0077B6", fontWeight: 600 }}>

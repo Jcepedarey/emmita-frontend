@@ -31,6 +31,7 @@
     "react-router-dom": "^7.4.0",
     "react-scripts": "^5.0.1",
     "react-speech-recognition": "^4.0.1",
+    "react-turnstile": "^1.1.5",
     "sweetalert2": "^11.26.3",
     "web-vitals": "^5.1.0",
     "webpack": "^5.98.0",

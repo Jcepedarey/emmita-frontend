@@ -32,6 +32,7 @@ import Reportes from "./pages/Reportes";
 import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
 import MiEmpresa from "./pages/MiEmpresa";
+import Terminos from "./pages/Terminos";
 
 // ✅ Componente interno que tiene acceso a useLocation
 function AppContent() {
@@ -44,7 +45,7 @@ function AppContent() {
   const [sidebarColapsado, setSidebarColapsado] = useState(false);
 
   // ✅ Detectar si estamos en páginas públicas (sin sesión)
-  const esPaginaPublica = location.pathname === "/" || location.pathname === "/registro";
+  const esPaginaPublica = ["/", "/registro", "/terminos"].includes(location.pathname);
 
   // 🔐 Cierre de sesión por inactividad
   useEffect(() => {
@@ -125,7 +126,7 @@ function AppContent() {
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/registro" element={<Register />} />
-            
+            <Route path="/terminos" element={<Terminos />} />
             <Route path="/inicio" element={<Inicio />} />
             <Route path="/crear-documento" element={<CrearDocumento />} />
             <Route path="/clientes" element={<Clientes />} />

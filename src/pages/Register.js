@@ -2,11 +2,14 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Swal from "sweetalert2";
+import { Turnstile } from "react-turnstile";
 
 export default function Register() {
   const navigate = useNavigate();
   const [paso, setPaso] = useState(1);
   const [cargando, setCargando] = useState(false);
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
 
   const [empresa, setEmpresa] = useState({
     nombre: "",
@@ -69,6 +72,14 @@ export default function Register() {
       Swal.fire("No coinciden", "Las contraseñas no coinciden", "warning");
       return false;
     }
+    if (!aceptaTerminos) {
+      Swal.fire("Términos requeridos", "Debes aceptar los términos y condiciones para continuar", "warning");
+      return false;
+    }
+    if (!captchaToken) {
+      Swal.fire("Verificación requerida", "Completa la verificación de seguridad", "warning");
+      return false;
+    }
     return true;
   };
 
@@ -94,6 +105,7 @@ export default function Register() {
             email: usuario.email.trim(),
             password: usuario.password,
           },
+          captchaToken,
         }),
       });
 
@@ -127,7 +139,7 @@ export default function Register() {
     }
   };
 
-  // ─── Estilos ─────────────────────────────────────────
+  // ——— Estilos ———
   const container = {
     minHeight: "100vh",
     display: "flex",
@@ -144,7 +156,7 @@ export default function Register() {
     maxWidth: 450,
     boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
   };
-  const label = {
+  const labelStyle = {
     display: "block",
     fontSize: 13,
     fontWeight: 600,
@@ -152,7 +164,7 @@ export default function Register() {
     marginBottom: 4,
     marginTop: 14,
   };
-  const input = {
+  const inputStyle = {
     width: "100%",
     padding: "10px 12px",
     border: "1px solid #d1d5db",
@@ -161,7 +173,7 @@ export default function Register() {
     boxSizing: "border-box",
   };
   const slugBox = {
-    ...input,
+    ...inputStyle,
     background: "#f3f4f6",
     color: "#6b7280",
     fontSize: 13,
@@ -222,15 +234,15 @@ export default function Register() {
 
         {paso === 1 && (
           <>
-            <label style={label}>Nombre de tu empresa *</label>
+            <label style={labelStyle}>Nombre de tu empresa *</label>
             <input
-              style={input}
+              style={inputStyle}
               value={empresa.nombre}
               onChange={(e) => handleEmpresaChange("nombre", e.target.value)}
               placeholder="Ej: Alquiler & Eventos Mi Fiesta"
             />
 
-            <label style={label}>Identificador único (slug)</label>
+            <label style={labelStyle}>Identificador único (slug)</label>
             <input
               style={slugBox}
               value={empresa.slug}
@@ -241,25 +253,25 @@ export default function Register() {
               Se usará en tu URL: swalquiler.com/{empresa.slug || "tu-empresa"}
             </p>
 
-            <label style={label}>Teléfono / WhatsApp</label>
+            <label style={labelStyle}>Teléfono / WhatsApp</label>
             <input
-              style={input}
+              style={inputStyle}
               value={empresa.telefono}
               onChange={(e) => setEmpresa({ ...empresa, telefono: e.target.value })}
               placeholder="3001234567"
             />
 
-            <label style={label}>Dirección</label>
+            <label style={labelStyle}>Dirección</label>
             <input
-              style={input}
+              style={inputStyle}
               value={empresa.direccion}
               onChange={(e) => setEmpresa({ ...empresa, direccion: e.target.value })}
               placeholder="Dirección de tu negocio"
             />
 
-            <label style={label}>Email de la empresa</label>
+            <label style={labelStyle}>Email de la empresa</label>
             <input
-              style={input}
+              style={inputStyle}
               type="email"
               value={empresa.email}
               onChange={(e) => setEmpresa({ ...empresa, email: e.target.value })}
@@ -281,35 +293,35 @@ export default function Register() {
 
         {paso === 2 && (
           <>
-            <label style={label}>Tu nombre completo *</label>
+            <label style={labelStyle}>Tu nombre completo *</label>
             <input
-              style={input}
+              style={inputStyle}
               value={usuario.nombre}
               onChange={(e) => setUsuario({ ...usuario, nombre: e.target.value })}
               placeholder="Tu nombre"
             />
 
-            <label style={label}>Email de acceso *</label>
+            <label style={labelStyle}>Email de acceso *</label>
             <input
-              style={input}
+              style={inputStyle}
               type="email"
               value={usuario.email}
               onChange={(e) => setUsuario({ ...usuario, email: e.target.value })}
               placeholder="tu@email.com"
             />
 
-            <label style={label}>Contraseña *</label>
+            <label style={labelStyle}>Contraseña *</label>
             <input
-              style={input}
+              style={inputStyle}
               type="password"
               value={usuario.password}
               onChange={(e) => setUsuario({ ...usuario, password: e.target.value })}
               placeholder="Mínimo 6 caracteres"
             />
 
-            <label style={label}>Confirmar contraseña *</label>
+            <label style={labelStyle}>Confirmar contraseña *</label>
             <input
-              style={input}
+              style={inputStyle}
               type="password"
               value={usuario.passwordConfirm}
               onChange={(e) => setUsuario({ ...usuario, passwordConfirm: e.target.value })}
@@ -317,7 +329,52 @@ export default function Register() {
               placeholder="Repite tu contraseña"
             />
 
-            <button style={btnPrimary} onClick={registrar} disabled={cargando}>
+            {/* ✅ Checkbox de Términos y Condiciones */}
+            <div style={{ 
+              marginTop: 18, 
+              display: "flex", 
+              alignItems: "flex-start", 
+              gap: 8,
+            }}>
+              <input
+                type="checkbox"
+                id="terminos"
+                checked={aceptaTerminos}
+                onChange={(e) => setAceptaTerminos(e.target.checked)}
+                style={{ marginTop: 3, cursor: "pointer", minWidth: 16, minHeight: 16 }}
+              />
+              <label htmlFor="terminos" style={{ fontSize: 13, color: "#4b5563", cursor: "pointer", lineHeight: 1.4 }}>
+                He leído y acepto los{" "}
+                <Link 
+                  to="/terminos" 
+                  target="_blank"
+                  style={{ color: "#0077B6", fontWeight: 600, textDecoration: "underline" }}
+                >
+                  Términos y Condiciones
+                </Link>
+                {" "}y la Política de Privacidad de SwAlquiler.
+              </label>
+            </div>
+
+            {/* ✅ CAPTCHA Cloudflare Turnstile */}
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+              <Turnstile
+                sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
+                onVerify={(token) => setCaptchaToken(token)}
+                onExpire={() => setCaptchaToken(null)}
+                theme="light"
+              />
+            </div>
+
+            <button 
+              style={{
+                ...btnPrimary,
+                opacity: cargando || !aceptaTerminos || !captchaToken ? 0.5 : 1,
+                cursor: cargando || !aceptaTerminos || !captchaToken ? "not-allowed" : "pointer",
+              }} 
+              onClick={registrar} 
+              disabled={cargando || !aceptaTerminos || !captchaToken}
+            >
               {cargando ? "Registrando..." : "Crear mi empresa"}
             </button>
 
