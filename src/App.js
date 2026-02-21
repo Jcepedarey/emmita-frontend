@@ -11,6 +11,7 @@ import TrialBanner from "./components/TrialBanner";
 import "./swal.css";
 import "./App.css";
 import { useNavigationState } from "./context/NavigationContext";
+import supabase from "./supabaseClient"; // ✅ NUEVO IMPORT
 
 // 📦 Páginas principales
 import Login from "./pages/Login";
@@ -33,6 +34,7 @@ import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
 import MiEmpresa from "./pages/MiEmpresa";
 import Terminos from "./pages/Terminos";
+import ResetPassword from "./pages/ResetPassword"; // ✅ NUEVO IMPORT
 
 // ✅ Componente interno que tiene acceso a useLocation
 function AppContent() {
@@ -45,7 +47,18 @@ function AppContent() {
   const [sidebarColapsado, setSidebarColapsado] = useState(false);
 
   // ✅ Detectar si estamos en páginas públicas (sin sesión)
-  const esPaginaPublica = ["/", "/registro", "/terminos"].includes(location.pathname);
+  // ✅ MODIFICADO: Se agregó "/reset-password"
+  const esPaginaPublica = ["/", "/registro", "/terminos", "/reset-password"].includes(location.pathname);
+
+  // ✅ Detectar recovery de contraseña desde email de Supabase
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        window.location.href = "/reset-password";
+      }
+    });
+    return () => subscription?.unsubscribe();
+  }, []);
 
   // 🔐 Cierre de sesión por inactividad
   useEffect(() => {
@@ -127,6 +140,7 @@ function AppContent() {
             <Route path="/" element={<Login />} />
             <Route path="/registro" element={<Register />} />
             <Route path="/terminos" element={<Terminos />} />
+            <Route path="/reset-password" element={<ResetPassword />} /> {/* ✅ NUEVA RUTA */}
             <Route path="/inicio" element={<Inicio />} />
             <Route path="/crear-documento" element={<CrearDocumento />} />
             <Route path="/clientes" element={<Clientes />} />

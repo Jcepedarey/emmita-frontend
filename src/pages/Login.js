@@ -80,7 +80,7 @@ export default function Login() {
     try {
       // ✅ NUEVO: Enviar el captchaToken a Supabase
       const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperar, {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/reset-password`,
         captchaToken,
       });
 
