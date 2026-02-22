@@ -54,6 +54,7 @@ app.get("/api/test", (req, res) => {
 app.use("/api/usuarios", require("./routes/usuarios")); // /login queda pública dentro del router y cambio de password
 app.use("/api/ia", require("./routes/ia")); // ✅ Proxy seguro para OpenAI
 app.use("/api/registro", require("./routes/registro")); // ✅ Registro Multi-Tenant seguro
+app.use("/api/empleados", require("./routes/empleados")); // ✅ Gestión de empleados
 
 // Ruta 404
 app.use((req, res) => {

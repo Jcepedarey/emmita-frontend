@@ -8,7 +8,7 @@ import supabase from "../supabaseClient";
 const PLANES = {
   trial: {
     nombre: "Prueba gratuita",
-    duracionDias: 7,
+    duracionDias: 14,
     maxProductos: 50,
     maxUsuarios: 1,
     maxClientes: Infinity,
@@ -134,7 +134,7 @@ export default function useLimites() {
     if (trialVencido) {
       return {
         titulo: "Prueba gratuita finalizada",
-        mensaje: "Tu período de prueba de 7 días ha terminado. Contacta a SwAlquiler para activar un plan y seguir usando el sistema.\n\nWhatsApp: 3166534685",
+        mensaje: "Tu período de prueba de 14 días ha terminado. Contacta a SwAlquiler para activar un plan y seguir usando el sistema.\n\nWhatsApp: 3214909600",
         icono: "warning",
       };
     }
