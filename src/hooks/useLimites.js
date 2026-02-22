@@ -134,8 +134,7 @@ export default function useLimites() {
     if (trialVencido) {
       return {
         titulo: "Prueba gratuita finalizada",
-        mensaje: "Tu período de prueba de 14 días ha terminado. Contacta a SwAlquiler para activar un plan y seguir usando el sistema.\n\nWhatsApp: 3214909600",
-        icono: "warning",
+        mensaje: "Tu período de prueba de 14 días ha terminado. Contacta a SwAlquiler para activar un plan y seguir usando el sistema.\n\n📱 3214909600\n💬 WhatsApp: 3214909600\n📧 soporte@swalquiler.com",
       };
     }
     // Límite de cantidad alcanzado
@@ -147,7 +146,7 @@ export default function useLimites() {
     };
     return {
       titulo: "Límite alcanzado",
-      mensaje: `Has alcanzado el máximo de ${nombres[tipo]} para el plan ${limites.nombre}. Contacta a SwAlquiler para mejorar tu plan.\n\nWhatsApp: 3166534685`,
+      mensaje: `Has alcanzado el máximo de ${nombres[tipo]} para el plan ${limites.nombre}. Contacta a SwAlquiler para mejorar tu plan.\n\n📱 3214909600\n💬 WhatsApp: 3214909600\n📧 soporte@swalquiler.com`,
       icono: "info",
     };
   };
