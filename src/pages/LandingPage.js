@@ -336,25 +336,14 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Imagen hero - placeholder para screenshot */}
+          {/* Imagen hero - REEMPLAZADO */}
           <div style={{
             flex: "1 1 400px", maxWidth: 500,
             background: "linear-gradient(145deg, #0077B6 0%, #00B4D8 100%)",
             borderRadius: 20, padding: 4,
             boxShadow: "0 20px 60px rgba(0,119,182,0.2)",
           }}>
-            <div style={{
-              background: "#f8fafc", borderRadius: 17,
-              height: 360, display: "flex",
-              alignItems: "center", justifyContent: "center",
-              fontSize: 16, color: "#94a3b8",
-              flexDirection: "column", gap: 12,
-            }}>
-              {/* TODO: Reemplazar con screenshot real */}
-              <img src="/icons/swalquiler-logo.png" alt="SwAlquiler" style={{ width: 80, opacity: 0.4 }} />
-              <span>Espacio para captura de pantalla</span>
-              <span style={{ fontSize: 12 }}>Dashboard principal</span>
-            </div>
+            <img src="/screenshots/hero.png" alt="SwAlquiler Dashboard" style={{ width: "100%", borderRadius: 17, display: "block" }} />
           </div>
         </div>
 
@@ -433,7 +422,7 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* Espacio para capturas de pantalla */}
+          {/* Espacio para capturas de pantalla - REEMPLAZADO */}
           <div id="screenshots" data-animate style={{
             marginTop: 80, textAlign: "center",
             ...animStyle("screenshots"),
@@ -446,16 +435,20 @@ export default function LandingPage() {
               gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
               gap: 20,
             }}>
-              {["Dashboard principal", "Crear cotización", "Inventario"].map((label, i) => (
+              {[
+                { label: "Dashboard principal", src: "/screenshots/dashboard.png" },
+                { label: "Crear cotización", src: "/screenshots/cotizacion.png" },
+                { label: "Inventario", src: "/screenshots/inventario.png" },
+              ].map((item, i) => (
                 <div key={i} style={{
-                  background: "linear-gradient(145deg, #f8fafc, #f1f5f9)",
-                  borderRadius: 16, height: 220, border: "2px dashed #cbd5e1",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexDirection: "column", gap: 8, color: "#94a3b8",
+                  borderRadius: 16, overflow: "hidden",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
                 }}>
-                  <span style={{ fontSize: 36 }}>📸</span>
-                  <span style={{ fontSize: 14 }}>{label}</span>
-                  <span style={{ fontSize: 11 }}>Captura de pantalla aquí</span>
+                  <img src={item.src} alt={item.label} style={{ width: "100%", display: "block" }} />
+                  <div style={{ padding: "12px 16px", background: "#f8fafc", fontSize: 14, fontWeight: 600, textAlign: "center" }}>
+                    {item.label}
+                  </div>
                 </div>
               ))}
             </div>
