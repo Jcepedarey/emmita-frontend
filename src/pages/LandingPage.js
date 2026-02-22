@@ -110,23 +110,23 @@ const PLANES = [
 
 const TESTIMONIOS = [
   {
-    nombre: "Carlos M.",
-    empresa: "Eventos Royal",
+    nombre: "Santiago P.",
+    empresa: "Eventos Royal Prestige",
     ciudad: "Bogotá",
     texto: "Antes manejaba todo en cuadernos y WhatsApp. Con SwAlquiler tengo control total de mi inventario y mis clientes. ¡Increíble!",
     avatar: "👨‍💼",
   },
   {
     nombre: "María L.",
-    empresa: "Deco Fiestas",
+    empresa: "Deco Fiestas Luxury",
     ciudad: "Medellín",
     texto: "La generación de cotizaciones en PDF con mi logo le da un nivel profesional a mi negocio que antes no tenía.",
     avatar: "👩‍💼",
   },
   {
     nombre: "Andrés R.",
-    empresa: "Alquiler Total",
-    ciudad: "Villavicencio",
+    empresa: "Eventos & Alquiler la Sucursal",
+    ciudad: "Cali",
     texto: "El calendario de agenda me salvó. Ya no se me cruzan los pedidos ni pierdo fechas de entrega.",
     avatar: "👨‍💼",
   },
