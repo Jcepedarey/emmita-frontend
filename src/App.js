@@ -14,6 +14,7 @@ import { useNavigationState } from "./context/NavigationContext";
 import supabase from "./supabaseClient"; // ✅ NUEVO IMPORT
 
 // 📦 Páginas principales
+import LandingPage from "./pages/LandingPage"; // ✅ NUEVO IMPORT LANDING
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Inicio from "./pages/Inicio";
@@ -47,8 +48,8 @@ function AppContent() {
   const [sidebarColapsado, setSidebarColapsado] = useState(false);
 
   // ✅ Detectar si estamos en páginas públicas (sin sesión)
-  // ✅ MODIFICADO: Se agregó "/reset-password"
-  const esPaginaPublica = ["/", "/registro", "/terminos", "/reset-password"].includes(location.pathname);
+  // ✅ MODIFICADO: Se agregó "/login"
+  const esPaginaPublica = ["/", "/login", "/registro", "/terminos", "/reset-password"].includes(location.pathname);
 
   // ✅ Detectar recovery de contraseña desde email de Supabase
   const navigate = useNavigate();
@@ -76,7 +77,7 @@ function AppContent() {
           localStorage.removeItem("usuario");
           clearAllStates();
           alert("Sesión cerrada por inactividad.");
-          window.location.href = "/";
+          window.location.href = "/login"; // ✅ Redirigir a login al expirar sesión
         }
       }, MAX_INACTIVIDAD);
     };
@@ -115,7 +116,7 @@ function AppContent() {
 
   return (
     <>
-      {/* ✅ Solo mostrar navegación si NO estamos en login/registro */}
+      {/* ✅ Solo mostrar navegación si NO estamos en login/registro/landing */}
       {!esPaginaPublica && (
         <>
           <Navbar onMenuClick={toggleSidebar} />
@@ -140,10 +141,11 @@ function AppContent() {
 
         <Suspense fallback={<CircularProgress style={{ display: "block", margin: "50px auto" }} />}>
           <Routes>
-            <Route path="/" element={<Login />} />
+            <Route path="/" element={<LandingPage />} /> {/* ✅ NUEVA RUTA LANDING */}
+            <Route path="/login" element={<Login />} /> {/* ✅ NUEVA RUTA LOGIN */}
             <Route path="/registro" element={<Register />} />
             <Route path="/terminos" element={<Terminos />} />
-            <Route path="/reset-password" element={<ResetPassword />} /> {/* ✅ NUEVA RUTA */}
+            <Route path="/reset-password" element={<ResetPassword />} /> 
             <Route path="/inicio" element={<Inicio />} />
             <Route path="/crear-documento" element={<CrearDocumento />} />
             <Route path="/clientes" element={<Clientes />} />

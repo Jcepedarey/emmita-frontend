@@ -79,7 +79,8 @@ export default function ResetPassword() {
         confirmButtonColor: "#0077B6",
       });
 
-      navigate("/");
+      // ✅ CAMBIO APLICADO AQUÍ: to="/login"
+      navigate("/login");
 
     } catch (err) {
       setCargando(false);

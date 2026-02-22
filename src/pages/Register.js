@@ -130,7 +130,7 @@ export default function Register() {
         confirmButtonColor: "#0077B6",
       });
 
-      navigate("/");
+      navigate("/login"); // ✅ También nos aseguramos de que el registro exitoso envíe al login
 
     } catch (err) {
       console.error("Error en registro:", err);
@@ -285,7 +285,8 @@ export default function Register() {
               Siguiente →
             </button>
 
-            <Link to="/" style={{ display: "block", textAlign: "center", marginTop: 16, color: "#0077B6", fontSize: 14 }}>
+            {/* ✅ CAMBIO APLICADO AQUÍ: to="/login" */}
+            <Link to="/login" style={{ display: "block", textAlign: "center", marginTop: 16, color: "#0077B6", fontSize: 14 }}>
               ← Ya tengo cuenta, iniciar sesión
             </Link>
           </>
