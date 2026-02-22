@@ -11,32 +11,26 @@ export default function ResetPassword() {
   const [sesionLista, setSesionLista] = useState(false);
   const navigate = useNavigate();
 
-  // ✅ Esperar a que Supabase procese el token de recovery de la URL
+  // ✅ Polling agresivo para atrapar la sesión aunque Supabase la procese antes de montar
   useEffect(() => {
-    // Verificar si la URL tiene token de recovery
-    const hash = window.location.hash;
-    if (hash.includes("type=recovery")) {
-      // Dar tiempo a Supabase para procesar el token del hash
-      const checkSession = async () => {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) setSesionLista(true);
-      };
-      checkSession();
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+    let intentos = 0;
+    const maxIntentos = 20;
+    
+    const verificar = setInterval(async () => {
+      intentos++;
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
         setSesionLista(true);
+        clearInterval(verificar);
       }
-    });
-
-    // Verificar sesión existente
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setSesionLista(true);
-    });
-
-    return () => subscription?.unsubscribe();
+      
+      if (intentos >= maxIntentos) {
+        clearInterval(verificar);
+      }
+    }, 500);
+    
+    return () => clearInterval(verificar);
   }, []);
 
   const handleReset = async () => {

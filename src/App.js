@@ -54,8 +54,10 @@ function AppContent() {
   const navigate = useNavigate();
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        navigate("/reset-password");
+       if (event === "PASSWORD_RECOVERY") {
+        if (window.location.pathname !== "/reset-password") {
+          navigate("/reset-password");
+        }
       }
     });
     return () => subscription?.unsubscribe();
