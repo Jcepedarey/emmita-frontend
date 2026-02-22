@@ -11,26 +11,37 @@ export default function ResetPassword() {
   const [sesionLista, setSesionLista] = useState(false);
   const navigate = useNavigate();
 
-  // ✅ Polling agresivo para atrapar la sesión aunque Supabase la procese antes de montar
+  // ✅ Extracción manual del token de la URL para forzar la sesión
   useEffect(() => {
-    let intentos = 0;
-    const maxIntentos = 20;
-    
-    const verificar = setInterval(async () => {
-      intentos++;
+    const procesarToken = async () => {
+      const hash = window.location.hash;
+      
+      if (hash.includes("type=recovery")) {
+        // Extraer los parámetros quitando el '#' inicial
+        const params = new URLSearchParams(hash.substring(1));
+        const access_token = params.get("access_token");
+        const refresh_token = params.get("refresh_token");
+        
+        if (access_token && refresh_token) {
+          // Forzar a Supabase a crear la sesión con estos tokens
+          const { error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          
+          if (!error) {
+            setSesionLista(true);
+            return;
+          }
+        }
+      }
+      
+      // Fallback: verificar si ya hay sesión activa por si recarga la página
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        setSesionLista(true);
-        clearInterval(verificar);
-      }
-      
-      if (intentos >= maxIntentos) {
-        clearInterval(verificar);
-      }
-    }, 500);
-    
-    return () => clearInterval(verificar);
+      if (session) setSesionLista(true);
+    };
+
+    procesarToken();
   }, []);
 
   const handleReset = async () => {
