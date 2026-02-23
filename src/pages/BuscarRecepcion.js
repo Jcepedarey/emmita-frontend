@@ -1,25 +1,24 @@
 import React, { useState } from "react";
-import supabase from "../supabase";
+import supabase from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import Swal from "sweetalert2";
-import Protegido from "../components/Protegido"; // 🔐 Protección
+import Protegido from "../components/Protegido";
 
 export default function BuscarRecepcion() {
-
   const [cliente, setCliente] = useState("");
-  const [inicio, setInicio] = useState(null);
-  const [fin, setFin] = useState(null);
+  const [inicio, setInicio] = useState("");
+  const [fin, setFin] = useState("");
   const [ordenes, setOrdenes] = useState([]);
   const [mostrar, setMostrar] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const limite = 20;
 
   const buscarRecepciones = async (paginaActual = 1) => {
+    setLoading(true);
     const desde = (paginaActual - 1) * limite;
     const hasta = desde + limite - 1;
 
@@ -30,14 +29,15 @@ export default function BuscarRecepcion() {
       .range(desde, hasta)
       .order("fecha_evento", { ascending: false });
 
+    setLoading(false);
+
     if (error) {
       console.error("Error al buscar recepciones:", error);
-      return;
+      return Swal.fire("Error", "No se pudieron cargar las recepciones.", "error");
     }
 
-    // filtros por cliente y fechas
-    let filtradas = data;
-    if (cliente) {
+    let filtradas = data || [];
+    if (cliente.trim()) {
       filtradas = filtradas.filter((o) =>
         o.clientes?.nombre?.toLowerCase().includes(cliente.toLowerCase())
       );
@@ -57,212 +57,275 @@ export default function BuscarRecepcion() {
 
   const limpiar = () => {
     setCliente("");
-    setInicio(null);
-    setFin(null);
+    setInicio("");
+    setFin("");
     setOrdenes([]);
     setMostrar(false);
   };
 
   const eliminarRecepcionDefinitiva = async (id) => {
-  try {
-    // 1) Código de seguridad
-    const { value: codigo } = await Swal.fire({
-      title: "🔒 Código de seguridad",
-      input: "password",
-      inputLabel: "Escribe el código para eliminar definitivamente",
-      inputPlaceholder: "••••",
-      showCancelButton: true,
-      confirmButtonText: "Continuar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (codigo !== "4860") {
-      if (codigo) Swal.fire("❌ Acceso denegado", "Código incorrecto", "error");
-      return;
-    }
-
-    // 2) Consultar movimientos vinculados
-    const { data: movimientos } = await supabase
-      .from("movimientos_contables")
-      .select("id, tipo")
-      .eq("orden_id", id);
-
-    const tieneMovimientos = Array.isArray(movimientos) && movimientos.length > 0;
-
-    let html = "";
-    if (tieneMovimientos) {
-      const ingresos = movimientos.filter((m) => m.tipo === "ingreso").length;
-      const gastos = movimientos.filter((m) => m.tipo === "gasto").length;
-      html = `
-        <ul style="text-align:left;margin:10px 0">
-          ${ingresos ? `<li><strong>${ingresos}</strong> ingreso(s)</li>` : ""}
-          ${gastos ? `<li><strong>${gastos}</strong> gasto(s)</li>` : ""}
-        </ul>
-        <p style="color:red;font-weight:bold">⚠️ TODO será eliminado de Contabilidad</p>
-      `;
-    }
-
-    // 3) Confirmación final
-    const confirm = await Swal.fire({
-      title: tieneMovimientos ? "⚠️ Esta recepción tiene registros asociados:" : "¿Eliminar esta recepción?",
-      html,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Sí, eliminar definitivamente",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#d33",
-    });
-
-    if (!confirm.isConfirmed) return;
-
-    // 4) Borrar movimientos primero (si hay)
-    if (tieneMovimientos) {
-      const { error: errorMov } = await supabase
+    try {
+      // 1) Consultar movimientos vinculados
+      const { data: movimientos } = await supabase
         .from("movimientos_contables")
-        .delete()
+        .select("id, tipo")
         .eq("orden_id", id);
-      if (errorMov) throw new Error("No se pudieron eliminar los movimientos contables");
+
+      const tieneMovimientos = Array.isArray(movimientos) && movimientos.length > 0;
+
+      let html = "";
+      if (tieneMovimientos) {
+        const ingresos = movimientos.filter((m) => m.tipo === "ingreso").length;
+        const gastos = movimientos.filter((m) => m.tipo === "gasto").length;
+        html = `
+          <ul style="text-align:left;margin:10px 0;">
+            ${ingresos ? `<li><strong>${ingresos}</strong> ingreso(s)</li>` : ""}
+            ${gastos ? `<li><strong>${gastos}</strong> gasto(s)</li>` : ""}
+          </ul>
+          <p style="color:#ef4444;font-weight:bold;margin-top:8px;">⚠️ TODO será eliminado de Contabilidad</p>
+        `;
+      }
+
+      // 2) Confirmación
+      const confirm = await Swal.fire({
+        title: tieneMovimientos
+          ? "⚠️ Esta recepción tiene registros asociados:"
+          : "¿Eliminar esta recepción?",
+        html: html || "Esta acción no se puede deshacer.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, eliminar definitivamente",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#ef4444",
+      });
+
+      if (!confirm.isConfirmed) return;
+
+      // 3) Borrar movimientos primero (si hay)
+      if (tieneMovimientos) {
+        const { error: errorMov } = await supabase
+          .from("movimientos_contables")
+          .delete()
+          .eq("orden_id", id);
+        if (errorMov) throw new Error("No se pudieron eliminar los movimientos contables");
+      }
+
+      // 4) Borrar recepción vinculada
+      const { data: recs } = await supabase.from("recepcion").select("id").eq("orden_id", id);
+      if (Array.isArray(recs) && recs.length > 0) {
+        const { error: errorRec } = await supabase.from("recepcion").delete().eq("orden_id", id);
+        if (errorRec) throw new Error("No se pudo eliminar la recepción asociada");
+      }
+
+      // 5) Borrar la orden revisada
+      const { error: errorOrden } = await supabase.from("ordenes_pedido").delete().eq("id", id);
+      if (errorOrden) throw new Error("No se pudo eliminar la orden/recepción");
+
+      // 6) Éxito
+      Swal.fire({ icon: "success", title: "Eliminado", text: "Recepción y registros eliminados", timer: 2000, showConfirmButton: false });
+      buscarRecepciones(pagina);
+    } catch (e) {
+      console.error("Error completo:", e);
+      Swal.fire("Error", e.message || "No se pudo completar la eliminación", "error");
     }
+  };
 
-    // 5) Borrar recepción (si existe tabla recepcion vinculada por orden_id)
-    const { data: recs } = await supabase.from("recepcion").select("id").eq("orden_id", id);
-    const tieneRecepcion = Array.isArray(recs) && recs.length > 0;
-
-    if (tieneRecepcion) {
-      const { error: errorRec } = await supabase.from("recepcion").delete().eq("orden_id", id);
-      if (errorRec) throw new Error("No se pudo eliminar la recepción asociada");
-    }
-
-    // 6) Borrar la orden revisada
-    const { error: errorOrden } = await supabase.from("ordenes_pedido").delete().eq("id", id);
-    if (errorOrden) throw new Error("No se pudo eliminar la orden/recepción");
-
-    // 7) Éxito
-    await Swal.fire({
-      title: "✅ Eliminado",
-      text: "La recepción y sus registros fueron eliminados",
-      icon: "success",
-      timer: 2000,
-      showConfirmButton: false,
-    });
-
-    // 8) Recargar la página actual del paginador
-    buscarRecepciones(pagina);
-  } catch (e) {
-    console.error("Error completo:", e);
-    Swal.fire({
-      title: "❌ Error",
-      text: e.message || "No se pudo completar la eliminación",
-      icon: "error",
-    });
-  }
-};
+  const inputStyle = {
+    width: "100%", padding: "10px 12px",
+    border: "1px solid var(--sw-borde)", borderRadius: 8,
+    fontSize: 14, boxSizing: "border-box"
+  };
 
   return (
     <Protegido>
-    <div className="p-4 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold text-center mb-6">🔍 Buscar Recepción</h2>
+      <div className="sw-pagina">
+        <div className="sw-pagina-contenido" style={{ maxWidth: 900 }}>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <input
-          type="text"
-          value={cliente}
-          onChange={(e) => setCliente(e.target.value)}
-          placeholder="Buscar cliente por nombre"
-          className="border p-2 rounded w-full"
-        />
-        <div className="flex flex-col">
-          <label className="text-sm mb-1">📅 Fecha evento (inicio):</label>
-          <DatePicker
-            selected={inicio}
-            onChange={(date) => setInicio(date)}
-            className="border p-2 rounded"
-            placeholderText="dd/mm/aaaa"
-            dateFormat="yyyy-MM-dd"
-          />
-        </div>
-        <div className="flex flex-col">
-          <label className="text-sm mb-1">📅 Fecha evento (fin):</label>
-          <DatePicker
-            selected={fin}
-            onChange={(date) => setFin(date)}
-            className="border p-2 rounded"
-            placeholderText="dd/mm/aaaa"
-            dateFormat="yyyy-MM-dd"
-          />
-        </div>
-      </div>
+          {/* ═══ HEADER ═══ */}
+          <div className="sw-header">
+            <h1 className="sw-header-titulo">🔍 Buscar Recepción</h1>
+          </div>
 
-      <div className="flex gap-3 mb-6">
-        <button onClick={() => buscarRecepciones(1)} className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200">
-          🔍 Buscar
-        </button>
-        <button onClick={limpiar} className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200">
-          🧹 Limpiar
-        </button>
-        <button onClick={() => setMostrar(false)} className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200">
-          👁️ Ocultar Resultados
-        </button>
-      </div>
-
-      {mostrar && (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Resultados (página {pagina}):</h3>
-          <div className="space-y-2">
-            {ordenes.map((o) => (
-              <div
-                key={o.id}
-                className="bg-gray-100 p-3 rounded shadow flex justify-between items-center"
-              >
-                <div>
-                  <strong>{o.clientes?.nombre || "Sin cliente"}</strong> – {o.numero} –{" "}
-                  {o.fecha_evento?.split("T")[0]}
+          {/* ═══ FILTROS ═══ */}
+          <div className="sw-card" style={{ marginBottom: 16 }}>
+            <div className="sw-card-header sw-card-header-cyan">
+              <h3 className="sw-card-titulo" style={{ color: "white", margin: 0 }}>🔎 Filtros de búsqueda</h3>
+            </div>
+            <div className="sw-card-body">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>
+                    Cliente
+                  </label>
+                  <input
+                    type="text"
+                    value={cliente}
+                    onChange={(e) => setCliente(e.target.value)}
+                    placeholder="Buscar por nombre de cliente..."
+                    style={inputStyle}
+                  />
                 </div>
-                <div className="flex gap-3 items-center">
-                  <button
-                    className="text-blue-600 underline"
-                    onClick={() => navigate(`/recepcion?id=${o.id}`)}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    className="text-green-600 underline"
-                    onClick={() => window.open(`/pdfrecepcion?id=${o.id}`, "_blank")}
-                  >
-                    PDF
-                  </button>
-                  <button
-                    onClick={() => eliminarRecepcionDefinitiva(o.id)}
-                    className="text-red-500 text-xl hover:text-red-700"
-                    title="Eliminar definitivamente"
-                  >
-                    ❌
-                  </button>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>
+                    📅 Fecha evento (desde)
+                  </label>
+                  <input
+                    type="date"
+                    value={inicio}
+                    onChange={(e) => setInicio(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>
+                    📅 Fecha evento (hasta)
+                  </label>
+                  <input
+                    type="date"
+                    value={fin}
+                    onChange={(e) => setFin(e.target.value)}
+                    style={inputStyle}
+                  />
                 </div>
               </div>
-            ))}
+
+              <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+                <button className="sw-btn sw-btn-primario" style={{ flex: 1, minWidth: 120 }} onClick={() => buscarRecepciones(1)}>
+                  🔍 Buscar
+                </button>
+                <button className="sw-btn sw-btn-secundario" style={{ flex: 1, minWidth: 120 }} onClick={limpiar}>
+                  🧹 Limpiar
+                </button>
+                {mostrar && (
+                  <button className="sw-btn sw-btn-secundario" style={{ flex: 1, minWidth: 120 }} onClick={() => setMostrar(false)}>
+                    👁️ Ocultar
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Botones de paginación */}
-          <div className="flex justify-center gap-4 mt-6">
-            <button
-              disabled={pagina <= 1}
-              onClick={() => buscarRecepciones(pagina - 1)}
-              className="px-4 py-2 border rounded bg-gray-200 disabled:opacity-50"
-            >
-              ⬅️ Anterior
-            </button>
-            <button
-              disabled={pagina >= totalPaginas}
-              onClick={() => buscarRecepciones(pagina + 1)}
-              className="px-4 py-2 border rounded bg-gray-200 disabled:opacity-50"
-            >
-              Siguiente ➡️
-            </button>
-          </div>
+          {/* ═══ RESULTADOS ═══ */}
+          {mostrar && (
+            <div className="sw-card">
+              <div className="sw-card-header">
+                <h3 className="sw-card-titulo">
+                  📋 Resultados — Página {pagina} de {totalPaginas} ({ordenes.length} recepción{ordenes.length !== 1 ? "es" : ""})
+                </h3>
+              </div>
+              <div className="sw-card-body" style={{ padding: 0 }}>
+                {loading ? (
+                  <div style={{ padding: 40, textAlign: "center", color: "var(--sw-texto-terciario)" }}>
+                    Buscando recepciones...
+                  </div>
+                ) : ordenes.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: "center" }}>
+                    <div style={{ fontSize: 40, marginBottom: 8 }}>📭</div>
+                    <div style={{ fontSize: 14, color: "var(--sw-texto-terciario)" }}>
+                      No se encontraron recepciones con esos filtros
+                    </div>
+                  </div>
+                ) : (
+                  ordenes.map((o) => (
+                    <div key={o.id} style={{
+                      padding: "14px 16px",
+                      borderBottom: "1px solid #f3f4f6",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      transition: "background 0.15s",
+                    }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ fontWeight: 600, fontSize: 14, color: "var(--sw-texto)" }}>
+                            {o.clientes?.nombre || "Sin cliente"}
+                          </span>
+                          {o.numero && (
+                            <span style={{
+                              fontSize: 11, padding: "2px 8px", borderRadius: 20,
+                              background: "var(--sw-cyan-muy-claro)", color: "var(--sw-azul)", fontWeight: 500
+                            }}>
+                              {o.numero}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 3, display: "flex", flexWrap: "wrap", gap: "4px 12px" }}>
+                          {o.fecha_evento && <span>📅 Evento: {o.fecha_evento.split("T")[0]}</span>}
+                          {o.total && (
+                            <span style={{ fontWeight: 600, color: "var(--sw-verde-oscuro)" }}>
+                              💰 ${Number(o.total).toLocaleString("es-CO")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Acciones */}
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                        <button
+                          className="sw-btn sw-btn-secundario"
+                          style={{ padding: "5px 10px", fontSize: 12 }}
+                          onClick={() => navigate(`/recepcion?id=${o.id}`)}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          className="sw-btn sw-btn-secundario"
+                          style={{ padding: "5px 10px", fontSize: 12 }}
+                          onClick={() => window.open(`/pdfrecepcion?id=${o.id}`, "_blank")}
+                        >
+                          📄 PDF
+                        </button>
+                        <button
+                          className="sw-btn-icono"
+                          onClick={() => eliminarRecepcionDefinitiva(o.id)}
+                          title="Eliminar definitivamente"
+                          style={{ color: "#ef4444" }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {/* Paginación */}
+                {ordenes.length > 0 && totalPaginas > 1 && (
+                  <div style={{
+                    display: "flex", justifyContent: "center", gap: 12,
+                    padding: "14px 16px", borderTop: "1px solid #f3f4f6"
+                  }}>
+                    <button
+                      className="sw-btn sw-btn-secundario"
+                      disabled={pagina <= 1}
+                      onClick={() => buscarRecepciones(pagina - 1)}
+                      style={{ opacity: pagina <= 1 ? 0.5 : 1 }}
+                    >
+                      ⬅️ Anterior
+                    </button>
+                    <span style={{ display: "flex", alignItems: "center", fontSize: 13, color: "var(--sw-texto-secundario)" }}>
+                      {pagina} / {totalPaginas}
+                    </span>
+                    <button
+                      className="sw-btn sw-btn-secundario"
+                      disabled={pagina >= totalPaginas}
+                      onClick={() => buscarRecepciones(pagina + 1)}
+                      style={{ opacity: pagina >= totalPaginas ? 0.5 : 1 }}
+                    >
+                      Siguiente ➡️
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
-    </div>
-  </Protegido>
-);
+      </div>
+    </Protegido>
+  );
 }

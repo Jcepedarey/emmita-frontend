@@ -1,69 +1,44 @@
-import * as XLSX from "xlsx";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
-import { FaEdit, FaTrash } from "react-icons/fa";
-import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import Protegido from "../components/Protegido";
 import { useNavigationState } from "../context/NavigationContext";
-
 import useLimites from "../hooks/useLimites";
+
+const money = (n) => `$${Number(n || 0).toLocaleString("es-CO")}`;
 
 export default function Inventario() {
   const { saveModuleState, getModuleState } = useNavigationState();
-
-  // ✅ Cargar estado guardado solo una vez
   const estadoGuardado = useRef(getModuleState("/inventario")).current;
 
   const [productos, setProductos] = useState([]);
-  const [form, setForm] = useState(estadoGuardado?.form || { 
-    nombre: "", 
-    descripcion: "", 
-    precio: "", 
-    stock: "", 
-    categoria: "" 
+  const [form, setForm] = useState(estadoGuardado?.form || {
+    nombre: "", descripcion: "", precio: "", stock: "", categoria: ""
   });
   const [buscar, setBuscar] = useState(estadoGuardado?.buscar || "");
   const [categoriaFiltro, setCategoriaFiltro] = useState(estadoGuardado?.categoriaFiltro || "");
   const [editandoId, setEditandoId] = useState(estadoGuardado?.editandoId || null);
   const [mostrarFormulario, setMostrarFormulario] = useState(estadoGuardado?.mostrarFormulario || false);
-  const [mostrarTodo, setMostrarTodo] = useState(estadoGuardado?.mostrarTodo || false);
+  const [loading, setLoading] = useState(true);
   const { puedeCrearProducto, mensajeBloqueo } = useLimites();
 
-  // ✅ GUARDAR ESTADO - Convertir objetos a string para evitar bucles
+  // Guardar estado
   useEffect(() => {
-    const estadoActual = {
-      form,
-      buscar,
-      categoriaFiltro,
-      editandoId,
-      mostrarFormulario,
-      mostrarTodo
-    };
-    
-    saveModuleState("/inventario", estadoActual);
-  }, [
-    JSON.stringify(form), // ✅ Convertir a string
-    buscar,
-    categoriaFiltro,
-    editandoId,
-    mostrarFormulario,
-    mostrarTodo,
-    saveModuleState
-  ]);
+    saveModuleState("/inventario", { form, buscar, categoriaFiltro, editandoId, mostrarFormulario });
+  }, [JSON.stringify(form), buscar, categoriaFiltro, editandoId, mostrarFormulario, saveModuleState]);
 
-  useEffect(() => {
-    obtenerProductos();
-  }, []);
+  useEffect(() => { obtenerProductos(); }, []);
 
   const obtenerProductos = async () => {
+    setLoading(true);
     const { data, error } = await supabase.from("productos").select("*").order("nombre");
     if (error) console.error("Error al obtener productos:", error);
-    else setProductos(data);
+    else setProductos(data || []);
+    setLoading(false);
   };
 
   const guardarProducto = async () => {
-    // ✅ Verificar límites del plan
     if (!editandoId && !puedeCrearProducto()) {
       const msg = mensajeBloqueo("producto");
       return Swal.fire(msg.titulo, msg.mensaje, msg.icono);
@@ -76,30 +51,30 @@ export default function Inventario() {
       return Swal.fire("Valores inválidos", "Precio y stock deben ser positivos.", "error");
     }
     const operacion = editandoId
-      ? supabase.from("productos").update({ nombre, descripcion, precio, stock, categoria }).eq("id", editandoId)
-      : supabase.from("productos").insert([{ nombre, descripcion, precio, stock, categoria }]);
+      ? supabase.from("productos").update({ nombre, descripcion, precio: Number(precio), stock: Number(stock), categoria }).eq("id", editandoId)
+      : supabase.from("productos").insert([{ nombre, descripcion, precio: Number(precio), stock: Number(stock), categoria }]);
     const { error } = await operacion;
     if (!error) {
-      Swal.fire(editandoId ? "Actualizado" : "Guardado", `Producto ${editandoId ? "actualizado" : "guardado"} correctamente`, "success");
-      setEditandoId(null);
+      Swal.fire({ icon: "success", title: editandoId ? "Actualizado" : "Guardado", timer: 1500, showConfirmButton: false });
       limpiarFormulario();
       obtenerProductos();
-    }
+    } else Swal.fire("Error", "No se pudo guardar el producto.", "error");
   };
 
   const eliminarProducto = async (id) => {
-    const confirmar = await Swal.fire({
+    const { isConfirmed } = await Swal.fire({
       title: "¿Eliminar este producto?",
       text: "Esta acción no se puede deshacer",
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Sí, eliminar",
+      confirmButtonColor: "#ef4444",
       cancelButtonText: "Cancelar",
     });
-    if (!confirmar.isConfirmed) return;
+    if (!isConfirmed) return;
     const { error } = await supabase.from("productos").delete().eq("id", id);
     if (!error) {
-      Swal.fire("Eliminado", "Producto eliminado correctamente", "success");
+      Swal.fire({ icon: "success", title: "Eliminado", timer: 1500, showConfirmButton: false });
       obtenerProductos();
     }
   };
@@ -107,13 +82,14 @@ export default function Inventario() {
   const editarProducto = (producto) => {
     setEditandoId(producto.id);
     setForm({
-      nombre: producto.nombre,
+      nombre: producto.nombre || "",
       descripcion: producto.descripcion || "",
       precio: producto.precio,
       stock: producto.stock,
       categoria: producto.categoria || "",
     });
     setMostrarFormulario(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const limpiarFormulario = () => {
@@ -122,171 +98,440 @@ export default function Inventario() {
     setMostrarFormulario(false);
   };
 
-  const productosFiltrados = productos.filter((p) => {
-    if (mostrarTodo) return true;
-    const coincideTexto = buscar && p.nombre.toLowerCase().includes(buscar.toLowerCase());
-    const coincideCategoria = categoriaFiltro && p.categoria?.toLowerCase() === categoriaFiltro.toLowerCase();
-    return coincideTexto || coincideCategoria;
-  });
-
-  const categoriasUnicas = [...new Set(productos.map((p) => p.categoria).filter(Boolean))];
-
-  const exportarCSV = () => {
-    if (productos.length === 0) {
-      Swal.fire("Sin datos", "No hay productos para exportar.", "info");
-      return;
-    }
-    const csv = Papa.unparse(productos, { delimiter: ";" });
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "inventario.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const borrarTodo = async () => {
+    if (productos.length === 0) return Swal.fire("Sin datos", "No hay productos para eliminar.", "info");
+    const { isConfirmed } = await Swal.fire({
+      title: "⚠️ ¿Eliminar TODO el inventario?",
+      html: `<p>Esta acción borrará <strong>${productos.length} producto(s)</strong> y no se puede deshacer.</p>
+             <p style="color:#ef4444;font-weight:600;margin-top:8px;">Los documentos que ya usen estos productos NO se afectan.</p>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar todo",
+      confirmButtonColor: "#ef4444",
+      cancelButtonText: "Cancelar",
+    });
+    if (!isConfirmed) return;
+    const { error } = await supabase.from("productos").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    if (!error) {
+      Swal.fire({ icon: "success", title: "Inventario eliminado", timer: 2000, showConfirmButton: false });
+      obtenerProductos();
+    } else Swal.fire("Error", "No se pudo eliminar el inventario.", "error");
   };
 
-  const importarDesdeArchivo = async (event) => {
+  /* ─── Exportar Excel (.xlsx) ─── */
+  const exportarExcel = () => {
+    if (productos.length === 0) return Swal.fire("Sin datos", "No hay productos para exportar.", "info");
+
+    const datosLimpios = productos.map((p, i) => ({
+      "#": i + 1,
+      "Nombre": p.nombre || "",
+      "Descripción": p.descripcion || "",
+      "Precio": Number(p.precio || 0),
+      "Stock": Number(p.stock || 0),
+      "Categoría": p.categoria || ""
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(datosLimpios);
+    ws["!cols"] = [
+      { wch: 5 }, { wch: 30 }, { wch: 30 }, { wch: 14 }, { wch: 8 }, { wch: 20 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+    const fecha = new Date().toLocaleDateString("es-CO").replaceAll("/", "-");
+    XLSX.writeFile(wb, `inventario_${fecha}.xlsx`);
+    Swal.fire({ icon: "success", title: "Excel descargado", timer: 1500, showConfirmButton: false });
+  };
+
+  /* ─── Importar desde Excel ─── */
+  const importarDesdeExcel = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
+    event.target.value = "";
+
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: "array" });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-      const productosValidos = json.filter((p) =>
-        p.nombre &&
-        p.categoria &&
-        !isNaN(parseFloat(p.precio)) &&
-        !isNaN(parseFloat(p.stock)) &&
-        parseFloat(p.precio) >= 0 &&
-        parseFloat(p.stock) >= 0
-      );
-      const productosPreparados = productosValidos.map((p) => ({
-        nombre: p.nombre,
-        descripcion: p.descripcion || "",
-        precio: parseFloat(p.precio),
-        stock: parseInt(p.stock, 10),
-        categoria: p.categoria
-      }));
-      if (productosPreparados.length === 0) {
-        Swal.fire("Archivo inválido", "No se encontraron productos válidos para importar.", "error");
-        return;
+
+      const mapCol = (row, opciones) => {
+        for (const key of opciones) {
+          const val = row[key] || row[key.toLowerCase()] || row[key.toUpperCase()];
+          if (val !== undefined && val !== "") return String(val).trim();
+        }
+        return "";
+      };
+
+      const productosValidos = json
+        .map((row) => ({
+          nombre: mapCol(row, ["nombre", "Nombre", "NOMBRE", "producto", "Producto", "PRODUCTO"]),
+          descripcion: mapCol(row, ["descripcion", "Descripción", "Descripcion", "DESCRIPCION"]),
+          precio: parseFloat(mapCol(row, ["precio", "Precio", "PRECIO", "price", "valor", "Valor"]) || "0"),
+          stock: parseInt(mapCol(row, ["stock", "Stock", "STOCK", "cantidad", "Cantidad", "CANTIDAD", "unidades"]) || "0", 10),
+          categoria: mapCol(row, ["categoria", "Categoría", "Categoria", "CATEGORIA", "tipo", "Tipo"])
+        }))
+        .filter((p) => p.nombre && !isNaN(p.precio) && p.precio >= 0 && !isNaN(p.stock) && p.stock >= 0);
+
+      if (productosValidos.length === 0) {
+        return Swal.fire("Sin datos válidos", "No se encontraron productos con nombre, precio y stock válidos.", "error");
       }
-      const { error } = await supabase.from("productos").insert(productosPreparados);
+
+      const { error } = await supabase.from("productos").insert(productosValidos);
       if (error) {
         console.error(error);
-        Swal.fire("Error", "No se pudieron guardar los productos.", "error");
-      } else {
-        Swal.fire("Importación exitosa", `${productosPreparados.length} productos fueron agregados.`, "success");
-        obtenerProductos();
+        return Swal.fire("Error", "No se pudieron importar los productos.", "error");
       }
+      Swal.fire("Importación exitosa", `${productosValidos.length} producto(s) importados correctamente.`, "success");
+      obtenerProductos();
     } catch (err) {
       console.error(err);
-      Swal.fire("Error al leer el archivo", "Verifica que sea un archivo Excel válido.", "error");
+      Swal.fire("Error al leer archivo", "Verifica que sea un archivo Excel (.xlsx) válido.", "error");
     }
   };
 
-  const borrarTodo = async () => {
-    const confirmacion = await Swal.fire({
-      title: "¿Eliminar todo el stock?",
-      text: "Esta acción borrará TODOS los productos del sistema y no se puede deshacer.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Sí, eliminar todo",
-      cancelButtonText: "Cancelar"
+  /* ─── Guía de importación ─── */
+  const mostrarGuia = () => {
+    Swal.fire({
+      title: "📥 Guía de importación desde Excel",
+      html: `
+        <div style="text-align:left;font-size:13px;line-height:1.7;">
+          <p>Tu archivo Excel debe tener estas columnas en la <strong>primera fila</strong>:</p>
+          <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:12px;">
+            <tr style="background:#f0f9ff;">
+              <th style="border:1px solid #e5e7eb;padding:6px;text-align:left;">Columna</th>
+              <th style="border:1px solid #e5e7eb;padding:6px;text-align:left;">¿Obligatoria?</th>
+              <th style="border:1px solid #e5e7eb;padding:6px;text-align:left;">Ejemplo</th>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;font-weight:600;">nombre</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#ef4444;">✅ Sí</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">Silla Tiffany</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;font-weight:600;">precio</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#ef4444;">✅ Sí</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">15000</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;font-weight:600;">stock</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#ef4444;">✅ Sí</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">50</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;">descripcion</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">Silla dorada elegante</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;">categoria</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">Mobiliario</td>
+            </tr>
+          </table>
+          <p style="margin-top:10px;">💡 <strong>Tips:</strong></p>
+          <ul style="margin:4px 0 0 16px;padding:0;">
+            <li>El sistema acepta variantes como "Nombre", "NOMBRE", "Producto", "cantidad", "Valor", etc.</li>
+            <li>Precio y stock deben ser números positivos.</li>
+            <li>Las filas sin nombre, precio o stock serán ignoradas.</li>
+            <li>Formatos aceptados: <strong>.xlsx</strong> y <strong>.xls</strong></li>
+          </ul>
+        </div>
+      `,
+      width: 560,
+      confirmButtonText: "Entendido",
+      confirmButtonColor: "#0077B6"
     });
-    if (confirmacion.isConfirmed) {
-      const { error } = await supabase.from("productos").delete().neq("id", 0);
-      if (!error) {
-        Swal.fire("Inventario eliminado", "Todos los productos fueron eliminados.", "success");
-        obtenerProductos();
-      } else {
-        Swal.fire("Error", "No se pudo eliminar el inventario.", "error");
-      }
-    }
   };
 
+  /* ─── Filtrar ─── */
+  const categoriasUnicas = useMemo(() =>
+    [...new Set(productos.map((p) => p.categoria).filter(Boolean))].sort(),
+    [productos]
+  );
+
+  const productosFiltrados = useMemo(() => {
+    let lista = productos;
+    if (buscar.trim()) {
+      const q = buscar.toLowerCase();
+      lista = lista.filter((p) =>
+        (p.nombre || "").toLowerCase().includes(q) ||
+        (p.descripcion || "").toLowerCase().includes(q) ||
+        (p.categoria || "").toLowerCase().includes(q)
+      );
+    }
+    if (categoriaFiltro) {
+      lista = lista.filter((p) => (p.categoria || "").toLowerCase() === categoriaFiltro.toLowerCase());
+    }
+    return lista;
+  }, [productos, buscar, categoriaFiltro]);
+
+  /* ─── KPIs ─── */
+  const valorTotal = productos.reduce((s, p) => s + (Number(p.precio || 0) * Number(p.stock || 0)), 0);
+  const stockTotal = productos.reduce((s, p) => s + Number(p.stock || 0), 0);
+  const sinStock = productos.filter((p) => Number(p.stock || 0) === 0).length;
+
+  /* ═══ RENDER ═══ */
   return (
     <Protegido>
-      <div style={{ padding: "1rem", maxWidth: "800px", margin: "auto" }}>
-        <h2 style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>Gestión de Inventario</h2>
+      <div className="sw-pagina">
+        <div className="sw-pagina-contenido" style={{ maxWidth: 950 }}>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px" }}>
-          <button onClick={() => { limpiarFormulario(); setMostrarFormulario(true); }} style={{ padding: "10px", background: "#ccc", borderRadius: "5px" }}>
-            ➕ Agregar
-          </button>
-          <button onClick={exportarCSV} style={{ padding: "10px", background: "#4caf50", color: "#fff", borderRadius: "5px" }}>
-            📊 Exportar CSV
-          </button>
-          <button onClick={() => document.getElementById("archivoExcel").click()} style={{ padding: "10px", background: "#2196f3", color: "#fff", borderRadius: "5px" }}>
-            📥 Importar desde Excel
-          </button>
-          <button onClick={() => { setBuscar(""); setCategoriaFiltro(""); setMostrarTodo(true); }} style={{ padding: "10px", background: "#795548", color: "#fff", borderRadius: "5px" }}>
-            📋 Ver todo el stock
-          </button>
-          <button onClick={borrarTodo} style={{ padding: "10px", background: "#f44336", color: "#fff", borderRadius: "5px" }}>
-            🗑️ Borrar todo el inventario
-          </button>
-        </div>
-
-        <input type="file" accept=".xlsx,.xls,.csv" onChange={importarDesdeArchivo} id="archivoExcel" style={{ display: "none" }} />
-
-        <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", gap: "10px" }}>
-          <input type="text" placeholder="Buscar por nombre" value={buscar} onChange={(e) => { setBuscar(e.target.value); setMostrarTodo(false); }} />
-          <select value={categoriaFiltro} onChange={(e) => { setCategoriaFiltro(e.target.value); setMostrarTodo(false); }}>
-            <option value="">Filtrar por categoría</option>
-            {categoriasUnicas.map((cat, idx) => (<option key={idx} value={cat}>{cat}</option>))}
-          </select>
-        </div>
-
-        {mostrarFormulario && (
-          <>
-            <h3 style={{ marginTop: "2rem" }}>{editandoId ? "Editar Producto" : "Agregar Producto"}</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "1rem" }}>
-              <input type="text" placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
-              <input type="text" placeholder="Descripción" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
-              <input type="number" placeholder="Precio" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} />
-              <input type="number" placeholder="Stock" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
-              <input type="text" placeholder="Categoría" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
-            </div>
-            <button onClick={guardarProducto} style={{ padding: "10px", width: "100%", background: "#2196f3", color: "#fff" }}>
-              {editandoId ? "Actualizar" : "Guardar"}
-            </button>
-            <button onClick={limpiarFormulario} style={{ padding: "10px", width: "100%", marginTop: "8px", background: "#eee" }}>
-              Cancelar
-            </button>
-          </>
-        )}
-
-        {productosFiltrados.length > 0 && (
-          <div style={{ marginTop: "2rem" }}>
-            <h3>Resultados</h3>
-            <ul style={{ listStyle: "none", padding: 0 }}>
-              {productosFiltrados.map((producto) => (
-                <li key={producto.id} style={{
-                  marginBottom: "1rem",
-                  border: "1px solid #ccc",
-                  borderRadius: "8px",
-                  padding: "12px"
-                }}>
-                  <strong>{producto.nombre}</strong><br />
-                  {producto.descripcion}<br />
-                  💲 {producto.precio} | Stock: {producto.stock} | {producto.categoria}
-                  <div style={{ marginTop: "0.5rem" }}>
-                    <button onClick={() => editarProducto(producto)} title="Editar" style={{ marginRight: "10px" }}>
-                      <FaEdit />
-                    </button>
-                    <button onClick={() => eliminarProducto(producto.id)} title="Eliminar">
-                      <FaTrash />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+          {/* ═══ HEADER ═══ */}
+          <div className="sw-header">
+            <h1 className="sw-header-titulo">📦 Gestión de Inventario</h1>
           </div>
-        )}
+
+          {/* ═══ KPI CARDS ═══ */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 12,
+            marginBottom: 20
+          }}>
+            <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Productos</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--sw-azul)", marginTop: 4 }}>{productos.length}</div>
+            </div>
+            <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Stock total</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--sw-verde)", marginTop: 4 }}>{stockTotal.toLocaleString("es-CO")}</div>
+            </div>
+            <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Valor inventario</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--sw-morado)", marginTop: 4 }}>{money(valorTotal)}</div>
+            </div>
+            <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Sin stock</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: sinStock > 0 ? "var(--sw-rojo)" : "var(--sw-verde)", marginTop: 4 }}>{sinStock}</div>
+            </div>
+          </div>
+
+          {/* ═══ ACCIONES ═══ */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+            <button className="sw-btn sw-btn-primario" onClick={() => { limpiarFormulario(); setMostrarFormulario(true); }}>
+              ＋ Nuevo producto
+            </button>
+            <button className="sw-btn sw-btn-secundario" onClick={exportarExcel}>
+              📊 Exportar Excel
+            </button>
+            <button className="sw-btn sw-btn-secundario" onClick={() => document.getElementById("archivoExcelInv").click()}>
+              📥 Importar Excel
+            </button>
+            <button className="sw-btn sw-btn-secundario" onClick={mostrarGuia}>
+              ❓ Guía importación
+            </button>
+            <button className="sw-btn" style={{ background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca" }} onClick={borrarTodo}>
+              🗑️ Eliminar todo
+            </button>
+          </div>
+
+          <input type="file" accept=".xlsx,.xls" onChange={importarDesdeExcel} id="archivoExcelInv" style={{ display: "none" }} />
+
+          {/* ═══ FORMULARIO ═══ */}
+          {mostrarFormulario && (
+            <div className="sw-card" style={{ marginBottom: 16 }}>
+              <div className="sw-card-header sw-card-header-cyan">
+                <h3 className="sw-card-titulo" style={{ color: "white", margin: 0 }}>
+                  {editandoId ? "✏️ Editar Producto" : "➕ Nuevo Producto"}
+                </h3>
+              </div>
+              <div className="sw-card-body">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Nombre *</label>
+                    <input type="text" placeholder="Nombre del producto" value={form.nombre}
+                      onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                      style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Descripción</label>
+                    <input type="text" placeholder="Descripción opcional" value={form.descripcion}
+                      onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+                      style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Precio *</label>
+                    <input type="number" placeholder="0" value={form.precio}
+                      onChange={(e) => setForm({ ...form, precio: e.target.value })}
+                      style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Stock *</label>
+                    <input type="number" placeholder="0" value={form.stock}
+                      onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                      style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Categoría</label>
+                    <input type="text" placeholder="Ej: Mobiliario, Decoración, Carpas..." value={form.categoria}
+                      onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                      list="categorias-list"
+                      style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                    />
+                    <datalist id="categorias-list">
+                      {categoriasUnicas.map((cat) => <option key={cat} value={cat} />)}
+                    </datalist>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                  <button className="sw-btn sw-btn-primario" style={{ flex: 1 }} onClick={guardarProducto}>
+                    {editandoId ? "💾 Actualizar" : "💾 Guardar"}
+                  </button>
+                  <button className="sw-btn sw-btn-secundario" style={{ flex: 1 }} onClick={limpiarFormulario}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ BÚSQUEDA Y FILTROS ═══ */}
+          <div className="sw-card" style={{ marginBottom: 16 }}>
+            <div className="sw-card-body" style={{ padding: "12px 16px" }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                {/* Búsqueda */}
+                <div style={{ position: "relative", flex: "1 1 250px", minWidth: 200 }}>
+                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: "var(--sw-texto-terciario)" }}>🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre, descripción, categoría..."
+                    value={buscar}
+                    onChange={(e) => setBuscar(e.target.value)}
+                    style={{
+                      width: "100%", padding: "10px 12px 10px 38px",
+                      border: "1px solid var(--sw-borde)", borderRadius: 8,
+                      fontSize: 14, boxSizing: "border-box",
+                      background: "var(--sw-fondo)"
+                    }}
+                  />
+                </div>
+                {/* Filtro categoría */}
+                <select
+                  value={categoriaFiltro}
+                  onChange={(e) => setCategoriaFiltro(e.target.value)}
+                  style={{
+                    padding: "10px 12px", border: "1px solid var(--sw-borde)",
+                    borderRadius: 8, fontSize: 14, background: "var(--sw-fondo)",
+                    color: "var(--sw-texto)", minWidth: 160
+                  }}
+                >
+                  <option value="">Todas las categorías</option>
+                  {categoriasUnicas.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              {(buscar || categoriaFiltro) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: "var(--sw-texto-terciario)" }}>
+                    {productosFiltrados.length} de {productos.length} productos
+                  </span>
+                  {(buscar || categoriaFiltro) && (
+                    <button
+                      onClick={() => { setBuscar(""); setCategoriaFiltro(""); }}
+                      style={{
+                        fontSize: 11, padding: "2px 10px", borderRadius: 20,
+                        background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca",
+                        cursor: "pointer"
+                      }}
+                    >
+                      ✕ Limpiar filtros
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ═══ LISTADO ═══ */}
+          <div className="sw-card">
+            <div className="sw-card-header">
+              <h3 className="sw-card-titulo">
+                📋 {buscar || categoriaFiltro ? "Resultados" : "Todos los productos"} ({productosFiltrados.length})
+              </h3>
+            </div>
+            <div className="sw-card-body" style={{ padding: 0 }}>
+              {loading ? (
+                <div style={{ padding: 40, textAlign: "center", color: "var(--sw-texto-terciario)" }}>
+                  Cargando inventario...
+                </div>
+              ) : productosFiltrados.length === 0 ? (
+                <div style={{ padding: 40, textAlign: "center" }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>📦</div>
+                  <div style={{ fontSize: 14, color: "var(--sw-texto-terciario)" }}>
+                    {buscar || categoriaFiltro ? "No se encontraron productos con esos filtros" : "No hay productos registrados"}
+                  </div>
+                  {!buscar && !categoriaFiltro && (
+                    <p style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 6 }}>
+                      Agrega tu primer producto o importa desde Excel
+                    </p>
+                  )}
+                </div>
+              ) : (
+                productosFiltrados.map((p) => (
+                  <div key={p.id} style={{
+                    padding: "14px 16px",
+                    borderBottom: "1px solid #f3f4f6",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    transition: "background 0.15s",
+                  }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  >
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--sw-texto)" }}>
+                          {p.nombre}
+                        </span>
+                        {p.categoria && (
+                          <span style={{
+                            fontSize: 11, padding: "2px 8px", borderRadius: 20,
+                            background: "var(--sw-cyan-muy-claro)", color: "var(--sw-azul)",
+                            fontWeight: 500
+                          }}>
+                            {p.categoria}
+                          </span>
+                        )}
+                        {Number(p.stock || 0) === 0 && (
+                          <span style={{
+                            fontSize: 10, padding: "2px 8px", borderRadius: 20,
+                            background: "#fef2f2", color: "#ef4444", fontWeight: 600
+                          }}>
+                            Sin stock
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 3, display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>
+                        <span style={{ fontWeight: 600, color: "var(--sw-verde-oscuro)" }}>{money(p.precio)}</span>
+                        <span>Stock: <strong>{Number(p.stock || 0)}</strong></span>
+                        {p.descripcion && <span style={{ color: "#9ca3af" }}>{p.descripcion}</span>}
+                      </div>
+                    </div>
+
+                    {/* Acciones */}
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button className="sw-btn-icono" onClick={() => editarProducto(p)} title="Editar">
+                        ✏️
+                      </button>
+                      <button className="sw-btn-icono" onClick={() => eliminarProducto(p.id)} title="Eliminar"
+                        style={{ color: "#ef4444" }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+        </div>
       </div>
     </Protegido>
   );
