@@ -331,18 +331,19 @@ function calcularFechasPendientes(rec, hastaFecha) {
   const hoy = hastaFecha || new Date();
   const hoyStr = hoy.toISOString().slice(0, 10);
 
-  // Punto de inicio: último generado + 1 día, o fecha_inicio
+  // Punto de inicio: último generado + 1 día, o inicio del mes de fecha_inicio
   let cursor;
   if (rec.ultimo_generado) {
     cursor = new Date(rec.ultimo_generado);
     cursor.setDate(cursor.getDate() + 1);
   } else {
-    cursor = new Date(rec.fecha_inicio);
+    // Empezar desde el día 1 del mes de fecha_inicio para no saltar
+    // el dia_cobro si fecha_inicio es posterior al dia_cobro en el mismo mes
+    const fi = new Date(rec.fecha_inicio);
+    cursor = new Date(fi.getFullYear(), fi.getMonth(), 1);
   }
 
-  // No generar antes de fecha_inicio
-  const inicio = new Date(rec.fecha_inicio);
-  if (cursor < inicio) cursor = new Date(inicio);
+  // La validación de mes se hace dentro del bucle (mismoMesOPosterior)
 
   // Iterar por períodos
   const maxIteraciones = 365; // seguridad
@@ -362,8 +363,17 @@ function calcularFechasPendientes(rec, hastaFecha) {
     // No pasar de fecha_fin
     if (rec.fecha_fin && fechaStr > rec.fecha_fin) break;
 
-    // No antes de fecha_inicio
-    if (fechaStr >= rec.fecha_inicio) {
+    // No antes del mes de fecha_inicio
+    // (permitir dia_cobro aunque sea anterior al día exacto de fecha_inicio,
+    //  siempre que esté en el mismo mes o posterior)
+    const fechaCobroDate = new Date(fechaStr);
+    const inicioDate = new Date(rec.fecha_inicio);
+    const mismoMesOPosterior =
+      fechaCobroDate.getFullYear() > inicioDate.getFullYear() ||
+      (fechaCobroDate.getFullYear() === inicioDate.getFullYear() &&
+       fechaCobroDate.getMonth() >= inicioDate.getMonth());
+
+    if (mismoMesOPosterior) {
       fechas.push(fechaStr);
     }
 
