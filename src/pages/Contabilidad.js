@@ -6,6 +6,7 @@ import { generarPDFContable } from "../utils/generarPDFContable";
 import GastosRecurrentesModal from "../components/GastosRecurrentesModal";
 import Swal from "sweetalert2";
 import Protegido from "../components/Protegido";
+import { useTenant } from "../context/TenantContext"; // ✅ IMPORTADO EL TENANT
 import "../estilos/EstilosGlobales.css";
 import "../estilos/ReportesContabilidad.css";
 
@@ -98,6 +99,8 @@ const Contabilidad = () => {
 
   // Datos del período anterior (KPI comparativa)
   const [movsPeriodoAnterior, setMovsPeriodoAnterior] = useState([]);
+
+  const { tenant } = useTenant(); // ✅ OBTENEMOS EL ID DE LA EMPRESA
 
   /* ─── Cargar movimientos ─── */
   const cargarMovimientos = useCallback(async () => {
@@ -340,6 +343,7 @@ const Contabilidad = () => {
     });
     if (!value) return;
 
+    // ✅ AHORA ENVÍA EL ID DE LA EMPRESA PARA QUE RLS LO DEJE GUARDAR
     const { error } = await supabase.from("movimientos_contables").insert([{
       tipo: value.tipo,
       monto: value.monto,
@@ -348,7 +352,9 @@ const Contabilidad = () => {
       fecha: value.fecha,
       estado: "activo",
       origen: "manual",
+      tenant_id: tenant.id
     }]);
+    
     if (error) return Swal.fire("Error", "No se pudo guardar el movimiento", "error");
     Swal.fire({ icon: "success", title: "Registrado", timer: 1500, showConfirmButton: false });
     cargarMovimientos();
@@ -413,11 +419,11 @@ const Contabilidad = () => {
     cargarMovimientos();
   };
 
-  /* ─── ELIMINAR movimiento ─── */
+  /* ─── ELIMINAR movimiento (✅ SIN CÓDIGO DE SEGURIDAD) ─── */
   const borrarMovimiento = async (m) => {
     const { isConfirmed } = await Swal.fire({
       title: "¿Eliminar este movimiento?",
-      text: `${m.descripcion || "Movimiento"} — ${m.tipo === "ingreso" ? "+" : "-"}$${Number(m.monto || 0).toLocaleString("es-CO")}`,
+      text: `${m.descripcion || "Movimiento"} — ${m.tipo === "ingreso" ? "+" : "-"}${money(m.monto)}`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Sí, eliminar",

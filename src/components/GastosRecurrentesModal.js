@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
+import { useTenant } from "../context/TenantContext"; // ✅ IMPORTADO EL TENANT
 
 /* ─── Categorías (mismas que Contabilidad.js) ─── */
 const CATEGORIAS_GASTO = [
@@ -30,6 +31,8 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
   const [recurrentes, setRecurrentes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
+  
+  const { tenant } = useTenant(); // ✅ OBTENEMOS EL ID DE LA EMPRESA
 
   /* ─── Cargar recurrentes ─── */
   const cargar = useCallback(async () => {
@@ -126,7 +129,8 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
       if (error) return Swal.fire("Error", "No se pudo actualizar", "error");
       Swal.fire({ icon: "success", title: "Actualizado", text: "Los cambios solo afectan movimientos futuros", timer: 2000, showConfirmButton: false });
     } else {
-      const { error } = await supabase.from("gastos_recurrentes").insert([{ ...value, activo: true }]);
+      // ✅ AHORA ENVÍA EL ID DE LA EMPRESA PARA QUE RLS LO DEJE GUARDAR
+      const { error } = await supabase.from("gastos_recurrentes").insert([{ ...value, activo: true, tenant_id: tenant.id }]);
       if (error) return Swal.fire("Error", "No se pudo crear", "error");
       Swal.fire({ icon: "success", title: "Creado", timer: 1500, showConfirmButton: false });
     }
@@ -190,7 +194,7 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
 
         if (existe && existe.length > 0) continue;
 
-        // Crear movimiento
+        // ✅ AHORA ENVÍA EL ID DE LA EMPRESA
         const { error } = await supabase.from("movimientos_contables").insert([{
           tipo: rec.tipo,
           monto: rec.monto,
@@ -200,6 +204,7 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
           estado: "activo",
           origen: "recurrente",
           recurrente_id: rec.id,
+          tenant_id: tenant.id
         }]);
 
         if (!error) totalGenerados++;
