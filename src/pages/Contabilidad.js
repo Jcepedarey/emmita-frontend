@@ -415,19 +415,18 @@ const Contabilidad = () => {
 
   /* ─── ELIMINAR movimiento ─── */
   const borrarMovimiento = async (m) => {
-    const { value: code } = await Swal.fire({
-      title: "Autorización requerida",
-      text: "Ingresa el código para eliminar este movimiento",
-      input: "password",
-      inputPlaceholder: "Código",
+    const { isConfirmed } = await Swal.fire({
+      title: "¿Eliminar este movimiento?",
+      text: `${m.descripcion || "Movimiento"} — ${m.tipo === "ingreso" ? "+" : "-"}$${Number(m.monto || 0).toLocaleString("es-CO")}`,
+      icon: "warning",
       showCancelButton: true,
-      confirmButtonText: "Eliminar",
+      confirmButtonText: "Sí, eliminar",
       confirmButtonColor: "#ef4444",
+      cancelButtonText: "Cancelar",
     });
-    if (code !== "4860") {
-      if (code) Swal.fire("Código incorrecto", "No se autorizó", "error");
-      return;
-    }
+    
+    if (!isConfirmed) return;
+    
     await supabase.from("movimientos_contables").delete().eq("id", m.id);
     Swal.fire({ icon: "success", title: "Eliminado", timer: 1500, showConfirmButton: false });
     cargarMovimientos();

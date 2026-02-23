@@ -3,13 +3,20 @@ const express = require("express");
 const router = express.Router();
 const { createClient } = require("@supabase/supabase-js");
 
-// Cliente con service_role (bypass RLS) — para crear usuarios
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY // service_role key
+  process.env.SUPABASE_KEY
 );
 
-// ─── Middleware: verificar que el usuario es admin ──────────────
+// 🔒 Límites
+const LIMITES = {
+  nombre: 100,
+  email: 100,
+  password_min: 6,
+  password_max: 72,
+};
+
+// ─── Middleware: verificar admin ────────────────────────────────
 async function verificarAdmin(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -19,14 +26,12 @@ async function verificarAdmin(req, res, next) {
   const token = authHeader.split(" ")[1];
 
   try {
-    // Verificar el JWT con Supabase
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) {
       return res.status(401).json({ error: "Token inválido o expirado" });
     }
 
-    // Buscar el perfil del usuario
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("id, tenant_id, rol, activo")
@@ -45,31 +50,58 @@ async function verificarAdmin(req, res, next) {
       return res.status(403).json({ error: "Tu cuenta está desactivada" });
     }
 
-    // Pasar datos al siguiente middleware
     req.adminProfile = profile;
     req.adminUser = user;
     next();
   } catch (err) {
-    console.error("Error verificando admin:", err);
+    console.error("Error verificando admin:", err.message);
     return res.status(500).json({ error: "Error de autenticación" });
   }
 }
 
-// ─── POST /api/empleados/crear — Crear usuario empleado ────────
+// 🔒 Verificar si email existe (sin traer TODOS los usuarios)
+async function emailExiste(email) {
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  return !!data;
+}
+
+// ─── POST /api/empleados/crear ─────────────────────────────────
 router.post("/crear", verificarAdmin, async (req, res) => {
   const { nombre, email, password, rol } = req.body;
   const tenantId = req.adminProfile.tenant_id;
 
-  // Validaciones
+  // 🔒 Validaciones estrictas
   if (!nombre?.trim() || !email?.trim() || !password) {
     return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
   }
-  if (password.length < 6) {
+  if (nombre.trim().length > LIMITES.nombre) {
+    return res.status(400).json({ error: `Nombre: máximo ${LIMITES.nombre} caracteres` });
+  }
+  if (email.trim().length > LIMITES.email) {
+    return res.status(400).json({ error: `Email: máximo ${LIMITES.email} caracteres` });
+  }
+  if (password.length < LIMITES.password_min) {
     return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+  }
+  if (password.length > LIMITES.password_max) {
+    return res.status(400).json({ error: "La contraseña es demasiado larga" });
   }
   if (!["admin", "empleado"].includes(rol)) {
     return res.status(400).json({ error: "Rol inválido" });
   }
+
+  // 🔒 Validar formato email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    return res.status(400).json({ error: "Formato de email inválido" });
+  }
+
+  const emailLimpio = email.trim().toLowerCase();
+  const nombreLimpio = nombre.trim();
 
   try {
     // 1. Verificar límite de usuarios del tenant
@@ -87,7 +119,6 @@ router.post("/crear", verificarAdmin, async (req, res) => {
       return res.status(403).json({ error: "La empresa está suspendida" });
     }
 
-    // Contar usuarios actuales
     const { count: totalUsuarios } = await supabaseAdmin
       .from("profiles")
       .select("id", { count: "exact", head: true })
@@ -99,28 +130,27 @@ router.post("/crear", verificarAdmin, async (req, res) => {
       });
     }
 
-    // 2. Verificar que el email no exista
-    const { data: { users: existentes } } = await supabaseAdmin.auth.admin.listUsers();
-    const emailEnUso = existentes?.find(u => u.email === email.trim().toLowerCase());
-    if (emailEnUso) {
-      return res.status(409).json({ error: "Ya existe una cuenta con ese email" });
+    // 2. 🔒 Verificar email sin traer todos los usuarios
+    const yaExiste = await emailExiste(emailLimpio);
+    if (yaExiste) {
+      return res.status(409).json({ error: "No se pudo crear el usuario. Verifica los datos." });
     }
 
     // 3. Crear usuario en Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email.trim().toLowerCase(),
+      email: emailLimpio,
       password,
-      email_confirm: true, // confirmar automáticamente
+      email_confirm: true,
       user_metadata: {
         tenant_id: tenantId,
-        nombre: nombre.trim(),
+        nombre: nombreLimpio,
         rol,
       },
     });
 
     if (authError) {
-      console.error("Error creando usuario en Auth:", authError);
-      return res.status(500).json({ error: authError.message || "No se pudo crear el usuario" });
+      console.error("Error creando usuario en Auth:", authError.message);
+      return res.status(500).json({ error: "No se pudo crear el usuario. Verifica los datos." });
     }
 
     // 4. Verificar/crear perfil
@@ -134,23 +164,21 @@ router.post("/crear", verificarAdmin, async (req, res) => {
       const { error: insertError } = await supabaseAdmin.from("profiles").insert({
         id: authData.user.id,
         tenant_id: tenantId,
-        nombre: nombre.trim(),
-        email: email.trim().toLowerCase(),
+        nombre: nombreLimpio,
+        email: emailLimpio,
         rol,
         activo: true,
       });
 
       if (insertError) {
-        console.error("Error creando perfil:", insertError);
-        // Intentar eliminar el usuario de Auth si el perfil falla
+        console.error("Error creando perfil:", insertError.message);
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
         return res.status(500).json({ error: "No se pudo crear el perfil del usuario" });
       }
     } else {
-      // Actualizar perfil existente (creado por trigger)
       await supabaseAdmin.from("profiles").update({
-        nombre: nombre.trim(),
-        email: email.trim().toLowerCase(),
+        nombre: nombreLimpio,
+        email: emailLimpio,
         rol,
         activo: true,
       }).eq("id", authData.user.id);
@@ -159,17 +187,17 @@ router.post("/crear", verificarAdmin, async (req, res) => {
     // ✅ Éxito
     res.status(201).json({
       ok: true,
-      mensaje: `Usuario ${nombre} creado exitosamente`,
+      mensaje: `Usuario ${nombreLimpio} creado exitosamente`,
       usuario: {
         id: authData.user.id,
-        nombre: nombre.trim(),
-        email: email.trim().toLowerCase(),
+        nombre: nombreLimpio,
+        email: emailLimpio,
         rol,
       },
     });
 
   } catch (err) {
-    console.error("Error en crear empleado:", err);
+    console.error("Error en crear empleado:", err.message);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });

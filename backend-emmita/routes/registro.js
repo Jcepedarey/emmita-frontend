@@ -3,13 +3,23 @@ const express = require("express");
 const router = express.Router();
 const { createClient } = require("@supabase/supabase-js");
 
-// Cliente con service_role (bypass RLS) — SOLO para registro
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY // service_role key
+  process.env.SUPABASE_KEY
 );
 
-// ✅ Verificar token de Turnstile con Cloudflare
+// 🔒 Límites de longitud
+const LIMITES = {
+  nombre: 100,
+  slug: 50,
+  telefono: 20,
+  direccion: 200,
+  email: 100,
+  password_min: 6,
+  password_max: 72,
+};
+
+// ✅ Verificar CAPTCHA con Cloudflare
 async function verificarCaptcha(token) {
   try {
     const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
@@ -23,16 +33,26 @@ async function verificarCaptcha(token) {
     const data = await response.json();
     return data.success === true;
   } catch (err) {
-    console.error("Error verificando CAPTCHA:", err);
+    console.error("Error verificando CAPTCHA:", err.message);
     return false;
   }
 }
 
-// POST /api/registro — Crear empresa + usuario administrador
+// 🔒 Verificar si email existe (sin traer TODOS los usuarios)
+async function emailExiste(email) {
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  return !!data;
+}
+
+// POST /api/registro
 router.post("/", async (req, res) => {
   const { empresa, usuario, captchaToken } = req.body;
 
-  // ─── Verificar CAPTCHA ────────────────────────────
+  // ── Verificar CAPTCHA ─────────────────────────────
   if (!captchaToken) {
     return res.status(400).json({ error: "Verificación de seguridad requerida" });
   }
@@ -41,48 +61,81 @@ router.post("/", async (req, res) => {
     return res.status(403).json({ error: "Verificación de seguridad fallida. Intenta de nuevo." });
   }
 
-  // ─── Validaciones ─────────────────────────────────
+  // ── Validaciones estrictas ────────────────────────
   if (!empresa?.nombre?.trim() || !empresa?.slug?.trim()) {
     return res.status(400).json({ error: "Nombre y slug de empresa son obligatorios" });
   }
   if (!usuario?.nombre?.trim() || !usuario?.email?.trim() || !usuario?.password) {
     return res.status(400).json({ error: "Nombre, email y contraseña son obligatorios" });
   }
-  if (usuario.password.length < 6) {
+
+  // 🔒 Validar longitudes
+  if (empresa.nombre.trim().length > LIMITES.nombre) {
+    return res.status(400).json({ error: `Nombre de empresa: máximo ${LIMITES.nombre} caracteres` });
+  }
+  if (empresa.slug.trim().length > LIMITES.slug) {
+    return res.status(400).json({ error: `Identificador: máximo ${LIMITES.slug} caracteres` });
+  }
+  if (usuario.nombre.trim().length > LIMITES.nombre) {
+    return res.status(400).json({ error: `Nombre: máximo ${LIMITES.nombre} caracteres` });
+  }
+  if (usuario.email.trim().length > LIMITES.email) {
+    return res.status(400).json({ error: `Email: máximo ${LIMITES.email} caracteres` });
+  }
+  if (usuario.password.length < LIMITES.password_min) {
     return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
   }
+  if (usuario.password.length > LIMITES.password_max) {
+    return res.status(400).json({ error: "La contraseña es demasiado larga" });
+  }
+
+  // 🔒 Validar formato email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(usuario.email.trim())) {
+    return res.status(400).json({ error: "Formato de email inválido" });
+  }
+
+  // 🔒 Validar slug
   if (!/^[a-z0-9-]+$/.test(empresa.slug) || empresa.slug.length < 3) {
     return res.status(400).json({ error: "El slug solo puede contener letras minúsculas, números y guiones (mínimo 3 caracteres)" });
   }
 
+  // 🔒 Sanitizar
+  const nombreEmpresa = empresa.nombre.trim();
+  const slugEmpresa = empresa.slug.trim();
+  const telefonoEmpresa = (empresa.telefono || "").trim().slice(0, LIMITES.telefono);
+  const direccionEmpresa = (empresa.direccion || "").trim().slice(0, LIMITES.direccion);
+  const emailEmpresa = (empresa.email || usuario.email).trim().toLowerCase();
+  const nombreUsuario = usuario.nombre.trim();
+  const emailUsuario = usuario.email.trim().toLowerCase();
+
   try {
-    // 1. Verificar que el slug no exista
+    // 1. Verificar slug único
     const { data: slugExiste } = await supabaseAdmin
       .from("tenants")
       .select("id")
-      .eq("slug", empresa.slug.trim())
+      .eq("slug", slugEmpresa)
       .maybeSingle();
 
     if (slugExiste) {
-      return res.status(409).json({ error: `El identificador "${empresa.slug}" ya está en uso` });
+      return res.status(409).json({ error: `El identificador "${slugEmpresa}" ya está en uso` });
     }
 
-    // 2. Verificar que el email no exista
-    const { data: { users: existentes } } = await supabaseAdmin.auth.admin.listUsers();
-    const emailEnUso = existentes?.find(u => u.email === usuario.email.trim().toLowerCase());
-    if (emailEnUso) {
-      return res.status(409).json({ error: "Ya existe una cuenta con ese email" });
+    // 2. 🔒 Verificar email sin traer todos los usuarios
+    const yaExiste = await emailExiste(emailUsuario);
+    if (yaExiste) {
+      return res.status(409).json({ error: "No se pudo completar el registro. Verifica tus datos." });
     }
 
-    // 3. Crear empresa (tenant)
+    // 3. Crear empresa
     const { data: nuevoTenant, error: tenantError } = await supabaseAdmin
       .from("tenants")
       .insert({
-        nombre: empresa.nombre.trim(),
-        slug: empresa.slug.trim(),
-        telefono: (empresa.telefono || "").trim(),
-        direccion: (empresa.direccion || "").trim(),
-        email: (empresa.email || usuario.email).trim(),
+        nombre: nombreEmpresa,
+        slug: slugEmpresa,
+        telefono: telefonoEmpresa,
+        direccion: direccionEmpresa,
+        email: emailEmpresa,
         plan: "trial",
         estado: "activo",
         max_usuarios: 2,
@@ -92,42 +145,41 @@ router.post("/", async (req, res) => {
       .single();
 
     if (tenantError) {
-      console.error("Error creando tenant:", tenantError);
+      console.error("Error creando tenant:", tenantError.message);
       return res.status(500).json({ error: "No se pudo crear la empresa" });
     }
 
-    // 4. Crear usuario en Auth (con tenant_id en metadata para el trigger)
+    // 4. Crear usuario en Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: usuario.email.trim().toLowerCase(),
+      email: emailUsuario,
       password: usuario.password,
       email_confirm: true,
       user_metadata: {
         tenant_id: nuevoTenant.id,
-        nombre: usuario.nombre.trim(),
+        nombre: nombreUsuario,
         rol: "admin",
       },
     });
 
     if (authError) {
-      console.error("Error creando usuario:", authError);
-      // Rollback: eliminar el tenant
+      console.error("Error creando usuario:", authError.message);
       await supabaseAdmin.from("tenants").delete().eq("id", nuevoTenant.id);
-      return res.status(500).json({ error: authError.message || "No se pudo crear el usuario" });
+      return res.status(500).json({ error: "No se pudo crear el usuario. Verifica tus datos." });
     }
 
-    // 5. Verificar que el trigger creó el profile
+    // 5. Verificar/crear profile
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("id, tenant_id, rol")
       .eq("id", authData.user.id)
       .maybeSingle();
 
-    // Si el trigger no lo creó (por timing), lo creamos manualmente
     if (!profile) {
       await supabaseAdmin.from("profiles").insert({
         id: authData.user.id,
         tenant_id: nuevoTenant.id,
-        nombre: usuario.nombre.trim(),
+        nombre: nombreUsuario,
+        email: emailUsuario,
         rol: "admin",
         activo: true,
       });
@@ -146,7 +198,7 @@ router.post("/", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Error en registro:", err);
+    console.error("Error en registro:", err.message);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
