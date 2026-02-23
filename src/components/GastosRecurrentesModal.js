@@ -1,8 +1,8 @@
-// src/components/GastosRecurrentesModal.js — SESIÓN 2
+// src/components/GastosRecurrentesModal.js
 import React, { useEffect, useState, useCallback } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
-import { useTenant } from "../context/TenantContext"; // ✅ IMPORTADO EL TENANT
+import { useTenant } from "../context/TenantContext";
 
 /* ─── Categorías (mismas que Contabilidad.js) ─── */
 const CATEGORIAS_GASTO = [
@@ -28,24 +28,25 @@ const money = (n) => `$${Number(n || 0).toLocaleString("es-CO")}`;
    COMPONENTE MODAL
    ═══════════════════════════════════════════════════════════════ */
 const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) => {
+  const { tenant } = useTenant();
   const [recurrentes, setRecurrentes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
-  
-  const { tenant } = useTenant(); // ✅ OBTENEMOS EL ID DE LA EMPRESA
 
-  /* ─── Cargar recurrentes ─── */
+  /* ─── Cargar recurrentes (FILTRADO POR TENANT) ─── */
   const cargar = useCallback(async () => {
+    if (!tenant?.id) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("gastos_recurrentes")
       .select("*")
+      .eq("tenant_id", tenant.id)
       .order("activo", { ascending: false })
       .order("created_at", { ascending: false });
     if (error) console.error("❌ Error cargando recurrentes:", error);
     setRecurrentes(data || []);
     setLoading(false);
-  }, []);
+  }, [tenant]);
 
   useEffect(() => {
     if (abierto) cargar();
@@ -54,7 +55,6 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
   /* ─── Crear/Editar recurrente ─── */
   const abrirFormulario = async (item = null) => {
     const esEdicion = !!item;
-    const cats = (item?.tipo || "gasto") === "gasto" ? CATEGORIAS_GASTO : [...CATEGORIAS_GASTO, ...CATEGORIAS_INGRESO];
 
     const { value } = await Swal.fire({
       title: esEdicion ? "Editar recurrente" : "Nuevo gasto/ingreso recurrente",
@@ -124,12 +124,10 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
     if (!value) return;
 
     if (esEdicion) {
-      // Editar: solo afecta movimientos FUTUROS (los pasados no se tocan)
       const { error } = await supabase.from("gastos_recurrentes").update(value).eq("id", item.id);
       if (error) return Swal.fire("Error", "No se pudo actualizar", "error");
       Swal.fire({ icon: "success", title: "Actualizado", text: "Los cambios solo afectan movimientos futuros", timer: 2000, showConfirmButton: false });
     } else {
-      // ✅ AHORA ENVÍA EL ID DE LA EMPRESA PARA QUE RLS LO DEJE GUARDAR
       const { error } = await supabase.from("gastos_recurrentes").insert([{ ...value, activo: true, tenant_id: tenant.id }]);
       if (error) return Swal.fire("Error", "No se pudo crear", "error");
       Swal.fire({ icon: "success", title: "Creado", timer: 1500, showConfirmButton: false });
@@ -177,14 +175,11 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
     let totalGenerados = 0;
 
     for (const rec of activos) {
-      // Verificar que no haya pasado la fecha fin
       if (rec.fecha_fin && rec.fecha_fin < hoyStr) continue;
 
-      // Calcular fechas a generar desde ultimo_generado (o fecha_inicio) hasta hoy
       const fechasAGenerar = calcularFechasPendientes(rec, hoy);
 
       for (const fecha of fechasAGenerar) {
-        // Verificar que no exista ya un movimiento para esta fecha + recurrente
         const { data: existe } = await supabase
           .from("movimientos_contables")
           .select("id")
@@ -194,7 +189,6 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
 
         if (existe && existe.length > 0) continue;
 
-        // ✅ AHORA ENVÍA EL ID DE LA EMPRESA
         const { error } = await supabase.from("movimientos_contables").insert([{
           tipo: rec.tipo,
           monto: rec.monto,
@@ -210,7 +204,6 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
         if (!error) totalGenerados++;
       }
 
-      // Actualizar ultimo_generado
       if (fechasAGenerar.length > 0) {
         await supabase.from("gastos_recurrentes")
           .update({ ultimo_generado: fechasAGenerar[fechasAGenerar.length - 1] })
@@ -336,41 +329,28 @@ function calcularFechasPendientes(rec, hastaFecha) {
   const hoy = hastaFecha || new Date();
   const hoyStr = hoy.toISOString().slice(0, 10);
 
-  // Punto de inicio: último generado + 1 día, o inicio del mes de fecha_inicio
   let cursor;
   if (rec.ultimo_generado) {
     cursor = new Date(rec.ultimo_generado);
     cursor.setDate(cursor.getDate() + 1);
   } else {
-    // Empezar desde el día 1 del mes de fecha_inicio para no saltar
-    // el dia_cobro si fecha_inicio es posterior al dia_cobro en el mismo mes
     const fi = new Date(rec.fecha_inicio);
     cursor = new Date(fi.getFullYear(), fi.getMonth(), 1);
   }
 
-  // La validación de mes se hace dentro del bucle (mismoMesOPosterior)
-
-  // Iterar por períodos
-  const maxIteraciones = 365; // seguridad
+  const maxIteraciones = 365;
   let iteraciones = 0;
 
   while (iteraciones < maxIteraciones) {
-    // Calcular la próxima fecha de cobro según frecuencia
     const fechaCobro = calcularProximaFecha(cursor, rec.frecuencia, rec.dia_cobro);
 
     if (!fechaCobro) break;
 
     const fechaStr = fechaCobro.toISOString().slice(0, 10);
 
-    // No pasar de hoy
     if (fechaStr > hoyStr) break;
-
-    // No pasar de fecha_fin
     if (rec.fecha_fin && fechaStr > rec.fecha_fin) break;
 
-    // No antes del mes de fecha_inicio
-    // (permitir dia_cobro aunque sea anterior al día exacto de fecha_inicio,
-    //  siempre que esté en el mismo mes o posterior)
     const fechaCobroDate = new Date(fechaStr);
     const inicioDate = new Date(rec.fecha_inicio);
     const mismoMesOPosterior =
@@ -382,7 +362,6 @@ function calcularFechasPendientes(rec, hastaFecha) {
       fechas.push(fechaStr);
     }
 
-    // Avanzar cursor al día siguiente del cobro
     cursor = new Date(fechaCobro);
     cursor.setDate(cursor.getDate() + 1);
     iteraciones++;
@@ -397,15 +376,12 @@ function calcularProximaFecha(desde, frecuencia, diaCobro) {
 
   switch (frecuencia) {
     case "semanal": {
-      // Próximo día de la semana que corresponda (usando dia como día de la semana 1=lunes..7=domingo)
       const target = new Date(d);
       target.setDate(d.getDate() + ((7 - d.getDay() + (dia % 7)) % 7 || 7));
       if (target <= d) target.setDate(target.getDate() + 7);
-      // Simplificado: generamos en la fecha del cursor si estamos en el día correcto, o avanzamos
       return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (7 - 1));
     }
     case "quincenal": {
-      // Día del cobro en la quincena actual o siguiente
       const y = d.getFullYear(), m = d.getMonth();
       const opcion1 = new Date(y, m, dia);
       const opcion2 = new Date(y, m, Math.min(dia + 15, 28));
