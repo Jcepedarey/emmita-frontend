@@ -5,6 +5,7 @@ import supabase from "../supabaseClient";
 import { useTenant } from "../context/TenantContext";
 import { limpiarCacheTenant } from "../utils/tenantPDF";
 import Protegido from "../components/Protegido";
+import useLimites from "../hooks/useLimites";
 
 // ─── Comprime imagen en el navegador antes de subir ───────────────────
 function comprimirImagen(file, maxAncho, maxAlto, calidad = 0.8) {
@@ -48,6 +49,7 @@ function comprimirImagen(file, maxAncho, maxAlto, calidad = 0.8) {
 
 export default function MiEmpresa() {
   const { tenant, esAdmin, recargar } = useTenant();
+  const { plan, diasRestantes, trialVencido, planVencido, conteos, limites } = useLimites();
   const [form, setForm] = useState({
     nombre: "",
     direccion: "",
@@ -318,6 +320,61 @@ export default function MiEmpresa() {
             {tenant?.estado || "—"}
           </strong>
         </p>
+
+        {/* ─── Info del plan ─── */}
+        <div style={{
+          background: "#f0f9ff", borderRadius: 12, padding: "14px 16px",
+          marginBottom: 16, border: "1px solid #bae6fd"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#0077B6" }}>
+                📋 Plan {plan === "trial" ? "Prueba gratuita" : plan.charAt(0).toUpperCase() + plan.slice(1)}
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: "#374151" }}>
+              {plan === "trial" && diasRestantes !== null && (
+                <span style={{
+                  padding: "3px 10px", borderRadius: 20, fontWeight: 600, fontSize: 11,
+                  background: diasRestantes <= 3 ? "#fef2f2" : "#ecfdf5",
+                  color: diasRestantes <= 3 ? "#dc2626" : "#059669",
+                }}>
+                  {trialVencido ? "Vencido" : `${diasRestantes} día${diasRestantes !== 1 ? "s" : ""} restante${diasRestantes !== 1 ? "s" : ""}`}
+                </span>
+              )}
+              {plan !== "trial" && tenant?.fecha_vencimiento && (
+                <span style={{
+                  padding: "3px 10px", borderRadius: 20, fontWeight: 600, fontSize: 11,
+                  background: planVencido ? "#fef2f2" : "#ecfdf5",
+                  color: planVencido ? "#dc2626" : "#059669",
+                }}>
+                  {planVencido ? "Vencido" : `Vence: ${new Date(tenant.fecha_vencimiento).toLocaleDateString("es-CO")}`}
+                </span>
+              )}
+              {plan !== "trial" && !tenant?.fecha_vencimiento && (
+                <span style={{
+                  padding: "3px 10px", borderRadius: 20, fontWeight: 600, fontSize: 11,
+                  background: "#ecfdf5", color: "#059669",
+                }}>
+                  Activo
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Uso actual */}
+          <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>
+              📦 Productos: <strong>{conteos.productos}</strong>{limites.maxProductos !== Infinity ? ` / ${limites.maxProductos}` : ""}
+            </span>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>
+              👥 Usuarios: <strong>{conteos.usuarios}</strong> / {limites.maxUsuarios}
+            </span>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>
+              📄 Documentos: <strong>{conteos.documentos}</strong>
+            </span>
+          </div>
+        </div>
 
         <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: 8 }} />
 
