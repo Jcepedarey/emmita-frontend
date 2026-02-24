@@ -805,7 +805,7 @@ const Inicio = () => {
                 title="Fecha a consultar"
               />
               
-              <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: '220px', zIndex: 50 }}>
                 <input
                   type="text"
                   value={busqProd}
@@ -827,9 +827,11 @@ const Inicio = () => {
                     border: '1px solid #e5e7eb',
                     borderRadius: '8px',
                     marginTop: '4px',
-                    maxHeight: '45vh',
-                    overflowY: 'auto',
-                    WebkitOverflowScrolling: 'touch',
+                    maxHeight: '40vh',
+overflowY: 'scroll',
+WebkitOverflowScrolling: 'touch',
+overscrollBehavior: 'contain',
+touchAction: 'pan-y',
                     zIndex: 50,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                     listStyle: 'none',
