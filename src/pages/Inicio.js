@@ -1,5 +1,5 @@
 // src/pages/Inicio.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
@@ -59,6 +59,28 @@ const Inicio = () => {
   const [fechaConsulta, setFechaConsulta] = useState("");
   const [stockConsulta, setStockConsulta] = useState(null);
   const [cargandoStock, setCargandoStock] = useState(false);
+
+  // 👤 Nombre del usuario logueado
+  const [nombreUsuario, setNombreUsuario] = useState("");
+  const seleccionandoRef = useRef(false); // evita re-buscar al seleccionar sugerencia
+
+  useEffect(() => {
+    const cargarNombreUsuario = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("nombre")
+        .eq("id", user.id)
+        .single();
+      if (profile?.nombre) {
+        // Extraer solo el primer nombre
+        const primerNombre = profile.nombre.trim().split(/\s+/)[0];
+        setNombreUsuario(primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase());
+      }
+    };
+    cargarNombreUsuario();
+  }, []);
 
   // ───────────────────── Cargar órdenes ─────────────────────
   useEffect(() => {
@@ -154,6 +176,11 @@ const Inicio = () => {
 
   // ───────────────────── Sugerencias por nombre (mín. 2 letras) ────────────────────
   useEffect(() => {
+    // Si acabamos de seleccionar una sugerencia, no re-buscar
+    if (seleccionandoRef.current) {
+      seleccionandoRef.current = false;
+      return;
+    }
     const fetch = async () => {
       if (!busqProd || busqProd.trim().length < 2) {
         setSugerencias([]);
@@ -551,7 +578,7 @@ const Inicio = () => {
           
           {/* Header */}
           <div style={estilos.header}>
-            <h1 style={estilos.titulo}>Bienvenido</h1>
+            <h1 style={estilos.titulo}>Bienvenido{nombreUsuario ? `, ${nombreUsuario}` : ""} 👋</h1>
           </div>
 
           {/* Grid de pedidos */}
@@ -800,8 +827,9 @@ const Inicio = () => {
                     border: '1px solid #e5e7eb',
                     borderRadius: '8px',
                     marginTop: '4px',
-                    maxHeight: '200px',
+                    maxHeight: '45vh',
                     overflowY: 'auto',
+                    WebkitOverflowScrolling: 'touch',
                     zIndex: 50,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                     listStyle: 'none',
@@ -813,6 +841,7 @@ const Inicio = () => {
                         <button
                           type="button"
                           onClick={() => {
+                            seleccionandoRef.current = true;
                             setProdSel(s);
                             setBusqProd(s.nombre);
                             setSugerencias([]);
