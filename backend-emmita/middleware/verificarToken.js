@@ -17,7 +17,6 @@ const verificarToken = async (req, res, next) => {
 
     const token = authHeader.split(" ")[1];
 
-    // 🔒 Validar que el token no esté vacío o sea sospechosamente corto
     if (!token || token.length < 20) {
       return res.status(401).json({ error: "Token inválido" });
     }
@@ -29,7 +28,7 @@ const verificarToken = async (req, res, next) => {
       return res.status(401).json({ error: "Token inválido o expirado" });
     }
 
-    // 3. 🔒 NUEVO: Verificar que el perfil esté activo
+    // 3. Verificar que el perfil esté activo
     const { data: profile } = await supabase
       .from("profiles")
       .select("id, tenant_id, rol, activo")
@@ -44,9 +43,44 @@ const verificarToken = async (req, res, next) => {
       return res.status(403).json({ error: "Tu cuenta ha sido desactivada. Contacta al administrador." });
     }
 
-    // 4. Agregar usuario y perfil a request
+    // 4. Verificar estado del tenant (empresa)
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("id, estado, plan, fecha_registro, fecha_vencimiento")
+      .eq("id", profile.tenant_id)
+      .single();
+
+    if (!tenant) {
+      return res.status(403).json({ error: "Empresa no encontrada" });
+    }
+
+    // Tenant suspendido manualmente
+    if (tenant.estado === "suspendido" || tenant.estado === "inactivo") {
+      return res.status(403).json({ error: "Cuenta suspendida. Contacta a SwAlquiler para reactivarla." });
+    }
+
+    // Trial vencido
+    if (tenant.plan === "trial" && tenant.fecha_registro) {
+      const inicio = new Date(tenant.fecha_registro);
+      const ahora = new Date();
+      const diffDias = Math.floor((ahora - inicio) / (1000 * 60 * 60 * 24));
+      if (diffDias >= 14) {
+        return res.status(403).json({ error: "Tu período de prueba ha finalizado. Contacta a SwAlquiler para activar un plan." });
+      }
+    }
+
+    // Plan pago vencido
+    if (tenant.plan !== "trial" && tenant.fecha_vencimiento) {
+      const vencimiento = new Date(tenant.fecha_vencimiento);
+      if (new Date() > vencimiento) {
+        return res.status(403).json({ error: "Tu plan ha vencido. Renueva tu suscripción para continuar." });
+      }
+    }
+
+    // 5. Agregar usuario, perfil y tenant a request
     req.usuario = user;
     req.perfil = profile;
+    req.tenant = tenant;
     next();
 
   } catch (error) {

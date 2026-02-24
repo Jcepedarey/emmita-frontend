@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTenant } from "../context/TenantContext";
 import supabase from "../supabaseClient";
 
-// ─── Definición de planes ──────────────────────────────────────────
+// ─── Definición de planes (valores por defecto) ──────────────────────
 const PLANES = {
   trial: {
     nombre: "Prueba gratuita",
@@ -12,11 +12,11 @@ const PLANES = {
     maxProductos: 50,
     maxUsuarios: 1,
     maxClientes: Infinity,
-    maxDocumentos: Infinity, // cotizaciones + pedidos
+    maxDocumentos: Infinity,
   },
   basico: {
     nombre: "Básico",
-    duracionDias: null, // sin límite de tiempo (mientras pague)
+    duracionDias: null,
     maxProductos: 50,
     maxUsuarios: 2,
     maxClientes: Infinity,
@@ -27,6 +27,14 @@ const PLANES = {
     duracionDias: null,
     maxProductos: Infinity,
     maxUsuarios: 5,
+    maxClientes: Infinity,
+    maxDocumentos: Infinity,
+  },
+  enterprise: {
+    nombre: "Enterprise",
+    duracionDias: null,
+    maxProductos: Infinity,
+    maxUsuarios: 10,
     maxClientes: Infinity,
     maxDocumentos: Infinity,
   },
@@ -74,7 +82,18 @@ export default function useLimites() {
 
   // ─── Cálculos ────────────────────────────────────────────────
   const plan = tenant?.plan || "trial";
-  const limites = PLANES[plan] || PLANES.trial;
+  const planesBase = PLANES[plan] || PLANES.trial;
+
+  // Usar valores de la DB si existen (permiten override manual por tenant)
+  const limites = {
+    ...planesBase,
+    maxProductos: tenant?.max_productos != null && tenant.max_productos > 0
+      ? tenant.max_productos
+      : planesBase.maxProductos,
+    maxUsuarios: tenant?.max_usuarios != null && tenant.max_usuarios > 0
+      ? tenant.max_usuarios
+      : planesBase.maxUsuarios,
+  };
 
   // Calcular días restantes del trial
   let diasRestantes = null;
@@ -85,37 +104,40 @@ export default function useLimites() {
     const ahora = new Date();
     const diffMs = ahora - inicio;
     const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    diasRestantes = Math.max(0, limites.duracionDias - diffDias);
+    diasRestantes = Math.max(0, 14 - diffDias);
     trialVencido = diasRestantes <= 0;
   }
 
-  // Verificar si el tenant está pausado/suspendido
-  const tenantInactivo = tenant?.estado !== "activo";
+  // Verificar si hay fecha de vencimiento (para planes pagos con vencimiento)
+  let planVencido = false;
+  if (plan !== "trial" && tenant?.fecha_vencimiento) {
+    const vencimiento = new Date(tenant.fecha_vencimiento);
+    planVencido = new Date() > vencimiento;
+  }
+
+  // Verificar si el tenant está suspendido
+  const tenantInactivo = tenant?.estado === "suspendido" || tenant?.estado === "inactivo" || planVencido;
 
   // ─── Funciones de verificación ───────────────────────────────
 
-  // ¿Puede crear un producto nuevo?
   const puedeCrearProducto = () => {
     if (tenantInactivo || trialVencido) return false;
-    if (conteos.productos >= limites.maxProductos) return false;
+    if (limites.maxProductos !== Infinity && conteos.productos >= limites.maxProductos) return false;
     return true;
   };
 
-  // ¿Puede crear un cliente nuevo?
   const puedeCrearCliente = () => {
     if (tenantInactivo || trialVencido) return false;
-    if (conteos.clientes >= limites.maxClientes) return false;
+    if (limites.maxClientes !== Infinity && conteos.clientes >= limites.maxClientes) return false;
     return true;
   };
 
-  // ¿Puede crear un documento (cotización/pedido)?
   const puedeCrearDocumento = () => {
     if (tenantInactivo || trialVencido) return false;
-    if (conteos.documentos >= limites.maxDocumentos) return false;
+    if (limites.maxDocumentos !== Infinity && conteos.documentos >= limites.maxDocumentos) return false;
     return true;
   };
 
-  // ¿Puede agregar un usuario?
   const puedeAgregarUsuario = () => {
     if (tenantInactivo || trialVencido) return false;
     if (conteos.usuarios >= limites.maxUsuarios) return false;
@@ -127,17 +149,24 @@ export default function useLimites() {
     if (tenantInactivo) {
       return {
         titulo: "Cuenta suspendida",
-        mensaje: "Tu cuenta está suspendida. Contacta a SwAlquiler para reactivarla.",
+        mensaje: "Tu cuenta está suspendida. Contacta a SwAlquiler para reactivarla.\n\n📱 WhatsApp: 321 490 9600\n📧 soporte@swalquiler.com",
         icono: "error",
       };
     }
     if (trialVencido) {
       return {
         titulo: "Prueba gratuita finalizada",
-        mensaje: "Tu período de prueba de 14 días ha terminado. Contacta a SwAlquiler para activar un plan y seguir usando el sistema.\n\n📱 3214909600\n💬 WhatsApp: 3214909600\n📧 soporte@swalquiler.com",
+        mensaje: "Tu período de prueba de 14 días ha terminado. Contacta a SwAlquiler para activar un plan y seguir usando el sistema.\n\n📱 WhatsApp: 321 490 9600\n📧 soporte@swalquiler.com",
+        icono: "warning",
       };
     }
-    // Límite de cantidad alcanzado
+    if (planVencido) {
+      return {
+        titulo: "Plan vencido",
+        mensaje: "Tu plan ha vencido. Renueva tu suscripción para seguir usando el sistema.\n\n📱 WhatsApp: 321 490 9600\n📧 soporte@swalquiler.com",
+        icono: "warning",
+      };
+    }
     const nombres = {
       producto: "productos",
       cliente: "clientes",
@@ -146,7 +175,7 @@ export default function useLimites() {
     };
     return {
       titulo: "Límite alcanzado",
-      mensaje: `Has alcanzado el máximo de ${nombres[tipo]} para el plan ${limites.nombre}. Contacta a SwAlquiler para mejorar tu plan.\n\n📱 3214909600\n💬 WhatsApp: 3214909600\n📧 soporte@swalquiler.com`,
+      mensaje: `Has alcanzado el máximo de ${nombres[tipo]} para el plan ${limites.nombre}. Contacta a SwAlquiler para mejorar tu plan.\n\n📱 WhatsApp: 321 490 9600\n📧 soporte@swalquiler.com`,
       icono: "info",
     };
   };
@@ -158,6 +187,7 @@ export default function useLimites() {
     cargando,
     diasRestantes,
     trialVencido,
+    planVencido,
     tenantInactivo,
     puedeCrearProducto,
     puedeCrearCliente,
