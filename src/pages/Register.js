@@ -64,10 +64,25 @@ export default function Register() {
       Swal.fire("Email inválido", "Ingresa un correo electrónico válido", "warning");
       return false;
     }
-    if (usuario.password.length < 6) {
-      Swal.fire("Contraseña corta", "La contraseña debe tener al menos 6 caracteres", "warning");
+    
+    // Validaciones de contraseña segura
+    if (usuario.password.length < 8) {
+      Swal.fire("Contraseña corta", "La contraseña debe tener al menos 8 caracteres", "warning");
       return false;
     }
+    if (!/[A-Z]/.test(usuario.password)) {
+      Swal.fire("Contraseña insegura", "Debe incluir al menos una letra mayúscula", "warning");
+      return false;
+    }
+    if (!/[a-z]/.test(usuario.password)) {
+      Swal.fire("Contraseña insegura", "Debe incluir al menos una letra minúscula", "warning");
+      return false;
+    }
+    if (!/[0-9]/.test(usuario.password)) {
+      Swal.fire("Contraseña insegura", "Debe incluir al menos un número", "warning");
+      return false;
+    }
+
     if (usuario.password !== usuario.passwordConfirm) {
       Swal.fire("No coinciden", "Las contraseñas no coinciden", "warning");
       return false;
@@ -130,7 +145,7 @@ export default function Register() {
         confirmButtonColor: "#0077B6",
       });
 
-      navigate("/login"); // ✅ También nos aseguramos de que el registro exitoso envíe al login
+      navigate("/login"); 
 
     } catch (err) {
       console.error("Error en registro:", err);
@@ -285,7 +300,6 @@ export default function Register() {
               Siguiente →
             </button>
 
-            {/* ✅ CAMBIO APLICADO AQUÍ: to="/login" */}
             <Link to="/login" style={{ display: "block", textAlign: "center", marginTop: 16, color: "#0077B6", fontSize: 14 }}>
               ← Ya tengo cuenta, iniciar sesión
             </Link>
@@ -317,8 +331,11 @@ export default function Register() {
               type="password"
               value={usuario.password}
               onChange={(e) => setUsuario({ ...usuario, password: e.target.value })}
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Mínimo 8 caracteres"
             />
+            <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 4, marginBottom: 0 }}>
+              Debe incluir mayúscula, minúscula y número. Ej: MiClave123
+            </p>
 
             <label style={labelStyle}>Confirmar contraseña *</label>
             <input
@@ -330,7 +347,6 @@ export default function Register() {
               placeholder="Repite tu contraseña"
             />
 
-            {/* ✅ Checkbox de Términos y Condiciones */}
             <div style={{ 
               marginTop: 18, 
               display: "flex", 
@@ -357,7 +373,6 @@ export default function Register() {
               </label>
             </div>
 
-            {/* ✅ CAPTCHA Cloudflare Turnstile */}
             <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
               <Turnstile
                 sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
