@@ -8,7 +8,7 @@ import Swal from "sweetalert2";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
 import Protegido from "../components/Protegido";
-import "../estilos/CrearDocumentoEstilo.css";
+import "../estilos/AgendaModerna.css";
 import { useNavigationState } from "../context/NavigationContext";
 
 // ✅ NUEVO: Componente IconoPago - Muestra $ verde (pagado) o rojo (pendiente)
@@ -61,6 +61,9 @@ export default function Agenda() {
   const [ordenes, setOrdenes] = useState([]);
   const [cotizaciones, setCotizaciones] = useState([]);
 
+  // ✅ Estado para puntos de color en el calendario
+  const [eventosDelMes, setEventosDelMes] = useState({ ordenes: {}, cotizaciones: {} });
+
   // Guardar cada vez que cambie algo
 const handleFechaChange = (fecha) => {
   setFechaSeleccionada(fecha);
@@ -96,6 +99,45 @@ const handleFechaChange = (fecha) => {
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
+
+  // ✅ Cargar eventos del mes visible para mostrar puntos en el calendario
+  const cargarEventosDelMes = useCallback(async (activeDate) => {
+    const y = activeDate.getFullYear();
+    const m = activeDate.getMonth();
+    const desde = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    const hasta = `${y}-${String(m + 1).padStart(2, "0")}-${new Date(y, m + 1, 0).getDate()}`;
+
+    const [{ data: ops }, { data: cots }] = await Promise.all([
+      supabase.from("ordenes_pedido").select("fecha_evento").gte("fecha_evento", desde).lte("fecha_evento", hasta),
+      supabase.from("cotizaciones").select("fecha_evento").gte("fecha_evento", desde).lte("fecha_evento", hasta),
+    ]);
+
+    const mapaOps = {};
+    (ops || []).forEach((o) => { if (o.fecha_evento) mapaOps[o.fecha_evento.split("T")[0]] = true; });
+    const mapaCots = {};
+    (cots || []).forEach((c) => { if (c.fecha_evento) mapaCots[c.fecha_evento.split("T")[0]] = true; });
+
+    setEventosDelMes({ ordenes: mapaOps, cotizaciones: mapaCots });
+  }, []);
+
+  useEffect(() => {
+    cargarEventosDelMes(fechaSeleccionada);
+  }, [cargarEventosDelMes, fechaSeleccionada]);
+
+  // ✅ Puntos de color en los días del calendario
+  const tileContent = ({ date, view }) => {
+    if (view !== "month") return null;
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const tieneOP = eventosDelMes.ordenes[key];
+    const tieneCot = eventosDelMes.cotizaciones[key];
+    if (!tieneOP && !tieneCot) return null;
+    return (
+      <div style={{ display: "flex", gap: 3, justifyContent: "center", marginTop: 2 }}>
+        {tieneOP && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#0077B6" }} />}
+        {tieneCot && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#8c9987" }} />}
+      </div>
+    );
+  };
 
   const guardarNota = async () => {
     if (!nuevaNota.trim()) return;
@@ -228,34 +270,43 @@ const handleFechaChange = (fecha) => {
 
   return (
     <Protegido>
-      <div className="cd-page" style={{ maxWidth: "1000px" }}>
+      <div className="sw-pagina">
+        <div className="sw-pagina-contenido" style={{ maxWidth: 1000 }}>
         {/* ========== HEADER ========== */}
-        <div className="cd-header">
-          <h1 className="cd-header-titulo" style={{ fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
-            <span className="cd-header-barra"></span>
-            📅 Calendario y Agenda
-          </h1>
+        <div className="sw-header">
+          <h1 className="sw-header-titulo">📅 Calendario y Agenda</h1>
         </div>
 
         <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-start" }}>
           {/* ========== CALENDARIO ========== */}
-          <div style={{ flex: "1", minWidth: "280px" }}>
-            <div className="cd-card">
-              <div className="cd-card-body" style={{ padding: "12px" }}>
+          <div style={{ flex: "1.5", minWidth: "300px" }}>
+            <div className="sw-card">
+              <div className="sw-card-body" style={{ padding: "12px" }}>
                 <Calendar
                   onChange={handleFechaChange}
                   value={fechaSeleccionada}
-                  className="react-calendar"
+                  className="react-calendar sw-calendario-moderno"
+                  tileContent={tileContent}
+                  onActiveStartDateChange={({ activeStartDate }) => cargarEventosDelMes(activeStartDate)}
                 />
+                {/* Leyenda */}
+                <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 10, fontSize: 11, color: "#6b7280" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#0077B6", display: "inline-block" }} /> Pedidos
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#8c9987", display: "inline-block" }} /> Cotizaciones
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* ========== NOTAS ========== */}
-          <div style={{ flex: "2", minWidth: "300px" }}>
-            <div className="cd-card">
-              <div className="cd-card-header">📝 Notas</div>
-              <div className="cd-card-body">
+          <div style={{ flex: "1", minWidth: "280px" }}>
+            <div className="sw-card">
+              <div className="sw-card-header">📝 Notas</div>
+              <div className="sw-card-body">
                 <textarea
                   value={nuevaNota}
                   onChange={(e) => setNuevaNota(e.target.value)}
@@ -263,7 +314,7 @@ const handleFechaChange = (fecha) => {
                   rows={3}
                   style={{ width: "100%", marginBottom: "10px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "14px", resize: "vertical" }}
                 />
-                <button className="cd-btn cd-btn-verde" style={{ width: "100%" }} onClick={guardarNota}>
+                <button className="sw-btn sw-btn-primario" style={{ width: "100%" }} onClick={guardarNota}>
                   💾 Guardar Nota
                 </button>
 
@@ -307,9 +358,9 @@ const handleFechaChange = (fecha) => {
         <div style={{ display: "flex", marginTop: "16px", gap: "16px", flexWrap: "wrap" }}>
           {/* Pedidos */}
           <div style={{ flex: "1", minWidth: "300px" }}>
-            <div className="cd-card">
-              <div className="cd-card-header cd-card-header-cyan">📦 Órdenes de Pedido</div>
-              <div className="cd-card-body" style={{ padding: ordenes.length === 0 ? "16px" : 0, minHeight: "120px" }}>
+            <div className="sw-card">
+              <div className="sw-card-header sw-card-header-cyan" style={{ color: "white" }}>📦 Órdenes de Pedido</div>
+              <div className="sw-card-body" style={{ padding: ordenes.length === 0 ? "16px" : 0, minHeight: "120px" }}>
                 {ordenes.length === 0 && (
                   <div style={{ textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>
                     No hay pedidos para este día.
@@ -351,9 +402,9 @@ const handleFechaChange = (fecha) => {
 
           {/* Cotizaciones */}
           <div style={{ flex: "1", minWidth: "300px" }}>
-            <div className="cd-card">
-              <div className="cd-card-header cd-card-header-amber">📋 Cotizaciones</div>
-              <div className="cd-card-body" style={{ padding: cotizaciones.length === 0 ? "16px" : 0, minHeight: "120px" }}>
+            <div className="sw-card">
+              <div className="sw-card-header" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)", color: "white", borderBottom: "none" }}>📋 Cotizaciones</div>
+              <div className="sw-card-body" style={{ padding: cotizaciones.length === 0 ? "16px" : 0, minHeight: "120px" }}>
                 {cotizaciones.length === 0 && (
                   <div style={{ textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>
                     No hay cotizaciones para este día.
@@ -390,6 +441,7 @@ const handleFechaChange = (fecha) => {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </Protegido>
