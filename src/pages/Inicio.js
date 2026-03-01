@@ -907,6 +907,61 @@ const Inicio = () => {
             </div>
           </div>
 
+          {/* ─── Footer informativo ─── */}
+          <div style={{
+            marginTop: 32,
+            padding: '20px 16px',
+            background: '#f8fafc',
+            borderRadius: 12,
+            border: '1px solid #e5e7eb',
+            textAlign: 'center',
+            marginBottom: 80
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+              <a href="https://wa.me/573214909600?text=Hola%2C%20necesito%20ayuda%20con%20SwAlquiler" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 14px', borderRadius: 8,
+                  background: '#ecfdf5', color: '#059669',
+                  fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                  border: '1px solid #bbf7d0'
+                }}>
+                💬 Soporte
+              </a>
+              <a href="https://www.instagram.com/swalquiler" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 14px', borderRadius: 8,
+                  background: '#fdf2f8', color: '#db2777',
+                  fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                  border: '1px solid #fbcfe8'
+                }}>
+                📸 Tutoriales
+              </a>
+              <a href="https://www.swalquiler.com" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 14px', borderRadius: 8,
+                  background: '#f0f9ff', color: '#0077B6',
+                  fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                  border: '1px solid #bae6fd'
+                }}>
+                🌐 swalquiler.com
+              </a>
+            </div>
+            <p style={{ fontSize: 11, color: '#9ca3af', margin: 0, lineHeight: 1.6 }}>
+              SwAlquiler v1.0 · Gestión de alquiler y eventos
+              <br />
+              📧 soporte@swalquiler.com · 📱 321 490 9600
+            </p>
+          </div>
+
         </div>
       </div>
     </Protegido>
