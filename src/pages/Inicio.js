@@ -886,7 +886,7 @@ const Inicio = () => {
             borderRadius: 12,
             border: '1px solid #e5e7eb',
             textAlign: 'center',
-            marginBottom: 40
+            marginBottom: 20
           }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
               <a href="https://wa.me/573214909600?text=Hola%2C%20necesito%20ayuda%20con%20SwAlquiler" 
