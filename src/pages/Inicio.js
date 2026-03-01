@@ -818,84 +818,55 @@ const Inicio = () => {
                   style={{ ...estilos.stockInput, width: '100%' }}
                 />
                 {sugerencias.length > 0 && (
-                  <>
-                    {/* Overlay para cerrar al tocar fuera */}
-                    <div
-                      onClick={() => setSugerencias([])}
-                      style={{
-                        position: 'fixed',
-                        top: 0, left: 0, right: 0, bottom: 0,
-                        background: 'rgba(0,0,0,0.3)',
-                        zIndex: 999
-                      }}
-                    />
-                    <ul style={{
-                      position: 'fixed',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      background: 'white',
-                      borderRadius: '16px 16px 0 0',
-                      maxHeight: '55vh',
-                      overflowY: 'scroll',
-                      WebkitOverflowScrolling: 'touch',
-                      overscrollBehavior: 'contain',
-                      touchAction: 'pan-y',
-                      zIndex: 1000,
-                      boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
-                      listStyle: 'none',
-                      padding: 0,
-                      margin: 0
-                    }}>
-                      {/* Header del panel */}
-                      <li style={{
-                        padding: '12px 16px 8px',
-                        borderBottom: '1px solid #e5e7eb',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        position: 'sticky',
-                        top: 0,
-                        background: 'white',
-                        borderRadius: '16px 16px 0 0',
-                        zIndex: 1
-                      }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
-                          📦 {sugerencias.length} producto{sugerencias.length !== 1 ? 's' : ''} encontrado{sugerencias.length !== 1 ? 's' : ''}
-                        </span>
+                  <ul style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    marginTop: '4px',
+                    maxHeight: '35vh',
+                    overflowY: 'scroll',
+                    WebkitOverflowScrolling: 'touch',
+                    overscrollBehavior: 'contain',
+                    touchAction: 'pan-y',
+                    zIndex: 200,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    listStyle: 'none',
+                    padding: '0 0 70px 0',
+                    margin: 0
+                  }}>
+                    {sugerencias.map((s) => (
+                      <li key={s.id}>
                         <button
-                          onClick={() => setSugerencias([])}
-                          style={{ background: 'none', border: 'none', fontSize: 18, color: '#9ca3af', cursor: 'pointer', padding: '4px 8px' }}
-                        >✕</button>
+                          type="button"
+                          onClick={() => {
+                            seleccionandoRef.current = true;
+                            setProdSel(s);
+                            setBusqProd(s.nombre);
+                            setSugerencias([]);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            textAlign: 'left',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            borderBottom: '1px solid #f3f4f6',
+                            color: '#1f2937'
+                          }}
+                          onMouseOver={(e) => e.target.style.background = '#f0f9ff'}
+                          onMouseOut={(e) => e.target.style.background = 'none'}
+                        >
+                          {s.nombre} <span style={{ color: '#9ca3af', fontSize: 12 }}>· Stock: {s.stock}</span>
+                        </button>
                       </li>
-                      {sugerencias.map((s) => (
-                        <li key={s.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              seleccionandoRef.current = true;
-                              setProdSel(s);
-                              setBusqProd(s.nombre);
-                              setSugerencias([]);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '14px 16px',
-                              textAlign: 'left',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              borderBottom: '1px solid #f3f4f6',
-                              color: '#1f2937'
-                            }}
-                          >
-                            {s.nombre} <span style={{ color: '#9ca3af', fontSize: 12 }}>· Stock: {s.stock}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
+                    ))}
+                  </ul>
                 )}
               </div>
 
