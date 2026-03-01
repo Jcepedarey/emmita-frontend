@@ -827,15 +827,15 @@ const Inicio = () => {
                     border: '1px solid #e5e7eb',
                     borderRadius: '8px',
                     marginTop: '4px',
-                    maxHeight: '40vh',
-overflowY: 'scroll',
-WebkitOverflowScrolling: 'touch',
-overscrollBehavior: 'contain',
-touchAction: 'pan-y',
-                    zIndex: 50,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    maxHeight: '35vh',
+                    overflowY: 'scroll',
+                    WebkitOverflowScrolling: 'touch',
+                    overscrollBehavior: 'contain',
+                    touchAction: 'pan-y',
+                    zIndex: 200,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     listStyle: 'none',
-                    padding: 0,
+                    padding: '0 0 70px 0',
                     margin: 0
                   }}>
                     {sugerencias.map((s) => (
