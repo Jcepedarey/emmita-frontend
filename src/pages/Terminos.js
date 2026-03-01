@@ -27,7 +27,7 @@ export default function Terminos() {
 
         <section style={estilos.seccion}>
           <h2 style={estilos.subtitulo}>4. Planes y Pagos</h2>
-          <p><strong>Plan de Prueba (Trial):</strong> Al registrarte, obtienes acceso gratuito por 7 días con funcionalidades limitadas. Al vencer el período de prueba, podrás consultar tus datos pero no crear nuevos registros hasta activar un plan de pago.</p>
+          <p><strong>Plan de Prueba (Trial):</strong> Al registrarte, obtienes acceso gratuito por 14 días con funcionalidades limitadas. Al vencer el período de prueba, podrás consultar tus datos pero no crear nuevos registros hasta activar un plan de pago.</p>
           <p><strong>Planes de Pago:</strong> Los planes disponibles y sus precios serán comunicados directamente. El pago es mensual y debe realizarse de forma oportuna para mantener el acceso completo al servicio.</p>
           <p>SwAlquiler se reserva el derecho de modificar los precios de los planes con previo aviso de al menos 30 días.</p>
         </section>
@@ -43,13 +43,26 @@ export default function Terminos() {
         </section>
 
         <section style={estilos.seccion}>
-          <h2 style={estilos.subtitulo}>6. Propiedad de los Datos</h2>
+          <h2 style={estilos.subtitulo}>6. Seguridad de tu Cuenta</h2>
+          <p>La seguridad de tu cuenta es una responsabilidad compartida entre SwAlquiler y tú como usuario. Nosotros protegemos tu información con cifrado y controles de acceso. De tu parte, te recomendamos seguir estas buenas prácticas:</p>
+          <p>• <strong>Contraseña segura:</strong> Tu contraseña debe tener al menos 8 caracteres, incluyendo una letra mayúscula, una minúscula y un número. Evita usar datos personales como tu nombre, fecha de nacimiento o número de teléfono.</p>
+          <p>• <strong>Contraseña única:</strong> No uses la misma contraseña que utilizas en otros servicios como redes sociales o correo electrónico. Si una de esas cuentas se ve comprometida, tu cuenta de SwAlquiler también estaría en riesgo.</p>
+          <p>• <strong>No compartas tu contraseña:</strong> Tu contraseña es personal e intransferible. Ningún miembro del equipo de SwAlquiler te pedirá tu contraseña por ningún medio.</p>
+          <p>• <strong>Equipos de uso público:</strong> Si accedes a SwAlquiler desde un computador público, compartido o que no sea de tu propiedad, asegúrate de cerrar sesión al terminar y no guardes la contraseña en el navegador.</p>
+          <p>• <strong>Redes Wi-Fi públicas:</strong> Evita acceder a tu cuenta desde redes Wi-Fi abiertas o sin contraseña (cafeterías, aeropuertos, centros comerciales), ya que tu información podría ser interceptada.</p>
+          <p>• <strong>Correos sospechosos:</strong> Si recibes un correo o mensaje que te pide tu contraseña de SwAlquiler o te invita a hacer clic en un enlace para "verificar tu cuenta", no respondas. Repórtalo a nuestro equipo de soporte.</p>
+          <p>• <strong>Cierra sesión:</strong> Si dejas de usar SwAlquiler por un período prolongado, cierra la sesión manualmente como medida de precaución.</p>
+          <p>SwAlquiler no será responsable por accesos no autorizados que resulten del incumplimiento de estas recomendaciones de seguridad por parte del usuario.</p>
+        </section>
+
+        <section style={estilos.seccion}>
+          <h2 style={estilos.subtitulo}>7. Propiedad de los Datos</h2>
           <p>Los datos que ingreses en la Plataforma (clientes, productos, cotizaciones, pedidos, etc.) son de tu propiedad. SwAlquiler no utilizará tus datos comerciales para fines distintos a la prestación del servicio.</p>
           <p>Puedes solicitar la exportación de tus datos en cualquier momento. En caso de cancelación de tu cuenta, tus datos serán eliminados dentro de los 30 días siguientes, salvo que solicites su exportación previamente.</p>
         </section>
 
         <section style={estilos.seccion}>
-          <h2 style={estilos.subtitulo}>7. Privacidad y Protección de Datos</h2>
+          <h2 style={estilos.subtitulo}>8. Privacidad y Protección de Datos</h2>
           <p>SwAlquiler se compromete a proteger tu información personal de acuerdo con la Ley 1581 de 2012 de Protección de Datos Personales de Colombia y demás normativa aplicable.</p>
           <p>Recopilamos y procesamos los siguientes datos:</p>
           <p>• <strong>Datos de la empresa:</strong> Nombre, dirección, teléfono, email, NIT, logotipo.</p>
@@ -59,12 +72,12 @@ export default function Terminos() {
         </section>
 
         <section style={estilos.seccion}>
-          <h2 style={estilos.subtitulo}>8. Disponibilidad del Servicio</h2>
+          <h2 style={estilos.subtitulo}>9. Disponibilidad del Servicio</h2>
           <p>SwAlquiler se esfuerza por mantener la Plataforma disponible las 24 horas del día, los 7 días de la semana. Sin embargo, no garantizamos disponibilidad ininterrumpida y pueden existir períodos de mantenimiento programado o interrupciones por causas de fuerza mayor.</p>
         </section>
 
         <section style={estilos.seccion}>
-          <h2 style={estilos.subtitulo}>9. Limitación de Responsabilidad</h2>
+          <h2 style={estilos.subtitulo}>10. Limitación de Responsabilidad</h2>
           <p>SwAlquiler proporciona la Plataforma "tal como está". No somos responsables por:</p>
           <p>• Pérdidas económicas derivadas del uso o imposibilidad de uso de la Plataforma.</p>
           <p>• Errores en los datos ingresados por los usuarios.</p>
@@ -73,7 +86,7 @@ export default function Terminos() {
         </section>
 
         <section style={estilos.seccion}>
-          <h2 style={estilos.subtitulo}>10. Suspensión y Terminación</h2>
+          <h2 style={estilos.subtitulo}>11. Suspensión y Terminación</h2>
           <p>SwAlquiler puede suspender o terminar tu cuenta si:</p>
           <p>• Incumples estos Términos y Condiciones.</p>
           <p>• No realizas el pago correspondiente a tu plan.</p>
@@ -82,19 +95,19 @@ export default function Terminos() {
         </section>
 
         <section style={estilos.seccion}>
-          <h2 style={estilos.subtitulo}>11. Modificaciones</h2>
+          <h2 style={estilos.subtitulo}>12. Modificaciones</h2>
           <p>SwAlquiler se reserva el derecho de modificar estos Términos y Condiciones. Las modificaciones serán notificadas a los usuarios registrados y entrarán en vigor 15 días después de su publicación.</p>
         </section>
 
         <section style={estilos.seccion}>
-          <h2 style={estilos.subtitulo}>12. Legislación Aplicable</h2>
+          <h2 style={estilos.subtitulo}>13. Legislación Aplicable</h2>
           <p>Estos Términos se rigen por las leyes de la República de Colombia. Cualquier controversia será resuelta ante los tribunales competentes de la ciudad de Villavicencio, Meta.</p>
         </section>
 
         <section style={estilos.seccion}>
-          <h2 style={estilos.subtitulo}>13. Contacto</h2>
+          <h2 style={estilos.subtitulo}>14. Contacto</h2>
           <p>Para cualquier consulta sobre estos Términos y Condiciones, puedes contactarnos a través de:</p>
-          <p>• WhatsApp: 3166534685</p>
+          <p>• WhatsApp: 3214909600</p>
           <p>• Email: soporte@swalquiler.com</p>
         </section>
 
