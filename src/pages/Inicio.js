@@ -886,7 +886,7 @@ const Inicio = () => {
             borderRadius: 12,
             border: '1px solid #e5e7eb',
             textAlign: 'center',
-            marginBottom: 80
+            marginBottom: 40
           }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
               <a href="https://wa.me/573214909600?text=Hola%2C%20necesito%20ayuda%20con%20SwAlquiler" 
@@ -929,7 +929,7 @@ const Inicio = () => {
             <p style={{ fontSize: 11, color: '#9ca3af', margin: 0, lineHeight: 1.6 }}>
               SwAlquiler v1.0 · Gestión de alquiler y eventos
               <br />
-              📧 soporte@swalquiler.com · 📱 321 490 9600
+              📧 soporte@swalquiler.com
             </p>
           </div>
 
