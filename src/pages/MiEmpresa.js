@@ -310,16 +310,17 @@ export default function MiEmpresa() {
 
   return (
     <Protegido>
-      <div style={card}>
-        <h2 style={{ textAlign: "center", color: "#0077B6", marginBottom: 4 }}>
-          Mi Empresa
-        </h2>
-        <p style={{ textAlign: "center", color: "#9ca3af", fontSize: 13, marginBottom: 16 }}>
-          Plan: <strong style={{ color: "#0077B6" }}>{tenant?.plan || "—"}</strong>
-          {" · "}Estado: <strong style={{ color: tenant?.estado === "activo" ? "#22c55e" : "#ef4444" }}>
-            {tenant?.estado || "—"}
-          </strong>
-        </p>
+      <div className="sw-pagina">
+        <div className="sw-pagina-contenido" style={{ maxWidth: 700 }}>
+          <div className="sw-header">
+            <h1 className="sw-header-titulo">🏢 Mi Empresa</h1>
+          </div>
+          <p style={{ textAlign: "center", color: "#9ca3af", fontSize: 13, marginBottom: 16, marginTop: -10 }}>
+            Plan: <strong style={{ color: "#0077B6" }}>{tenant?.plan || "—"}</strong>
+            {" · "}Estado: <strong style={{ color: tenant?.estado === "activo" ? "#22c55e" : "#ef4444" }}>
+              {tenant?.estado || "—"}
+            </strong>
+          </p>
 
         {/* ─── Info del plan ─── */}
         <div style={{
@@ -515,6 +516,7 @@ export default function MiEmpresa() {
         <button style={btnGuardar} onClick={guardar} disabled={guardando}>
           {guardando ? "Guardando..." : "Guardar cambios"}
         </button>
+      </div>
       </div>
     </Protegido>
   );

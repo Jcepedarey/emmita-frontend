@@ -517,14 +517,12 @@ for (const pago of pagosProveedoresRecepcion) {
 
   return (
     <Protegido>
-      <div className="cd-page">
-        {/* ========== HEADER ========== */}
-        <div className="cd-header">
-          <h1 className="cd-header-titulo">
-            <span className="cd-header-barra"></span>
-            📦 Recepción de Pedidos
-          </h1>
-        </div>
+      <div className="sw-pagina">
+        <div className="sw-pagina-contenido" style={{ maxWidth: 900 }}>
+          {/* ========== HEADER ========== */}
+          <div className="sw-header">
+            <h1 className="sw-header-titulo">📦 Recepción de Pedidos</h1>
+          </div>
 
         {!ordenSeleccionada ? (
           <div className="cd-card">
@@ -977,6 +975,7 @@ for (const pago of pagosProveedoresRecepcion) {
             </div>
           </div>
         )}
+      </div>
       </div>
     </Protegido>
   );

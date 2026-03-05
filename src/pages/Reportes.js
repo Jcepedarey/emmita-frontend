@@ -666,10 +666,12 @@ export default function Reportes() {
      ═══════════════════════════════════════════════════════════════ */
   return (
     <Protegido>
-      <div className="sw-page">
-        <div className="sw-container">
-          <h1 className="sw-titulo-pagina" style={{ textAlign: "center", fontSize: "clamp(1.5rem, 4vw, 2rem)", margin: "24px 0 20px" }}>📊 Dashboard</h1>
-
+      <div className="sw-pagina">
+        <div className="sw-pagina-contenido" style={{ maxWidth: 900 }}>
+          <div className="sw-header">
+            <h1 className="sw-header-titulo">📊 Dashboard</h1>
+          </div>
+          
           {/* ═══ KPIs ═══ */}
           {!loading && (
             <div className="sw-kpi-grid" key={`${desde}-${hasta}`}>

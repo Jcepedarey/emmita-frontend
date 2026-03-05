@@ -231,14 +231,12 @@ export default function Trazabilidad() {
 
   return (
     <Protegido>
-      <div className="cd-page">
-        {/* ========== HEADER ========== */}
-        <div className="cd-header">
-          <h1 className="cd-header-titulo" style={{ fontSize: "clamp(1.5rem, 4vw, 2rem)" }}>
-            <span className="cd-header-barra"></span>
-            🔎 Trazabilidad de Artículos
-          </h1>
-        </div>
+      <div className="sw-pagina">
+        <div className="sw-pagina-contenido" style={{ maxWidth: 900 }}>
+          {/* ========== HEADER ========== */}
+          <div className="sw-header">
+            <h1 className="sw-header-titulo">🔎 Trazabilidad de Artículos</h1>
+          </div>
 
         {/* ========== FILTROS ========== */}
         <div className="cd-card">
@@ -423,6 +421,7 @@ export default function Trazabilidad() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </Protegido>
   );

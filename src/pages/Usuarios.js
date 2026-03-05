@@ -338,11 +338,14 @@ export default function Usuarios() {
 
   return (
     <Protegido>
-      <div style={estilos.container}>
-        <h2 style={estilos.titulo}>👤 Usuarios</h2>
-        <p style={estilos.subtitulo}>
-          {tenant?.nombre || "Cargando..."}
-        </p>
+      <div className="sw-pagina">
+        <div className="sw-pagina-contenido" style={{ maxWidth: 700 }}>
+          <div className="sw-header">
+            <h1 className="sw-header-titulo">👤 Usuarios</h1>
+          </div>
+          <p style={{ textAlign: "center", color: "#9ca3af", marginBottom: 24, marginTop: -10 }}>
+            {tenant?.nombre || "Cargando..."}
+          </p>
 
         {/* ─── Tabs ─────────────────────────────────────────── */}
         <div style={estilos.tabs}>
@@ -560,6 +563,7 @@ export default function Usuarios() {
             )}
           </>
         )}
+      </div>
       </div>
     </Protegido>
   );

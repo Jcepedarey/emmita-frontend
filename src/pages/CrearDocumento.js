@@ -1158,17 +1158,19 @@ mostrar_notas: mostrarNotas
 
     return (
       <Protegido>
-        <div className="cd-page">
-          {/* ========== HEADER ========== */}
-          <div className="cd-header">
-            <h1 className="cd-header-titulo">
-              <span className="cd-header-barra"></span>
-              📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
-            </h1>
+        <div className="sw-pagina">
+          <div className="sw-pagina-contenido" style={{ maxWidth: 900 }}>
+            {/* ========== HEADER ========== */}
+            <div className="sw-header">
+              <h1 className="sw-header-titulo">
+                📄 {tipoDocumento === "cotizacion" ? "Cotización" : "Orden de Pedido"}
+              </h1>
+            </div>
             {esEdicion && (
-              <p className="cd-header-subtipo">Editando: {numeroDocumentoActual}</p>
+              <p style={{ color: "#6b7280", fontSize: 14, marginTop: -16, marginBottom: 24 }}>
+                Editando: {numeroDocumentoActual}
+              </p>
             )}
-          </div>
 
           {/* ========== TIPO DOCUMENTO ========== */}
           <div className="cd-tipo-selector">
@@ -1740,16 +1742,17 @@ mostrar_notas: mostrarNotas
   )}
 
   {/* Modal de Pagos a Proveedores */}
-{modalPagosProveedor && (
-  <PagosProveedorModal
-    productosAgregados={productosAgregados}
-    pagosProveedores={pagosProveedores}
-    numeroDias={numeroDias}
-    onGuardar={handleGuardarPagosProveedores}
-    onClose={() => setModalPagosProveedor(false)}
-  />
-)}
-        </div>
+        {modalPagosProveedor && (
+          <PagosProveedorModal
+            productosAgregados={productosAgregados}
+            pagosProveedores={pagosProveedores}
+            numeroDias={numeroDias}
+            onGuardar={handleGuardarPagosProveedores}
+            onClose={() => setModalPagosProveedor(false)}
+          />
+        )}
+          </div>
+        </div> {/* <--- ESTE ES EL DIV EXTRA QUE CERRAMOS */}
       </Protegido>
     );
   };
