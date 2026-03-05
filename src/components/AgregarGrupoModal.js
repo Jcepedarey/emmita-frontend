@@ -227,7 +227,7 @@ const AgregarGrupoModal = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
+    <div className="modal-overlay"> {/* <--- AQUÍ LE QUITAMOS EL ONCLICK */}
       <div className="modal-contenedor ancho-grande" onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}

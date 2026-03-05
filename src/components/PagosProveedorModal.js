@@ -272,7 +272,7 @@ const PagosProveedorModal = ({
   }
 
   return (
-    <div className="pagos-proveedor-overlay" onClick={onClose}>
+    <div className="pagos-proveedor-overlay"> {/* <--- AQUÍ LE QUITAMOS EL ONCLICK */}
       <div
         className="pagos-proveedor-modal"
         onClick={(e) => e.stopPropagation()}

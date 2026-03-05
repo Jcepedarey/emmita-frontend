@@ -207,7 +207,7 @@ export default function BuscarProductoModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-contenedor" onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}

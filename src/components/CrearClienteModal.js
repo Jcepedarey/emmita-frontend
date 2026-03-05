@@ -84,7 +84,7 @@ const CrearClienteModal = ({ onClienteCreado, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-contenedor ancho-medio" onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}
