@@ -230,6 +230,8 @@ export default function Proveedores() {
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: "array" });
+
+      // ─── Hoja 1: Proveedores ───
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
@@ -244,8 +246,8 @@ export default function Proveedores() {
       const provsValidos = json
         .map((row) => ({
           nombre: mapCol(row, ["nombre", "Nombre", "NOMBRE", "proveedor", "Proveedor", "PROVEEDOR"]),
-          telefono: mapCol(row, ["telefono", "Teléfono", "Telefono", "TELEFONO", "cel", "celular", "Celular"]),
-          tipo_servicio: mapCol(row, ["tipo_servicio", "Tipo de servicio", "tipo", "Tipo", "TIPO", "servicio", "Servicio"])
+          telefono: mapCol(row, ["telefono", "Teléfono", "Telefono", "TELEFONO", "cel", "celular", "Celular"]) || null,
+          tipo_servicio: mapCol(row, ["tipo_servicio", "Tipo de servicio", "tipo", "Tipo", "TIPO", "servicio", "Servicio"]) || null
         }))
         .filter((p) => p.nombre);
 
@@ -253,12 +255,78 @@ export default function Proveedores() {
         return Swal.fire("Sin datos válidos", "No se encontraron proveedores con nombre. Revisa que la columna 'nombre' exista.", "error");
       }
 
-      const { error } = await supabase.from("proveedores").insert(provsValidos);
-      if (error) {
-        console.error(error);
-        return Swal.fire("Error", "No se pudieron importar los proveedores.", "error");
+      // Insertar proveedores uno por uno para obtener IDs y manejar duplicados
+      let provsImportados = 0;
+      let provsErrores = 0;
+      const mapaProveedores = {}; // nombre -> id
+
+      for (const prov of provsValidos) {
+        // Verificar si ya existe
+        const { data: existente } = await supabase
+          .from("proveedores")
+          .select("id, nombre")
+          .ilike("nombre", prov.nombre)
+          .limit(1);
+
+        if (existente && existente.length > 0) {
+          // Ya existe: usar su ID para los productos
+          mapaProveedores[prov.nombre.toLowerCase()] = existente[0].id;
+          provsErrores++;
+        } else {
+          const { data: nuevo, error } = await supabase
+            .from("proveedores")
+            .insert([prov])
+            .select("id")
+            .single();
+          if (error) {
+            console.warn(`⚠️ No se importó proveedor "${prov.nombre}":`, error.message);
+            provsErrores++;
+          } else {
+            mapaProveedores[prov.nombre.toLowerCase()] = nuevo.id;
+            provsImportados++;
+          }
+        }
       }
-      Swal.fire("Importación exitosa", `${provsValidos.length} proveedor(es) importados correctamente.`, "success");
+
+      // ─── Hoja 2: Productos (si existe) ───
+      let prodsImportados = 0;
+      if (workbook.SheetNames.length >= 2) {
+        const wsProds = workbook.Sheets[workbook.SheetNames[1]];
+        const jsonProds = XLSX.utils.sheet_to_json(wsProds, { defval: "" });
+
+        for (const row of jsonProds) {
+          const provNombre = mapCol(row, ["proveedor", "Proveedor", "PROVEEDOR", "nombre_proveedor"]);
+          const prodNombre = mapCol(row, ["producto", "Producto", "PRODUCTO", "nombre", "Nombre"]);
+          const precioCompra = parseFloat(mapCol(row, ["precio_compra", "Precio compra", "Precio Compra", "costo", "Costo"]) || 0);
+          const precioVenta = parseFloat(mapCol(row, ["precio_venta", "Precio venta", "Precio Venta", "precio", "Precio"]) || 0);
+
+          if (!prodNombre || !provNombre) continue;
+
+          const provId = mapaProveedores[provNombre.toLowerCase()];
+          if (!provId) {
+            console.warn(`⚠️ Producto "${prodNombre}" ignorado: proveedor "${provNombre}" no encontrado`);
+            continue;
+          }
+
+          const { error } = await supabase.from("productos_proveedores").insert([{
+            proveedor_id: provId,
+            nombre: prodNombre,
+            precio_compra: precioCompra,
+            precio_venta: precioVenta,
+            stock: 0
+          }]);
+          if (!error) prodsImportados++;
+        }
+      }
+
+      // ─── Resultado ───
+      let msg = "";
+      if (provsImportados > 0) msg += `✅ ${provsImportados} proveedor(es) nuevos\n`;
+      if (provsErrores > 0) msg += `⚠️ ${provsErrores} proveedor(es) ya existían o con error\n`;
+      if (prodsImportados > 0) msg += `📦 ${prodsImportados} producto(s) importados`;
+      if (!msg) msg = "No se importó nada nuevo.";
+
+      Swal.fire("Importación completada", msg, provsImportados > 0 || prodsImportados > 0 ? "success" : "info");
       cargarDatos();
     } catch (err) {
       console.error(err);
@@ -299,9 +367,43 @@ export default function Proveedores() {
           <ul style="margin:4px 0 0 16px;padding:0;">
             <li>Acepta variantes como "Nombre", "Proveedor", "Teléfono", "celular", "Tipo", etc.</li>
             <li>Las filas sin nombre serán ignoradas.</li>
-            <li>Los productos se agregan después desde el sistema.</li>
+            <li>Si el proveedor ya existe, se reutiliza para asignarle productos.</li>
             <li>Formatos aceptados: <strong>.xlsx</strong> y <strong>.xls</strong></li>
           </ul>
+
+          <hr style="margin:14px 0;border:none;border-top:1px solid #e5e7eb;" />
+
+          <p><strong>📦 Hoja 2 (opcional): Productos de proveedores</strong></p>
+          <p>Si tu archivo tiene una segunda hoja, puedes incluir los productos de cada proveedor:</p>
+          <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:12px;">
+            <tr style="background:#f0fdf4;">
+              <th style="border:1px solid #e5e7eb;padding:6px;text-align:left;">Columna</th>
+              <th style="border:1px solid #e5e7eb;padding:6px;text-align:left;">¿Obligatoria?</th>
+              <th style="border:1px solid #e5e7eb;padding:6px;text-align:left;">Ejemplo</th>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;font-weight:600;">Proveedor</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#ef4444;">✅ Sí</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">Decoraciones María</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;font-weight:600;">Producto</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#ef4444;">✅ Sí</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">Arreglo floral grande</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;">Precio compra</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">25000</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:6px;">Precio venta</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">45000</td>
+            </tr>
+          </table>
+          <p style="font-size:12px;color:#6b7280;">💡 El nombre del proveedor debe coincidir con los de la Hoja 1. Si el proveedor ya existe en el sistema, los productos se le asignan automáticamente.</p>
+          <p style="font-size:12px;color:#6b7280;">💡 <strong>Tip:</strong> Usa "Exportar Excel" para descargar un ejemplo con el formato correcto de ambas hojas.</p>
         </div>
       `,
       width: 560,

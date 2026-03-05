@@ -221,15 +221,35 @@ export default function Clientes() {
 
       const clientesConCodigo = clientesValidos.map((c) => {
         maxCodigo++;
-        return { codigo: `C${maxCodigo}`, ...c };
+        return {
+          codigo: `C${maxCodigo}`,
+          nombre: c.nombre,
+          identificacion: c.identificacion || null,
+          telefono: c.telefono || null,
+          direccion: c.direccion || null,
+          email: c.email || null,
+        };
       });
 
-      const { error } = await supabase.from("clientes").insert(clientesConCodigo);
-      if (error) {
-        console.error(error);
-        return Swal.fire("Error", "No se pudieron importar los clientes.", "error");
+      // Insertar uno por uno para saltar duplicados sin detener toda la importación
+      let importados = 0;
+      let errores = 0;
+      for (const cliente of clientesConCodigo) {
+        const { error } = await supabase.from("clientes").insert([cliente]);
+        if (error) {
+          console.warn(`⚠️ No se importó "${cliente.nombre}":`, error.message);
+          errores++;
+        } else {
+          importados++;
+        }
       }
-      Swal.fire("Importación exitosa", `${clientesConCodigo.length} cliente(s) importados correctamente.`, "success");
+
+      if (importados === 0) {
+        return Swal.fire("Error", "No se pudo importar ningún cliente. Revisa que no haya emails o identificaciones duplicadas.", "error");
+      }
+
+      const msgExtra = errores > 0 ? `\n⚠️ ${errores} cliente(s) no se importaron por datos duplicados.` : "";
+      Swal.fire("Importación exitosa", `${importados} cliente(s) importados correctamente.${msgExtra}`, importados > 0 && errores > 0 ? "warning" : "success");
       cargarClientes();
     } catch (err) {
       console.error(err);
