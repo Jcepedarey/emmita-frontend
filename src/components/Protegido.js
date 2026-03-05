@@ -17,8 +17,10 @@ export default function Protegido({ children }) {
     }
   }, [navigate]);
 
-  // Mientras verifica sesión o carga tenant
-  if (!verificado || cargando) return null;
+  // Mientras verifica sesión o carga tenant POR PRIMERA VEZ
+  // Si ya verificó y está recargando en background, NO desmontar los hijos
+  if (!verificado) return null;
+  if (cargando && !tenant && !perfil) return null;
 
   // ─── Verificar estado del tenant ───
   const suspendido = tenant?.estado === "suspendido" || tenant?.estado === "inactivo";

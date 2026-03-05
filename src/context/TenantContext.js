@@ -9,11 +9,15 @@ export const TenantProvider = ({ children }) => {
   const [perfil, setPerfil] = useState(null);        // profile del usuario (rol, permisos)
   const [cargando, setCargando] = useState(true);    // loading inicial
   const [error, setError] = useState(null);
+  const cargaInicialCompleta = React.useRef(false);
 
   // Cargar perfil y tenant del usuario autenticado
-  const cargarTenant = useCallback(async () => {
+  // Si softRefresh=true, no muestra loading (evita desmontar la UI)
+  const cargarTenant = useCallback(async (softRefresh = false) => {
     try {
-      setCargando(true);
+      if (!softRefresh) {
+        setCargando(true);
+      }
       setError(null);
 
       // 1. Obtener usuario autenticado
@@ -55,6 +59,7 @@ export const TenantProvider = ({ children }) => {
 
       setPerfil(perfilData);
       setTenant(tenantData);
+      cargaInicialCompleta.current = true;
       setCargando(false);
 
     } catch (err) {
@@ -70,13 +75,15 @@ export const TenantProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        cargarTenant();
+        // Si ya completó carga inicial, es un refresh de token — no desmontar UI
+        cargarTenant(cargaInicialCompleta.current);
       }
       if (event === "SIGNED_OUT") {
         setTenant(null);
         setPerfil(null);
         setCargando(false);
         setError(null);
+        cargaInicialCompleta.current = false;
       }
     });
 
