@@ -1005,43 +1005,37 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
     }
 
     if (ordenIdFinal) {
-      // Si es edición, primero sincronizar cambios
-      if (esEdicion) {
-        const abonosYaRegistrados = documento?.abonos_registrados_contabilidad || [];
-        const abonosActualizados = await sincronizarAbonosContabilidad(
-          abonos,
-          abonosYaRegistrados
-        );
-        
-        // Actualizar el registro
-        await supabase
-          .from(tabla)
-          .update({ abonos_registrados_contabilidad: abonosActualizados })
-          .eq("id", ordenIdFinal);
-      }
+      // ✅ FIX: Siempre leer datos FRESCOS de la BD (no del estado local que puede estar desactualizado)
+      const { data: ordenFresca } = await supabase
+        .from(tabla)
+        .select("abonos_registrados_contabilidad")
+        .eq("id", ordenIdFinal)
+        .single();
 
-      // Registrar abonos NUEVOS
-      const abonosYaRegistrados = esEdicion 
-        ? (documento?.abonos_registrados_contabilidad || [])
-        : [];
-        
+      const abonosYaRegistrados = ordenFresca?.abonos_registrados_contabilidad || [];
+
+      // Sincronizar cambios (eliminar/editar abonos existentes)
+      const abonosActualizados = await sincronizarAbonosContabilidad(
+        abonos,
+        abonosYaRegistrados
+      );
+
+      // Registrar solo abonos NUEVOS (que no estén ya registrados)
       const movimientosCreados = await registrarAbonosEnContabilidad(
         ordenIdFinal,
         clienteSeleccionado.id,
         abonos,
-        abonosYaRegistrados,
+        abonosActualizados, // ✅ Usar la lista ya sincronizada, no la vieja
         numeroDocumento,
         clienteSeleccionado.nombre
       );
 
-      // Actualizar la columna abonos_registrados_contabilidad
-      if (movimientosCreados.length > 0) {
-        const nuevosRegistrados = [...abonosYaRegistrados, ...movimientosCreados];
-        await supabase
-          .from(tabla)
-          .update({ abonos_registrados_contabilidad: nuevosRegistrados })
-          .eq("id", ordenIdFinal);
-      }
+      // Guardar el registro actualizado completo en la BD
+      const registroFinal = [...abonosActualizados, ...movimientosCreados];
+      await supabase
+        .from(tabla)
+        .update({ abonos_registrados_contabilidad: registroFinal })
+        .eq("id", ordenIdFinal);
     }
 
     // 🆕 REGISTRAR PAGOS A PROVEEDORES EN CONTABILIDAD
