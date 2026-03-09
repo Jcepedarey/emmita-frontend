@@ -387,6 +387,14 @@ const handleFechaChange = (fecha) => {
                       <div style={{ fontSize: "11px", color: "#9ca3af" }}>
                         {new Date(orden.fecha_evento).toLocaleDateString("es-CO")}
                       </div>
+                      {/* 🆕 Fechas de entrega y devolución */}
+                      {(orden.fecha_entrega || orden.fecha_devolucion) && (
+                        <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: 2 }}>
+                          {orden.fecha_entrega && `📦 ${new Date(orden.fecha_entrega).toLocaleDateString("es-CO")}`}
+                          {orden.fecha_entrega && orden.fecha_devolucion && "  ·  "}
+                          {orden.fecha_devolucion && `📥 ${new Date(orden.fecha_devolucion).toLocaleDateString("es-CO")}`}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                       <IconoPago orden={orden} />

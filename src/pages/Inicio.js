@@ -37,6 +37,14 @@ const soloFecha = (valor) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// 🆕 Formato corto dd/mm para tarjetas
+const fechaCorta = (valor) => {
+  if (!valor) return null;
+  const s = String(valor).trim().slice(0, 10);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}` : null;
+};
+
 // ========== COMPONENTE PRINCIPAL ==========
 const Inicio = () => {
   const navigate = useNavigate();
@@ -47,10 +55,11 @@ const Inicio = () => {
   const [cotizacionesProximas, setCotizacionesProximas] = useState([]);
   const [ordenesPendientes, setOrdenesPendientes] = useState([]);
   const [ordenesSaldoPendiente, setOrdenesSaldoPendiente] = useState([]);
+  const [devolucionesVencidas, setDevolucionesVencidas] = useState([]); // 🆕
 
   // 🆕 Estados para pestañas
   const [tabIzquierda, setTabIzquierda] = useState("pedidos"); // "pedidos" | "cotizaciones"
-  const [tabDerecha, setTabDerecha] = useState("revisar"); // "revisar" | "pagos"
+  const [tabDerecha, setTabDerecha] = useState("revisar"); // "revisar" | "pagos" | "devoluciones"
 
   // 🔎 Consulta rápida de stock
   const [busqProd, setBusqProd] = useState("");
@@ -140,6 +149,29 @@ const Inicio = () => {
       setOrdenesProximas(proximas);
       setOrdenesPendientes(vencidas);
       setOrdenesSaldoPendiente(conSaldo);
+
+      // 🆕 Devoluciones vencidas: pasó fecha_devolucion y no se ha marcado mercancia_devuelta
+      const devVencidas = (data || []).filter((o) => {
+        if (o.cerrada || o.mercancia_devuelta) return false;
+        // Calcular fecha de devolución esperada
+        let fechaDev = o.fecha_devolucion;
+        if (!fechaDev) {
+          // Fallback: día siguiente al último día del evento
+          let ultimoDia = o.fecha_evento;
+          if (o.multi_dias && Array.isArray(o.fechas_evento) && o.fechas_evento.length > 0) {
+            const sorted = [...o.fechas_evento].sort();
+            ultimoDia = sorted[sorted.length - 1];
+          }
+          if (!ultimoDia) return false;
+          const ud = new Date(ultimoDia);
+          ud.setDate(ud.getDate() + 1);
+          fechaDev = ud.toISOString().slice(0, 10);
+        }
+        const fd = new Date(fechaDev);
+        if (isNaN(fd.getTime())) return false;
+        return fd.getTime() < hoy.getTime();
+      });
+      setDevolucionesVencidas(devVencidas);
     };
 
     cargarOrdenes();
@@ -628,6 +660,14 @@ const Inicio = () => {
                           <p style={estilos.pedidoNumero}>{orden.numero || "OP-???"}</p>
                           <p style={estilos.pedidoCliente}>{orden.clientes?.nombre || "Cliente"}</p>
                           <p style={estilos.pedidoFecha}>{soloFecha(orden.fecha_evento) || "-"}</p>
+                          {/* 🆕 Fechas de entrega y devolución */}
+                          {(orden.fecha_entrega || orden.fecha_devolucion) && (
+                            <p style={{ fontSize: 10, color: "#9ca3af", margin: "2px 0 0" }}>
+                              {fechaCorta(orden.fecha_entrega) && `📦 ${fechaCorta(orden.fecha_entrega)}`}
+                              {orden.fecha_entrega && orden.fecha_devolucion && "  ·  "}
+                              {fechaCorta(orden.fecha_devolucion) && `📥 ${fechaCorta(orden.fecha_devolucion)}`}
+                            </p>
+                          )}
                         </div>
                         <div style={estilos.pedidoAcciones}>
                           <IconoPago orden={orden} />
@@ -682,6 +722,16 @@ const Inicio = () => {
                     ))
                   )
                 )}
+
+                {/* 🆕 Botón Ver todos */}
+                {tabIzquierda === "pedidos" && ordenesProximas.length > 0 && (
+                  <div style={{ textAlign: "center", padding: "8px 0 4px", borderTop: "1px solid #f3f4f6" }}>
+                    <button onClick={() => navigate("/ruta-entregas")}
+                      style={{ background: "none", border: "none", color: "#0077B6", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                      Ver todos ({ordenesProximas.length}) →
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -712,9 +762,25 @@ const Inicio = () => {
                     borderTopRightRadius: "12px",
                   }}
                 >
-                  💰 Pagos pendientes
+                  💰 Pagos
                 </button>
               </div>
+
+              {/* 🆕 Alerta de devoluciones vencidas */}
+              {devolucionesVencidas.length > 0 && tabDerecha !== "devoluciones" && (
+                <div
+                  onClick={() => setTabDerecha("devoluciones")}
+                  style={{
+                    padding: "8px 12px", margin: "0 12px 8px", borderRadius: 8,
+                    background: "linear-gradient(135deg, #fef2f2, #fee2e2)",
+                    border: "1px solid rgba(239,68,68,0.2)",
+                    fontSize: 12, color: "#991b1b", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  🚨 {devolucionesVencidas.length} pedido{devolucionesVencidas.length > 1 ? "s" : ""} con devolución vencida — click para ver
+                </div>
+              )}
 
               {/* Contenido según pestaña */}
               <div style={estilos.cardBody}>
@@ -748,6 +814,49 @@ const Inicio = () => {
                         </div>
                       </div>
                     ))
+                  )
+                ) : tabDerecha === "devoluciones" ? (
+                  // 🆕 DEVOLUCIONES VENCIDAS
+                  devolucionesVencidas.length === 0 ? (
+                    <p style={estilos.noData}>No hay devoluciones vencidas 🎉</p>
+                  ) : (
+                    devolucionesVencidas.slice(0, 10).map((orden) => {
+                      let fechaDev = orden.fecha_devolucion;
+                      if (!fechaDev) {
+                        let ultimoDia = orden.fecha_evento;
+                        if (orden.multi_dias && Array.isArray(orden.fechas_evento) && orden.fechas_evento.length > 0) {
+                          const sorted = [...orden.fechas_evento].sort();
+                          ultimoDia = sorted[sorted.length - 1];
+                        }
+                        if (ultimoDia) {
+                          const ud = new Date(ultimoDia);
+                          ud.setDate(ud.getDate() + 1);
+                          fechaDev = ud.toISOString().slice(0, 10);
+                        }
+                      }
+                      const diasRetraso = fechaDev ? Math.floor((new Date() - new Date(fechaDev)) / 86400000) : 0;
+                      return (
+                        <div key={orden.id} style={{
+                          ...estilos.pedidoCard,
+                          backgroundColor: "#fef2f2",
+                          border: "1px solid rgba(239, 68, 68, 0.25)",
+                        }}>
+                          <div style={estilos.pedidoInfo}>
+                            <p style={{ ...estilos.pedidoNumero, color: '#dc2626' }}>{orden.numero || "OP-???"}</p>
+                            <p style={estilos.pedidoCliente}>{orden.clientes?.nombre || "Cliente"}</p>
+                            <p style={{ fontSize: 11, color: "#dc2626", fontWeight: 600, margin: 0 }}>
+                              ⏰ {diasRetraso} día{diasRetraso !== 1 ? "s" : ""} de retraso
+                            </p>
+                          </div>
+                          <div style={estilos.pedidoAcciones}>
+                            <button style={{ ...estilos.btnIcono, backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                              onClick={() => navigate(`/recepcion?id=${orden.id}`)} title="Recepción">📝</button>
+                            <button style={{ ...estilos.btnIcono, backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                              onClick={() => editarOrden(orden)} title="Editar">✏️</button>
+                          </div>
+                        </div>
+                      );
+                    })
                   )
                 ) : (
                   // PAGOS PENDIENTES
@@ -788,6 +897,16 @@ const Inicio = () => {
                       </div>
                     ))
                   )
+                )}
+
+                {/* 🆕 Botón Ver todos para pagos pendientes */}
+                {tabDerecha === "pagos" && ordenesSaldoPendiente.length > 0 && (
+                  <div style={{ textAlign: "center", padding: "8px 0 4px", borderTop: "1px solid #f3f4f6" }}>
+                    <button onClick={() => navigate("/pagos-pendientes")}
+                      style={{ background: "none", border: "none", color: "#6d28d9", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                      Ver todos ({ordenesSaldoPendiente.length}) →
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

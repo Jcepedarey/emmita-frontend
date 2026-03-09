@@ -286,41 +286,70 @@ useEffect(() => {
     // 1) Inventario base
     const { data: productosData } = await supabase.from("productos").select("id, stock");
 
-    // 2) Órdenes abiertas
+    // 2) Órdenes abiertas (sin filtro de fecha porque usamos rango entrega–devolución)
     let ordenesData = [];
-    const hoy = new Date();
-hoy.setHours(0, 0, 0, 0);
-const fechaHoy = hoy.toISOString().split('T')[0];
-
-let res = await supabase
-  .from("ordenes_pedido")
-  .select("productos, fecha_evento, fechas_evento, cerrada")
-  .eq("cerrada", false)
-  .gte("fecha_evento", fechaHoy);
+    let res = await supabase
+      .from("ordenes_pedido")
+      .select("productos, fecha_evento, fechas_evento, fecha_entrega, fecha_devolucion, cerrada")
+      .eq("cerrada", false);
 
     if (res.error && String(res.error.message || "").includes("fechas_evento")) {
-  res = await supabase
-    .from("ordenes_pedido")
-    .select("productos, fecha_evento, cerrada")
-    .eq("cerrada", false)
-    .gte("fecha_evento", fechaHoy);  // ⬅️ AGREGAR ESTA LÍNEA
-}
+      res = await supabase
+        .from("ordenes_pedido")
+        .select("productos, fecha_evento, fecha_entrega, fecha_devolucion, cerrada")
+        .eq("cerrada", false);
+    }
     if (res.data) ordenesData = res.data;
 
     const reservasPorFecha = {};
     fechasConsulta.forEach((f) => (reservasPorFecha[f] = {}));
 
-    // ✅ CORRECCIÓN: Evitar contar múltiples veces el mismo pedido
+    // Helper: todos los días entre inicio y fin inclusive
+    const diasEnRango = (inicio, fin) => {
+      const dias = [];
+      const d = new Date(inicio + "T12:00:00");
+      const dFin = new Date(fin + "T12:00:00");
+      while (d <= dFin) {
+        dias.push(d.toISOString().slice(0, 10));
+        d.setDate(d.getDate() + 1);
+      }
+      return dias;
+    };
+
     ordenesData.forEach((orden) => {
-      const diasOrd = new Set([
+      if (orden.cerrada) return;
+
+      // Último día del evento (para calcular devolución por defecto)
+      const diasEvento = [
         ...(orden.fecha_evento ? [String(orden.fecha_evento).slice(0, 10)] : []),
         ...((orden.fechas_evento || []).map((d) => String(d).slice(0, 10))),
-      ]);
+      ].sort();
+      const ultimoDiaEvento = diasEvento[diasEvento.length - 1];
+      if (!ultimoDiaEvento) return;
+
+      // entrega = fecha_entrega || fecha_evento (fallback)
+      const entrega = orden.fecha_entrega
+        ? String(orden.fecha_entrega).slice(0, 10)
+        : String(orden.fecha_evento).slice(0, 10);
+
+      // devolucion = fecha_devolucion || día siguiente al último día del evento
+      let devolucion;
+      if (orden.fecha_devolucion) {
+        devolucion = String(orden.fecha_devolucion).slice(0, 10);
+      } else {
+        const d = new Date(ultimoDiaEvento + "T12:00:00");
+        d.setDate(d.getDate() + 1);
+        devolucion = d.toISOString().slice(0, 10);
+      }
+
+      if (!entrega || !devolucion) return;
+
+      // Días ocupados = todos los días desde entrega hasta devolucion inclusive
+      const diasOcupados = new Set(diasEnRango(entrega, devolucion));
 
       const acumular = (id, cant) => {
-        // ✅ Acumular en TODAS las fechas consultadas que traslapen
         fechasConsulta.forEach((f) => {
-          if (diasOrd.has(f)) {
+          if (diasOcupados.has(f)) {
             reservasPorFecha[f][id] = (reservasPorFecha[f][id] || 0) + cant;
           }
         });
