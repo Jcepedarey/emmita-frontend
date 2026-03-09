@@ -874,6 +874,7 @@ const Inicio = () => {
                             {orden.numero || "OP-???"}
                           </p>
                           <p style={estilos.pedidoCliente}>{orden.clientes?.nombre || "Cliente"}</p>
+                          <p style={estilos.pedidoFecha}>{soloFecha(orden.fecha_evento) || "-"}</p>
                           <p style={estilos.pedidoSaldo}>
                             Saldo: ${calcularSaldo(orden).toLocaleString()}
                           </p>
@@ -884,7 +885,7 @@ const Inicio = () => {
                             onClick={() => editarOrden(orden)}
                             title="Ver pedido"
                           >
-                            👁️
+                            ✏️
                           </button>
                           <button 
                             style={{ ...estilos.btnIcono, backgroundColor: 'rgba(139, 92, 246, 0.1)' }}
