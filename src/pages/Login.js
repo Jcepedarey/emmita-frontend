@@ -15,14 +15,11 @@ export default function Login() {
   
   const { recargar } = useTenant();
 
-  // ✅ NUEVO: Limpiar cualquier sesión "pegada" en la PWA apenas carga la pantalla
+  // ✅ CORRECCIÓN: Limpieza suave y local. 
+  // No llamamos a supabase.auth.signOut() aquí para no disparar las alarmas antibots de Cloudflare.
   useEffect(() => {
-    const limpiarSesionFantasma = async () => {
-      localStorage.removeItem("usuario");
-      localStorage.removeItem("sesion");
-      await supabase.auth.signOut(); // Fuerza el cierre en Supabase
-    };
-    limpiarSesionFantasma();
+    localStorage.removeItem("usuario");
+    localStorage.removeItem("sesion");
   }, []);
 
   const handleLogin = async () => {
