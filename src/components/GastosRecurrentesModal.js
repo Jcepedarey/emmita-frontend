@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import supabase from "../supabaseClient";
 import Swal from "sweetalert2";
 import { useTenant } from "../context/TenantContext";
+import { generarMovimientosRecurrentes } from "../utils/generarRecurrentes";
 
 /* ─── Categorías (mismas que Contabilidad.js) ─── */
 const CATEGORIAS_GASTO = [
@@ -163,8 +164,6 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
   /* ─── Generar movimientos pendientes de TODOS los recurrentes activos ─── */
   const generarMovimientosPendientes = async () => {
     setGenerando(true);
-    const hoy = new Date();
-    const hoyStr = hoy.toISOString().slice(0, 10);
 
     const activos = recurrentes.filter((r) => r.activo);
     if (!activos.length) {
@@ -172,53 +171,22 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
       return Swal.fire("Sin recurrentes", "No hay gastos/ingresos recurrentes activos", "info");
     }
 
-    let totalGenerados = 0;
+    try {
+      const { totalGenerados } = await generarMovimientosRecurrentes(tenant?.id, false);
 
-    for (const rec of activos) {
-      if (rec.fecha_fin && rec.fecha_fin < hoyStr) continue;
+      setGenerando(false);
+      await cargar();
 
-      const fechasAGenerar = calcularFechasPendientes(rec, hoy);
-
-      for (const fecha of fechasAGenerar) {
-        const { data: existe } = await supabase
-          .from("movimientos_contables")
-          .select("id")
-          .eq("recurrente_id", rec.id)
-          .eq("fecha", fecha)
-          .limit(1);
-
-        if (existe && existe.length > 0) continue;
-
-        const { error } = await supabase.from("movimientos_contables").insert([{
-          tipo: rec.tipo,
-          monto: rec.monto,
-          descripcion: rec.descripcion,
-          categoria: rec.categoria || "",
-          fecha: fecha,
-          estado: "activo",
-          origen: "recurrente",
-          recurrente_id: rec.id,
-          tenant_id: tenant.id
-        }]);
-
-        if (!error) totalGenerados++;
+      if (totalGenerados > 0) {
+        Swal.fire({ icon: "success", title: `${totalGenerados} movimiento${totalGenerados > 1 ? "s" : ""} generado${totalGenerados > 1 ? "s" : ""}`, timer: 2000, showConfirmButton: false });
+        if (onRecurrentesGenerados) onRecurrentesGenerados();
+      } else {
+        Swal.fire({ icon: "info", title: "Todo al día", text: "No hay movimientos pendientes por generar", timer: 2000, showConfirmButton: false });
       }
-
-      if (fechasAGenerar.length > 0) {
-        await supabase.from("gastos_recurrentes")
-          .update({ ultimo_generado: fechasAGenerar[fechasAGenerar.length - 1] })
-          .eq("id", rec.id);
-      }
-    }
-
-    setGenerando(false);
-    await cargar();
-
-    if (totalGenerados > 0) {
-      Swal.fire({ icon: "success", title: `${totalGenerados} movimiento${totalGenerados > 1 ? "s" : ""} generado${totalGenerados > 1 ? "s" : ""}`, timer: 2000, showConfirmButton: false });
-      if (onRecurrentesGenerados) onRecurrentesGenerados();
-    } else {
-      Swal.fire({ icon: "info", title: "Todo al día", text: "No hay movimientos pendientes por generar", timer: 2000, showConfirmButton: false });
+    } catch (err) {
+      console.error("Error generando recurrentes:", err);
+      setGenerando(false);
+      Swal.fire("Error", "Hubo un problema al generar los movimientos", "error");
     }
   };
 
@@ -321,101 +289,5 @@ const GastosRecurrentesModal = ({ abierto, onCerrar, onRecurrentesGenerados }) =
   );
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   FUNCIÓN: Calcular fechas pendientes de generación
-   ═══════════════════════════════════════════════════════════════ */
-function calcularFechasPendientes(rec, hastaFecha) {
-  const fechas = [];
-  const hoy = hastaFecha || new Date();
-  const hoyStr = hoy.toISOString().slice(0, 10);
-
-  let cursor;
-  if (rec.ultimo_generado) {
-    cursor = new Date(rec.ultimo_generado);
-    cursor.setDate(cursor.getDate() + 1);
-  } else {
-    const fi = new Date(rec.fecha_inicio);
-    cursor = new Date(fi.getFullYear(), fi.getMonth(), 1);
-  }
-
-  const maxIteraciones = 365;
-  let iteraciones = 0;
-
-  while (iteraciones < maxIteraciones) {
-    const fechaCobro = calcularProximaFecha(cursor, rec.frecuencia, rec.dia_cobro);
-
-    if (!fechaCobro) break;
-
-    const fechaStr = fechaCobro.toISOString().slice(0, 10);
-
-    if (fechaStr > hoyStr) break;
-    if (rec.fecha_fin && fechaStr > rec.fecha_fin) break;
-
-    const fechaCobroDate = new Date(fechaStr);
-    const inicioDate = new Date(rec.fecha_inicio);
-    const mismoMesOPosterior =
-      fechaCobroDate.getFullYear() > inicioDate.getFullYear() ||
-      (fechaCobroDate.getFullYear() === inicioDate.getFullYear() &&
-       fechaCobroDate.getMonth() >= inicioDate.getMonth());
-
-    if (mismoMesOPosterior) {
-      fechas.push(fechaStr);
-    }
-
-    cursor = new Date(fechaCobro);
-    cursor.setDate(cursor.getDate() + 1);
-    iteraciones++;
-  }
-
-  return fechas;
-}
-
-function calcularProximaFecha(desde, frecuencia, diaCobro) {
-  const d = new Date(desde);
-  const dia = Math.min(diaCobro || 1, 28);
-
-  switch (frecuencia) {
-    case "semanal": {
-      const target = new Date(d);
-      target.setDate(d.getDate() + ((7 - d.getDay() + (dia % 7)) % 7 || 7));
-      if (target <= d) target.setDate(target.getDate() + 7);
-      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (7 - 1));
-    }
-    case "quincenal": {
-      const y = d.getFullYear(), m = d.getMonth();
-      const opcion1 = new Date(y, m, dia);
-      const opcion2 = new Date(y, m, Math.min(dia + 15, 28));
-      if (opcion1 >= d) return opcion1;
-      if (opcion2 >= d) return opcion2;
-      return new Date(y, m + 1, dia);
-    }
-    case "mensual": {
-      const y = d.getFullYear(), m = d.getMonth();
-      const enEsteMes = new Date(y, m, dia);
-      if (enEsteMes >= d) return enEsteMes;
-      return new Date(y, m + 1, dia);
-    }
-    case "bimestral": {
-      const y = d.getFullYear(), m = d.getMonth();
-      const enEsteMes = new Date(y, m, dia);
-      if (enEsteMes >= d) return enEsteMes;
-      return new Date(y, m + 2, dia);
-    }
-    case "trimestral": {
-      const y = d.getFullYear(), m = d.getMonth();
-      const enEsteMes = new Date(y, m, dia);
-      if (enEsteMes >= d) return enEsteMes;
-      return new Date(y, m + 3, dia);
-    }
-    case "anual": {
-      const y = d.getFullYear(), m = d.getMonth();
-      const enEsteAnio = new Date(y, m, dia);
-      if (enEsteAnio >= d) return enEsteAnio;
-      return new Date(y + 1, m, dia);
-    }
-    default:
-      return null;
-  }
-}
 
 export default GastosRecurrentesModal;

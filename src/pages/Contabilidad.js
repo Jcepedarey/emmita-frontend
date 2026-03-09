@@ -7,6 +7,7 @@ import GastosRecurrentesModal from "../components/GastosRecurrentesModal";
 import Swal from "sweetalert2";
 import Protegido from "../components/Protegido";
 import { useTenant } from "../context/TenantContext"; // ✅ IMPORTADO EL TENANT
+import { generarMovimientosRecurrentes } from "../utils/generarRecurrentes"; // 🆕 Auto-generar recurrentes
 import "../estilos/EstilosGlobales.css";
 import "../estilos/ReportesContabilidad.css";
 
@@ -155,6 +156,28 @@ const Contabilidad = () => {
   }, [desde, hasta]);
 
   useEffect(() => { cargarMovimientos(); }, [cargarMovimientos]);
+
+  // 🆕 Auto-generar movimientos recurrentes pendientes al abrir Contabilidad
+  useEffect(() => {
+    if (!tenant?.id) return;
+    let cancelado = false;
+
+    const autoGenerar = async () => {
+      try {
+        const { totalGenerados } = await generarMovimientosRecurrentes(tenant.id, true);
+        if (totalGenerados > 0 && !cancelado) {
+          console.log(`✅ ${totalGenerados} movimiento(s) recurrente(s) generado(s) automáticamente`);
+          cargarMovimientos(); // Recargar para que aparezcan
+        }
+      } catch (err) {
+        console.error("Error auto-generando recurrentes:", err);
+      }
+    };
+
+    autoGenerar();
+    return () => { cancelado = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant?.id]);
 
   /* ─── Cargar resumen de proveedores (pagos_proveedores de órdenes) ─── */
   useEffect(() => {
