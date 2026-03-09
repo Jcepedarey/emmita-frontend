@@ -430,6 +430,23 @@ let y = (doc.lastAutoTable?.finalY || 100) + 10;
   doc.text(`SALDO FINAL: $${fmt(saldo)}`, xTot, y);
   y += 6; // pequeño respiro
 
+  // 🆕 Nota de fechas de entrega y devolución (solo si tienen valor)
+  const fEntrega = documento.fecha_entrega ? soloFecha(documento.fecha_entrega) : null;
+  const fDevolucion = documento.fecha_devolucion ? soloFecha(documento.fecha_devolucion) : null;
+
+  if (fEntrega || fDevolucion) {
+    y += 6;
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128); // gris
+    const partes = [];
+    if (fEntrega) partes.push(`Entrega: ${fEntrega}`);
+    if (fDevolucion) partes.push(`Devolución: ${fDevolucion}`);
+    doc.text(partes.join("  ·  "), 10, y);
+    doc.setTextColor(0, 0, 0); // restaurar negro
+    doc.setFontSize(12);
+    y += 8;
+  }
+
   // ─── Pie anclado al borde inferior (con guardia anti-encime) ─────────────────
   // Si por cualquier motivo quedamos muy cerca del pie, forzamos nueva página
   const pageHeight = doc.internal.pageSize.getHeight();

@@ -45,6 +45,8 @@
     const [fechaEvento, setFechaEvento] = useState("");         // modo 1 día
     const [fechasEvento, setFechasEvento] = useState([]);       // modo multi-día
     const numeroDias = useMemo(() => (multiDias ? fechasEvento.length : 1), [multiDias, fechasEvento]);
+    const [fechaEntrega, setFechaEntrega] = useState("");       // 🆕 fecha entrega mercancía
+    const [fechaDevolucion, setFechaDevolucion] = useState(""); // 🆕 fecha devolución mercancía
     const [mostrarNotas, setMostrarNotas] = useState(false);
 
     const [clientes, setClientes] = useState([]);
@@ -222,6 +224,10 @@ useEffect(() => {
       setFechaGarantia(documento?.fecha_garantia || "");
       setMostrarNotas(!!documento?.mostrar_notas);
 
+      // 🆕 Cargar fechas de entrega y devolución
+      if (documento.fecha_entrega) setFechaEntrega(norm(documento.fecha_entrega));
+      if (documento.fecha_devolucion) setFechaDevolucion(norm(documento.fecha_devolucion));
+
       // 🔧 FIX: Precargar descuento y retención al editar
       const descVal = Number(documento.descuento || 0);
       if (descVal > 0) {
@@ -358,6 +364,52 @@ let res = await supabase
       return recomputarSubtotales(prev);
     });
   }, [fechaEvento, multiDias, numeroDias]);
+
+  // 🆕 Auto-sugerir fechas de entrega y devolución al cambiar fecha del evento
+  // Solo para órdenes de pedido. Solo sugiere si el campo está vacío (no sobreescribe ediciones del usuario)
+  useEffect(() => {
+    if (tipoDocumento === "cotizacion") return;
+
+    const sugerirFechas = (fechaBase) => {
+      if (!fechaBase) return;
+      const base = new Date(fechaBase + "T12:00:00"); // evitar desfase timezone
+      if (isNaN(base.getTime())) return;
+
+      // Sugerir entrega = día anterior al evento
+      if (!fechaEntrega) {
+        const entrega = new Date(base);
+        entrega.setDate(entrega.getDate() - 1);
+        setFechaEntrega(entrega.toISOString().slice(0, 10));
+      }
+
+      // Sugerir devolución = día siguiente al evento
+      if (!fechaDevolucion) {
+        const devolucion = new Date(base);
+        devolucion.setDate(devolucion.getDate() + 1);
+        setFechaDevolucion(devolucion.toISOString().slice(0, 10));
+      }
+    };
+
+    if (multiDias && fechasEvento.length > 0) {
+      const primera = fechasEvento[0];
+      const ultima = fechasEvento[fechasEvento.length - 1];
+      // Entrega = día anterior a la primera fecha
+      if (!fechaEntrega && primera) {
+        const base = new Date(primera + "T12:00:00");
+        base.setDate(base.getDate() - 1);
+        setFechaEntrega(base.toISOString().slice(0, 10));
+      }
+      // Devolución = día siguiente a la última fecha
+      if (!fechaDevolucion && ultima) {
+        const base = new Date(ultima + "T12:00:00");
+        base.setDate(base.getDate() + 1);
+        setFechaDevolucion(base.toISOString().slice(0, 10));
+      }
+    } else {
+      sugerirFechas(fechaEvento);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fechaEvento, fechasEvento, multiDias, tipoDocumento]);
 
     // 🧮 Helpers de cálculo
   const calcularSubtotal = (item) => {
@@ -860,6 +912,11 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
     abonos,
     // 🔧 CORREGIDO: pagos_proveedores solo existe en ordenes_pedido, NO en cotizaciones
     ...(tipoDocumento !== "cotizacion" && { pagos_proveedores: pagosProveedores }),
+    // 🆕 Fechas de entrega y devolución (solo órdenes)
+    ...(tipoDocumento !== "cotizacion" && {
+      fecha_entrega: fechaEntrega || null,
+      fecha_devolucion: fechaDevolucion || null,
+    }),
     garantia: parseFloat(garantia || 0),
     garantia_recibida: !!garantiaRecibida,
     fecha_garantia: fechaGarantia || null,
@@ -1107,6 +1164,8 @@ if (tipoDocumento !== "cotizacion" && pagosProveedores && pagosProveedores.lengt
       fechas_evento: multiDias ? fechasEvento : [],
       numero_dias: numeroDias,
       fecha_evento: multiDias ? (fechasEvento[0] || null) : (fechaEvento || null),
+      fecha_entrega: fechaEntrega || null,
+      fecha_devolucion: fechaDevolucion || null,
 mostrar_notas: mostrarNotas
 });
 
@@ -1242,6 +1301,30 @@ mostrar_notas: mostrarNotas
                   </div>
                 )}
               </div>
+
+              {/* 🆕 Fechas de entrega y devolución (solo para órdenes de pedido) */}
+              {tipoDocumento !== "cotizacion" && (
+                <div className="cd-fechas-grid" style={{ marginTop: 12 }}>
+                  <div className="cd-campo">
+                    <label>📦 Fecha de entrega</label>
+                    <input
+                      type="date"
+                      value={fechaEntrega}
+                      onChange={(e) => setFechaEntrega(e.target.value)}
+                      title="Día en que se entrega la mercancía al cliente (opcional)"
+                    />
+                  </div>
+                  <div className="cd-campo">
+                    <label>📥 Fecha de devolución</label>
+                    <input
+                      type="date"
+                      value={fechaDevolucion}
+                      onChange={(e) => setFechaDevolucion(e.target.value)}
+                      title="Día en que el cliente debe devolver la mercancía (opcional)"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1658,6 +1741,7 @@ mostrar_notas: mostrarNotas
                 setFechaEvento("");
                 setFechasEvento([]);
                 setMultiDias(false);
+                setFechaEntrega(""); setFechaDevolucion("");
                 setAplicarDescuento(false); setDescuento("");
                 setAplicarRetencion(false); setRetencion("");
                 setGarantiaRecibida(false); setFechaGarantia("");

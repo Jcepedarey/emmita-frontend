@@ -1,4 +1,4 @@
-  import { jsPDF } from "jspdf";
+import { jsPDF } from "jspdf";
   import autoTable from "jspdf-autotable";
   import { generarNombreArchivo } from "./nombrePDF";
   import { obtenerDatosTenantPDF } from "./tenantPDF";
@@ -271,6 +271,22 @@ autoTable(doc, {
   const pageH = doc.internal.pageSize.height;
   const firmasAlto = 30; // alto estimado del bloque de firmas
   let yFirmas = (doc.lastAutoTable?.finalY || 90) + 16;
+
+  // 🆕 Nota de fechas de entrega y devolución
+  const fEntrega = documento.fecha_entrega ? soloFecha(documento.fecha_entrega) : null;
+  const fDevolucion = documento.fecha_devolucion ? soloFecha(documento.fecha_devolucion) : null;
+
+  if (fEntrega || fDevolucion) {
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128);
+    const partes = [];
+    if (fEntrega) partes.push(`Entrega: ${fEntrega}`);
+    if (fDevolucion) partes.push(`Devolución: ${fDevolucion}`);
+    doc.text(partes.join("  ·  "), 10, yFirmas);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    yFirmas += 12;
+  }
 
   // Si no caben en esta hoja, saltamos de página
   if (yFirmas + firmasAlto > pageH - 10) {
