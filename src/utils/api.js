@@ -27,9 +27,10 @@ export const fetchAPI = async (url, options = {}) => {
 
   if (!response.ok) {
     if (response.status === 401) {
-      // Token expirado, redirigir a login
+      // Token expirado, limpiar TODO y redirigir a login
       localStorage.removeItem('usuario');
       localStorage.removeItem('sesion');
+      await supabase.auth.signOut(); // ✅ NUEVO: Forzar cierre en Supabase
       window.location.href = '/login';
     }
     throw new Error(`HTTP error! status: ${response.status}`);

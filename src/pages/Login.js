@@ -1,5 +1,5 @@
 // src/pages/Login.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import supabase from "../supabaseClient";
@@ -14,6 +14,16 @@ export default function Login() {
   const navigate = useNavigate();
   
   const { recargar } = useTenant();
+
+  // ✅ NUEVO: Limpiar cualquier sesión "pegada" en la PWA apenas carga la pantalla
+  useEffect(() => {
+    const limpiarSesionFantasma = async () => {
+      localStorage.removeItem("usuario");
+      localStorage.removeItem("sesion");
+      await supabase.auth.signOut(); // Fuerza el cierre en Supabase
+    };
+    limpiarSesionFantasma();
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -72,13 +82,13 @@ export default function Login() {
 
     if (!emailRecuperar) return;
 
-    // ✅ NUEVO: Validar que el CAPTCHA esté completado antes de enviar la petición
+    // Validar que el CAPTCHA esté completado antes de enviar la petición
     if (!captchaToken) {
       return Swal.fire("Verificación requerida", "Completa primero la verificación de seguridad (abajo) y luego intenta recuperar tu contraseña", "info");
     }
 
     try {
-      // ✅ NUEVO: Enviar el captchaToken a Supabase
+      // Enviar el captchaToken a Supabase
       const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperar, {
         redirectTo: `${window.location.origin}/reset-password`,
         captchaToken,
@@ -135,7 +145,7 @@ export default function Login() {
         style={{ padding: "10px", marginBottom: "10px", width: "250px" }}
       /><br />
 
-      {/* ✅ Enlace de recuperar contraseña */}
+      {/* Enlace de recuperar contraseña */}
       <p style={{ margin: "0 0 16px 0", fontSize: 13 }}>
         <span
           onClick={handleRecuperarPassword}
@@ -164,7 +174,7 @@ export default function Login() {
         </Link>
       </p>
 
-      {/* ✅ CAPTCHA Cloudflare Turnstile */}
+      {/* CAPTCHA Cloudflare Turnstile */}
       <div style={{ display: "inline-block", marginTop: 8 }}>
         <Turnstile
           sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
