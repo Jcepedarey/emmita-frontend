@@ -22,10 +22,13 @@ const Recepcion = () => {
   const [garantiaRetenida, setGarantiaRetenida] = useState("");  // monto retenido por daños/demora
 
   // Pagos a proveedores
-const [pagosProveedoresRecepcion, setPagosProveedoresRecepcion] = useState([]);
+  const [pagosProveedoresRecepcion, setPagosProveedoresRecepcion] = useState([]);
 
   // 🔒 Protección contra doble clic
   const [guardando, setGuardando] = useState(false);
+
+  // ✅ Checkboxes de artículos devueltos
+  const [articulosDevueltos, setArticulosDevueltos] = useState([]);
 
   const queryParams = new URLSearchParams(location.search);
   const ordenId = queryParams.get("id");
@@ -40,7 +43,7 @@ const [pagosProveedoresRecepcion, setPagosProveedoresRecepcion] = useState([]);
       if (ordenId) {
         const { data, error } = await supabase
           .from("ordenes_pedido")
-          .select("*, clientes(*), productos, abonos")
+          .select("*, clientes(*), productos, abonos, fecha_entrega, fecha_devolucion, mercancia_devuelta, articulos_devueltos, gastos_extras_recepcion, abonos_recepcion")
           .eq("id", ordenId)
           .single();
 
@@ -55,7 +58,7 @@ const [pagosProveedoresRecepcion, setPagosProveedoresRecepcion] = useState([]);
         const hoy = new Date().toISOString().split("T")[0];
         const { data, error } = await supabase
           .from("ordenes_pedido")
-          .select("*, clientes(*)")
+          .select("*, clientes(*), fecha_entrega, fecha_devolucion, mercancia_devuelta, articulos_devueltos")
           .eq("revisada", false)
           .lt("fecha_evento", hoy)
           .order("fecha_evento", { ascending: true });
@@ -79,16 +82,16 @@ const [pagosProveedoresRecepcion, setPagosProveedoresRecepcion] = useState([]);
     orden.productos.forEach((p) => {
       if (p.es_grupo && Array.isArray(p.productos)) {
         const cantidadGrupo = Number(p.cantidad || 1);
-        
+
         p.productos.forEach((sub) => {
           const cantidadSub = Number(sub.cantidad || 0);
           const multiplicarSub = sub.multiplicar !== false; // por defecto true
-          
+
           // ✅ Calcular cantidad esperada según checkbox
-          const cantidadEsperada = multiplicarSub 
-            ? cantidadSub * cantidadGrupo 
+          const cantidadEsperada = multiplicarSub
+            ? cantidadSub * cantidadGrupo
             : cantidadSub;
-          
+
           productosConCampo.push({
             nombre: sub.nombre,
             esperado: cantidadEsperada,
@@ -116,7 +119,61 @@ const [pagosProveedoresRecepcion, setPagosProveedoresRecepcion] = useState([]);
 
     setProductosRevisados(productosConCampo);
     setDanos(productosConCampo.map(() => ({ monto: 0 })));
+
+    // ✅ Precargar artículos devueltos desde guardado parcial anterior
+    const devueltosGuardados = orden.articulos_devueltos || [];
+    const devueltosInicial = productosConCampo.map((p) => {
+      const guardado = devueltosGuardados.find((d) => d.nombre === p.nombre);
+      return { nombre: p.nombre, devuelto: guardado ? guardado.devuelto : false };
+    });
+    setArticulosDevueltos(devueltosInicial);
+
+    // ✅ Precargar gastos extras si había guardado parcial
+    if (orden.gastos_extras_recepcion && orden.gastos_extras_recepcion.length > 0) {
+      setGastosExtras(orden.gastos_extras_recepcion);
+    } else {
+      setGastosExtras([{ motivo: "", valor: "" }]);
+    }
+
+    // ✅ Precargar abonos de recepción si había guardado parcial
+    if (orden.abonos_recepcion && orden.abonos_recepcion.length > 0) {
+      setIngresosAdicionales(orden.abonos_recepcion);
+    } else {
+      setIngresosAdicionales([]);
+    }
+
+    // ✅ Precargar garantía retenida
+    if (orden.garantia !== undefined && orden.garantia_devuelta !== undefined) {
+      const retenida = Number(orden.garantia || 0) - Number(orden.garantia_devuelta || 0);
+      if (retenida > 0) setGarantiaRetenida(String(retenida));
+      else setGarantiaRetenida("");
+    } else {
+      setGarantiaRetenida("");
+    }
+
+    // ✅ Precargar comentario
+    if (orden.comentario_revision) {
+      setComentarioGeneral(orden.comentario_revision);
+    } else {
+      setComentarioGeneral("");
+    }
   };
+
+  // ✅ Toggle devuelto individual
+  const toggleDevuelto = (index, valor) => {
+    const copia = [...articulosDevueltos];
+    copia[index] = { ...copia[index], devuelto: valor };
+    setArticulosDevueltos(copia);
+  };
+
+  // ✅ Toggle todos los artículos devueltos
+  const toggleTodos = (checked) => {
+    setArticulosDevueltos(articulosDevueltos.map((a) => ({ ...a, devuelto: checked })));
+  };
+
+  // ✅ Computed: ¿todos los artículos están devueltos?
+  const todosDevueltos = articulosDevueltos.length > 0 && articulosDevueltos.every((a) => a.devuelto);
+  const algunoDevuelto = articulosDevueltos.some((a) => a.devuelto);
 
   // Extraer información de proveedores desde los productos
 const extraerInfoProveedores = (productos) => {
@@ -243,186 +300,329 @@ useEffect(() => {
     }
   };
 
-  const guardarRevision = async () => {
-  if (!ordenSeleccionada) {
-    Swal.fire("Error", "No hay una orden cargada para revisar", "error");
-    return;
-  }
+  // 🛡️ Anti-duplicados: borrar y re-insertar MC por categorías
+  const limpiarYReinsertarMC = async (orden_id, categorias, insertar) => {
+    for (const cat of categorias) {
+      await supabase
+        .from("movimientos_contables")
+        .delete()
+        .eq("orden_id", orden_id)
+        .eq("categoria", cat);
+    }
+    await insertar();
+  };
 
-  // 🔒 Protección contra doble clic
-  if (guardando) {
-    console.log("⚠️ Ya se está guardando, ignorando clic adicional");
-    return;
-  }
-  setGuardando(true);
+  // 🔧 Función central de guardado (parcial o definitivo)
+  const guardarEstado = async (cerrar = false) => {
+    if (!ordenSeleccionada) {
+      Swal.fire("Error", "No hay una orden cargada para revisar", "error");
+      return;
+    }
 
-  try {
-    // ✅ Cerrar y marcar como revisada EN UNA SOLA OPERACIÓN
-    await supabase
-      .from("ordenes_pedido")
-      .update({ 
-        cerrada: true,
-        revisada: true,
-        comentario_revision: comentarioGeneral 
-      })
-      .eq("id", ordenSeleccionada.id);
+    if (guardando) {
+      console.log("⚠️ Ya se está guardando, ignorando clic adicional");
+      return;
+    }
+    setGuardando(true);
 
-    // 1️⃣ Descontar stock por diferencia esperada vs recibida
-      for (const item of productosRevisados) {
-        const diferencia = item.esperado - item.recibido;
-        if (diferencia > 0 && item.producto_id) {
-          await supabase.rpc("descontar_stock", {
-            producto_id: item.producto_id,
-            cantidad: diferencia,
-          });
-        }
-      }
-
-      // 3️⃣ Registrar movimientos contables
-      await registrarContabilidadPorPedido(
-  ordenSeleccionada,
-  productosRevisados.map((p, i) => ({
-    nombre: p.nombre,
-    monto: parseInt(danos[i]?.monto || 0),
-    tipo: p.tipo_origen,
-  })),
-  usuario
-);
-
-      // ✅ Calcular ingresos
-
-
+    try {
       const numeroOP = String(ordenSeleccionada.numero || "");
       const numeroLimpio = numeroOP.startsWith("OP-") ? numeroOP : `OP-${numeroOP}`;
+      const fechaHoy = new Date().toISOString().split("T")[0];
 
-      // ✅ Guardar los gastos adicionales ingresados manualmente
-      for (const gasto of gastosExtras) {
-        const valorNumerico = Number(gasto.valor);
-        if (gasto.motivo && valorNumerico > 0) {
-          await insertMC(
-            {
-              orden_id: ordenSeleccionada.id,
-              cliente_id: ordenSeleccionada.cliente_id,
-              fecha: new Date().toISOString().split("T")[0],
-              tipo: "gasto",
-              monto: valorNumerico,
-              descripcion: `[${numeroLimpio}] ${gasto.motivo}`,
-              categoria: "Gasto adicional (manual)",
-              estado: "activo",
-              usuario: usuario?.nombre || "Administrador",
-              fecha_modificacion: null,
-            },
-            "gasto adicional"
-          );
+      // ✅ Calcular mercancia_devuelta automáticamente
+      const mercanciaDevuelta = todosDevueltos;
+
+      // 1️⃣ Guardar estado base en la orden (siempre)
+      const updateData = {
+        comentario_revision: comentarioGeneral,
+        productos_revisados: productosRevisados,
+        articulos_devueltos: articulosDevueltos,
+        mercancia_devuelta: mercanciaDevuelta,
+        gastos_extras_recepcion: gastosExtras.filter((g) => g.motivo && Number(g.valor) > 0),
+        abonos_recepcion: ingresosAdicionales.filter((a) => Number(a.valor) > 0),
+      };
+
+      if (cerrar) {
+        updateData.revisada = true;
+        updateData.cerrada = true;
+      }
+
+      await supabase
+        .from("ordenes_pedido")
+        .update(updateData)
+        .eq("id", ordenSeleccionada.id);
+
+      // 2️⃣ Descontar stock (solo al cerrar definitivamente)
+      if (cerrar) {
+        for (const item of productosRevisados) {
+          const diferencia = item.esperado - item.recibido;
+          if (diferencia > 0 && item.producto_id) {
+            await supabase.rpc("descontar_stock", {
+              producto_id: item.producto_id,
+              cantidad: diferencia,
+            });
+          }
         }
       }
 
-      // 🆕 Guardar ingresos adicionales (abonos en recepción)
-      for (const ingreso of ingresosAdicionales) {
-        const valorNumerico = Number(ingreso.valor);
-        if (valorNumerico > 0) {
-          await insertMC(
-            {
-              orden_id: ordenSeleccionada.id,
-              cliente_id: ordenSeleccionada.cliente_id,
-              fecha: ingreso.fecha || new Date().toISOString().split("T")[0],
-              tipo: "ingreso",
-              monto: valorNumerico,
-              descripcion: `[${numeroLimpio}] Abono recibido en recepción`,
-              categoria: "Abonos",
-              estado: "activo",
-              usuario: usuario?.nombre || "Administrador",
-              fecha_modificacion: null,
-            },
-            "ingreso adicional"
-          );
+      // 3️⃣ Daños — limpiar y re-insertar (anti-duplicados)
+      await limpiarYReinsertarMC(
+        ordenSeleccionada.id,
+        ["Daños proveedor", "Daños propios"],
+        async () => {
+          for (let i = 0; i < productosRevisados.length; i++) {
+            const p = productosRevisados[i];
+            const monto = parseFloat(danos[i]?.monto || 0);
+            if (monto > 0) {
+              const cat = p.tipo_origen === "proveedor" ? "Daños proveedor" : "Daños propios";
+              const desc =
+                p.tipo_origen === "proveedor"
+                  ? `[${numeroLimpio}] Daño en producto del proveedor: ${p.nombre}`
+                  : `[${numeroLimpio}] Daño en producto propio: ${p.nombre}`;
+              await insertMC(
+                {
+                  orden_id: ordenSeleccionada.id,
+                  cliente_id: ordenSeleccionada.cliente_id,
+                  fecha: fechaHoy,
+                  tipo: "gasto",
+                  monto: Math.abs(monto),
+                  descripcion: desc,
+                  categoria: cat,
+                  estado: "activo",
+                  usuario: usuario?.nombre || "Administrador",
+                  fecha_modificacion: null,
+                },
+                "daño"
+              );
+            }
+          }
         }
+      );
+
+      // 4️⃣ Descuentos y retenciones — solo al cerrar (son datos estáticos de la orden)
+      if (cerrar) {
+        await limpiarYReinsertarMC(
+          ordenSeleccionada.id,
+          ["Descuentos"],
+          async () => {
+            if (ordenSeleccionada.descuento && Number(ordenSeleccionada.descuento) > 0) {
+              await insertMC(
+                {
+                  orden_id: ordenSeleccionada.id,
+                  cliente_id: ordenSeleccionada.cliente_id,
+                  fecha: fechaHoy,
+                  tipo: "gasto",
+                  monto: Number(ordenSeleccionada.descuento),
+                  descripcion: `[${numeroLimpio}] Descuento aplicado`,
+                  categoria: "Descuentos",
+                  estado: "activo",
+                  usuario: usuario?.nombre || "Administrador",
+                  fecha_modificacion: null,
+                },
+                "descuento"
+              );
+            }
+          }
+        );
+
+        await limpiarYReinsertarMC(
+          ordenSeleccionada.id,
+          ["Retenciones"],
+          async () => {
+            if (ordenSeleccionada.retencion && Number(ordenSeleccionada.retencion) > 0) {
+              await insertMC(
+                {
+                  orden_id: ordenSeleccionada.id,
+                  cliente_id: ordenSeleccionada.cliente_id,
+                  fecha: fechaHoy,
+                  tipo: "gasto",
+                  monto: Number(ordenSeleccionada.retencion),
+                  descripcion: `[${numeroLimpio}] Retención legal`,
+                  categoria: "Retenciones",
+                  estado: "activo",
+                  usuario: usuario?.nombre || "Administrador",
+                  fecha_modificacion: null,
+                },
+                "retención"
+              );
+            }
+          }
+        );
       }
 
-      // 🛡️ Registrar garantía retenida como INGRESO
+      // 5️⃣ Gastos adicionales — limpiar y re-insertar (anti-duplicados)
+      await limpiarYReinsertarMC(
+        ordenSeleccionada.id,
+        ["Gasto adicional (manual)"],
+        async () => {
+          for (const gasto of gastosExtras) {
+            const valorNumerico = Number(gasto.valor);
+            if (gasto.motivo && valorNumerico > 0) {
+              await insertMC(
+                {
+                  orden_id: ordenSeleccionada.id,
+                  cliente_id: ordenSeleccionada.cliente_id,
+                  fecha: fechaHoy,
+                  tipo: "gasto",
+                  monto: valorNumerico,
+                  descripcion: `[${numeroLimpio}] ${gasto.motivo}`,
+                  categoria: "Gasto adicional (manual)",
+                  estado: "activo",
+                  usuario: usuario?.nombre || "Administrador",
+                  fecha_modificacion: null,
+                },
+                "gasto adicional"
+              );
+            }
+          }
+        }
+      );
+
+      // 6️⃣ Abonos (ingresos adicionales) — leer frescos de BD y re-insertar
+      await limpiarYReinsertarMC(
+        ordenSeleccionada.id,
+        ["Abonos"],
+        async () => {
+          for (const ingreso of ingresosAdicionales) {
+            const valorNumerico = Number(ingreso.valor);
+            if (valorNumerico > 0) {
+              await insertMC(
+                {
+                  orden_id: ordenSeleccionada.id,
+                  cliente_id: ordenSeleccionada.cliente_id,
+                  fecha: ingreso.fecha || fechaHoy,
+                  tipo: "ingreso",
+                  monto: valorNumerico,
+                  descripcion: `[${numeroLimpio}] Abono recibido en recepción`,
+                  categoria: "Abonos",
+                  estado: "activo",
+                  usuario: usuario?.nombre || "Administrador",
+                  fecha_modificacion: null,
+                },
+                "ingreso adicional"
+              );
+            }
+          }
+        }
+      );
+
+      // 7️⃣ Garantía retenida — limpiar y re-insertar
       const valorGarantiaRetenida = Number(garantiaRetenida || 0);
       const garantiaTotal = Number(ordenSeleccionada.garantia || 0);
       const garantiaDevuelta = Math.max(0, garantiaTotal - valorGarantiaRetenida);
 
-      if (valorGarantiaRetenida > 0) {
-        await insertMC(
-          {
-            orden_id: ordenSeleccionada.id,
-            cliente_id: ordenSeleccionada.cliente_id,
-            fecha: new Date().toISOString().split("T")[0],
-            tipo: "ingreso",
-            monto: valorGarantiaRetenida,
-            descripcion: `[${numeroLimpio}] Garantía retenida por daños/demora`,
-            categoria: "Garantía retenida",
-            estado: "activo",
-            usuario: usuario?.nombre || "Administrador",
-            fecha_modificacion: null,
-          },
-          "garantía retenida"
-        );
-      }
+      await limpiarYReinsertarMC(
+        ordenSeleccionada.id,
+        ["Garantía retenida"],
+        async () => {
+          if (valorGarantiaRetenida > 0) {
+            await insertMC(
+              {
+                orden_id: ordenSeleccionada.id,
+                cliente_id: ordenSeleccionada.cliente_id,
+                fecha: fechaHoy,
+                tipo: "ingreso",
+                monto: valorGarantiaRetenida,
+                descripcion: `[${numeroLimpio}] Garantía retenida por daños/demora`,
+                categoria: "Garantía retenida",
+                estado: "activo",
+                usuario: usuario?.nombre || "Administrador",
+                fecha_modificacion: null,
+              },
+              "garantía retenida"
+            );
+          }
+        }
+      );
 
       // 💾 Guardar info de garantía en la orden
       if (garantiaTotal > 0) {
         await supabase
           .from("ordenes_pedido")
-          .update({
-            garantia_devuelta: garantiaDevuelta,
-          })
+          .update({ garantia_devuelta: garantiaDevuelta })
           .eq("id", ordenSeleccionada.id);
       }
 
-      // 🆕 Registrar pagos a proveedores realizados en recepción
-for (const pago of pagosProveedoresRecepcion) {
-  const valorAbono = Number(pago.abono_recepcion || 0);
-  if (valorAbono > 0) {
-    await insertMC(
-      {
-        orden_id: ordenSeleccionada.id,
-        cliente_id: null,
-        fecha: pago.fecha_abono_recepcion || new Date().toISOString().split("T")[0],
-        tipo: "gasto",
-        monto: valorAbono,
-        descripcion: `[${numeroLimpio}] Pago a proveedor: ${pago.proveedor_nombre}`,
-        categoria: "Pagos a proveedores",
-        estado: "activo",
-        usuario: usuario?.nombre || "Administrador",
-        fecha_modificacion: null,
-      },
-      "pago proveedor recepción"
-    );
+      // 8️⃣ Pagos a proveedores — leer frescos de BD (anti-duplicados)
+      const { data: ordenFresca } = await supabase
+        .from("ordenes_pedido")
+        .select("pagos_proveedores")
+        .eq("id", ordenSeleccionada.id)
+        .single();
 
-    // Actualizar los pagos en la orden
-    const abonosActualizados = [
-      ...(pago.abonos_previos || []),
-      { valor: valorAbono, fecha: pago.fecha_abono_recepcion },
-    ];
+      const pagosActuales = ordenFresca?.pagos_proveedores || [];
 
-    // Actualizar pagos_proveedores en la orden
-    const pagosActuales = ordenSeleccionada.pagos_proveedores || [];
-    const indexPago = pagosActuales.findIndex(
-      (p) => p.proveedor_nombre === pago.proveedor_nombre
-    );
+      await limpiarYReinsertarMC(
+        ordenSeleccionada.id,
+        ["Pagos a proveedores"],
+        async () => {
+          for (const pago of pagosProveedoresRecepcion) {
+            const valorAbono = Number(pago.abono_recepcion || 0);
+            if (valorAbono > 0) {
+              await insertMC(
+                {
+                  orden_id: ordenSeleccionada.id,
+                  cliente_id: null,
+                  fecha: pago.fecha_abono_recepcion || fechaHoy,
+                  tipo: "gasto",
+                  monto: valorAbono,
+                  descripcion: `[${numeroLimpio}] Pago a proveedor: ${pago.proveedor_nombre}`,
+                  categoria: "Pagos a proveedores",
+                  estado: "activo",
+                  usuario: usuario?.nombre || "Administrador",
+                  fecha_modificacion: null,
+                },
+                "pago proveedor recepción"
+              );
+            }
+          }
+        }
+      );
 
-    if (indexPago >= 0) {
-      pagosActuales[indexPago].abonos = abonosActualizados;
-    } else {
-      pagosActuales.push({
-        proveedor_nombre: pago.proveedor_nombre,
-        proveedor_id: pago.proveedor_id,
-        total: pago.total,
-        abonos: abonosActualizados,
-      });
-    }
+      // Actualizar pagos_proveedores en la orden
+      const pagosActualizados = [...pagosActuales];
+      for (const pago of pagosProveedoresRecepcion) {
+        const valorAbono = Number(pago.abono_recepcion || 0);
+        if (valorAbono > 0) {
+          const abonosActualizados = [
+            ...(pago.abonos_previos || []),
+            { valor: valorAbono, fecha: pago.fecha_abono_recepcion },
+          ];
+          const indexPago = pagosActualizados.findIndex(
+            (p) => p.proveedor_nombre === pago.proveedor_nombre
+          );
+          if (indexPago >= 0) {
+            pagosActualizados[indexPago].abonos = abonosActualizados;
+          } else {
+            pagosActualizados.push({
+              proveedor_nombre: pago.proveedor_nombre,
+              proveedor_id: pago.proveedor_id,
+              total: pago.total,
+              abonos: abonosActualizados,
+            });
+          }
+        }
+      }
 
-    await supabase
-      .from("ordenes_pedido")
-      .update({ pagos_proveedores: pagosActuales })
-      .eq("id", ordenSeleccionada.id);
-  }
-}
+      if (pagosActualizados.length > 0) {
+        await supabase
+          .from("ordenes_pedido")
+          .update({ pagos_proveedores: pagosActualizados })
+          .eq("id", ordenSeleccionada.id);
+      }
 
-      Swal.fire("✅ Revisión guardada", "La recepción se ha registrado correctamente.", "success");
+      if (cerrar) {
+        Swal.fire("✅ Recepción cerrada", "La recepción se cerró y registró correctamente.", "success");
+      } else {
+        Swal.fire({
+          title: "💾 Guardado parcial exitoso",
+          text: "El estado fue guardado. Puedes seguir editando.",
+          icon: "success",
+          timer: 2500,
+          showConfirmButton: false,
+        });
+      }
     } catch (error) {
       console.error("❌ Error general:", error);
       Swal.fire("Error", "Hubo un problema al guardar la revisión", "error");
@@ -431,6 +631,29 @@ for (const pago of pagosProveedoresRecepcion) {
       setGuardando(false);
     }
   };
+
+  // 💾 Guardado parcial (sin marcar como cerrada/revisada)
+  const guardarParcial = () => guardarEstado(false);
+
+  // ✅ Cerrar recepción definitivamente
+  const cerrarRecepcion = async () => {
+    const confirm = await Swal.fire({
+      title: "¿Cerrar definitivamente esta recepción?",
+      text: "Una vez cerrada no se puede reabrir fácilmente.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#16a34a",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Sí, cerrar",
+      cancelButtonText: "Cancelar",
+    });
+    if (confirm.isConfirmed) {
+      guardarEstado(true);
+    }
+  };
+
+  // 🔁 Mantener guardarRevision por compatibilidad (ya no se usa en la UI)
+  const guardarRevision = () => guardarEstado(true);
 
   const registrarContabilidadPorPedido = async (
   orden,
@@ -588,6 +811,23 @@ for (const pago of pagosProveedoresRecepcion) {
                         <th>Recibido</th>
                         <th>Daño ($)</th>
                         <th>Observación</th>
+                        <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                            <span>Devuelto</span>
+                            <label style={{ display: "flex", alignItems: "center", gap: "4px", fontWeight: 400, fontSize: "11px", color: "#6b7280", cursor: "pointer" }}>
+                              <input
+                                type="checkbox"
+                                checked={todosDevueltos}
+                                ref={(el) => {
+                                  if (el) el.indeterminate = algunoDevuelto && !todosDevueltos;
+                                }}
+                                onChange={(e) => toggleTodos(e.target.checked)}
+                                style={{ cursor: "pointer" }}
+                              />
+                              Todos
+                            </label>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -628,11 +868,39 @@ for (const pago of pagosProveedoresRecepcion) {
                               style={{ width: "100%", padding: "6px", border: "1px solid #e5e7eb", borderRadius: "6px" }}
                             />
                           </td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={articulosDevueltos[index]?.devuelto || false}
+                              onChange={(e) => toggleDevuelto(index, e.target.checked)}
+                              style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#16a34a" }}
+                            />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Indicador de mercancia devuelta */}
+                {articulosDevueltos.length > 0 && (
+                  <div style={{
+                    padding: "8px 16px",
+                    background: todosDevueltos ? "#f0fdf4" : algunoDevuelto ? "#fffbeb" : "#f9fafb",
+                    borderTop: "1px solid #e5e7eb",
+                    fontSize: "13px",
+                    color: todosDevueltos ? "#166534" : algunoDevuelto ? "#92400e" : "#6b7280",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}>
+                    {todosDevueltos
+                      ? "✅ Toda la mercancía marcada como devuelta"
+                      : algunoDevuelto
+                      ? `⚠️ ${articulosDevueltos.filter((a) => a.devuelto).length} de ${articulosDevueltos.length} artículos devueltos`
+                      : "⬜ Ningún artículo marcado como devuelto aún"}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -939,14 +1207,25 @@ for (const pago of pagosProveedoresRecepcion) {
 
             {/* ========== BOTONES FINALES ========== */}
             <div className="cd-botones-finales">
+              {/* 💾 Guardar Parcial */}
               <button
-                onClick={guardarRevision}
+                onClick={guardarParcial}
+                disabled={guardando}
+                className={`cd-btn ${guardando ? "cd-btn-disabled" : "cd-btn-azul"}`}
+              >
+                {guardando ? "⏳ Guardando..." : "💾 Guardar Parcial"}
+              </button>
+
+              {/* ✅ Cerrar Recepción */}
+              <button
+                onClick={cerrarRecepcion}
                 disabled={guardando}
                 className={`cd-btn ${guardando ? "cd-btn-disabled" : "cd-btn-verde"}`}
               >
-                {guardando ? "⏳ Guardando..." : "💾 Guardar Revisión"}
+                {guardando ? "⏳ Cerrando..." : "✅ Cerrar Recepción"}
               </button>
 
+              {/* 🧾 Descargar PDF */}
               <button
                 className="cd-btn cd-btn-gris"
                 onClick={() => {
