@@ -234,7 +234,7 @@ const Inicio = () => {
     fetch();
   }, [busqProd]);
 
-  // ───────────────────── Calcular stock por fecha ─────────────────────
+  // ───────────────────── Calcular stock por fecha (rango entrega–devolución) ─────────────────────
   const calcularStockParaFecha = async (productoId, fechaISO) => {
     setCargandoStock(true);
     try {
@@ -245,28 +245,43 @@ const Inicio = () => {
         .single();
       const stockBase = parseInt(prod?.stock ?? 0, 10);
 
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      const fechaHoy = hoy.toISOString().split('T')[0];
-
+      // Sin filtro de fecha: usamos rango entrega–devolución igual que CrearDocumento
       const { data: ords } = await supabase
         .from("ordenes_pedido")
-        .select("productos, fecha_evento, fechas_evento, cerrada")
-        .eq("cerrada", false)
-        .gte("fecha_evento", fechaHoy);
+        .select("productos, fecha_evento, fechas_evento, fecha_entrega, fecha_devolucion, cerrada")
+        .eq("cerrada", false);
 
       const ordenes = ords || [];
       const fecha = String(fechaISO).slice(0, 10);
 
       let reservado = 0;
-      
+
       ordenes.forEach((o) => {
-        const dias = new Set([
+        // Calcular último día del evento (para fallback de devolución)
+        const diasEvento = [
           ...(o.fecha_evento ? [String(o.fecha_evento).slice(0, 10)] : []),
           ...((o.fechas_evento || []).map((d) => String(d).slice(0, 10))),
-        ]);
-        
-        if (!dias.has(fecha)) return;
+        ].sort();
+        const ultimoDiaEvento = diasEvento[diasEvento.length - 1];
+        if (!ultimoDiaEvento) return;
+
+        // entrega = fecha_entrega || fecha_evento (fallback)
+        const entrega = o.fecha_entrega
+          ? String(o.fecha_entrega).slice(0, 10)
+          : String(o.fecha_evento).slice(0, 10);
+
+        // devolucion = fecha_devolucion || día siguiente al último día del evento
+        let devolucion;
+        if (o.fecha_devolucion) {
+          devolucion = String(o.fecha_devolucion).slice(0, 10);
+        } else {
+          const d = new Date(ultimoDiaEvento + "T12:00:00");
+          d.setDate(d.getDate() + 1);
+          devolucion = d.toISOString().slice(0, 10);
+        }
+
+        // La orden ocupa stock si la fecha consultada está dentro del rango [entrega, devolucion]
+        if (fecha < entrega || fecha > devolucion) return;
 
         (o.productos || []).forEach((p) => {
           if (p.es_grupo && Array.isArray(p.productos)) {
