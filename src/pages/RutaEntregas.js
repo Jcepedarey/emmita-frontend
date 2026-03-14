@@ -1,8 +1,7 @@
 // src/pages/RutaEntregas.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { obtenerDatosTenantPDF } from "../utils/tenantPDF";
 import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
@@ -12,7 +11,6 @@ import "../estilos/CrearDocumentoEstilo.css";
 
 const hoyISO = () => new Date().toISOString().split("T")[0];
 
-// 🖼️ Igual que en generarRemision.js
 const procesarImagen = (src, width = 150, calidad = 1.0) =>
   new Promise((resolve) => {
     const img = new Image();
@@ -43,6 +41,8 @@ export default function RutaEntregas() {
   const [ruta, setRuta] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [notasRuta, setNotasRuta] = useState({});
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const checkboxMaestroRef = useRef(null);
 
   // Cargar órdenes no cerradas una sola vez
   useEffect(() => {
@@ -71,7 +71,6 @@ export default function RutaEntregas() {
       return;
     }
     const filtradas = todasOrdenes.filter((o) => {
-      // Usar fecha_entrega como día de entrega; fallback a fecha_evento
       const diaEntrega = o.fecha_entrega
         ? String(o.fecha_entrega).slice(0, 10)
         : o.fecha_evento
@@ -81,6 +80,32 @@ export default function RutaEntregas() {
     });
     setRuta(filtradas);
   }, [fecha, todasOrdenes]);
+
+  // Seleccionar todos al cargar/cambiar ruta
+  useEffect(() => {
+    setSeleccionados(new Set(ruta.map((o) => o.id)));
+  }, [ruta]);
+
+  // Estado indeterminate del checkbox maestro
+  useEffect(() => {
+    if (checkboxMaestroRef.current) {
+      checkboxMaestroRef.current.indeterminate =
+        seleccionados.size > 0 && seleccionados.size < ruta.length;
+    }
+  }, [seleccionados, ruta]);
+
+  // ──────────────── Selección ────────────────
+  const toggleSeleccion = (id) =>
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleTodos = () =>
+    seleccionados.size === ruta.length
+      ? setSeleccionados(new Set())
+      : setSeleccionados(new Set(ruta.map((o) => o.id)));
 
   // ──────────────── Orden drag (botones ▲ ▼) ────────────────
   const mover = (index, direccion) => {
@@ -146,105 +171,189 @@ export default function RutaEntregas() {
     });
   };
 
-  // ──────────────── Exportar PDF de ruta ────────────────
+  // ──────────────── Exportar PDF de ruta (tarjetas) ────────────────
   const exportarPDFRuta = async () => {
+    const pedidos = ruta.filter((o) => seleccionados.has(o.id));
+    if (pedidos.length === 0) return;
+
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-    const CYAN = [0, 180, 216];
-    const GRIS = [100, 100, 100];
-    const NEGRO = [30, 30, 30];
+    const PAGE_W = doc.internal.pageSize.getWidth();
+    const PAGE_H = doc.internal.pageSize.getHeight();
+    const MARGIN = 14;
+    const CARD_W = PAGE_W - MARGIN * 2;
+    const CARD_GAP = 4;
+    const FOOTER_RESERVE = 22;
 
-    // 1️⃣ Cargar datos de empresa (mismo patrón que generarRemision.js)
+    const CYAN_RGB = [0, 180, 216];
+    const NEGRO_RGB = [30, 30, 30];
+    const GRIS_RGB = [100, 100, 100];
+    const GRIS_OSC_RGB = [60, 60, 60];
+
     const emp = await obtenerDatosTenantPDF();
     const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
     const fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
 
-    // 2️⃣ Marca de agua centrada (igual que generarRemision.js)
-    const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
-    const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
-    doc.saveGraphicsState();
-    doc.setGState(new doc.GState({ opacity: 0.08 }));
-    doc.addImage(fondo, "PNG", centerX, centerY, 150, 150);
-    doc.restoreGraphicsState();
+    const insertarPagina = () => {
+      // Marca de agua
+      const cx = (PAGE_W - 150) / 2;
+      const cy = (PAGE_H - 150) / 2;
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.08 }));
+      doc.addImage(fondo, "PNG", cx, cy, 150, 150);
+      doc.restoreGraphicsState();
 
-    // 3️⃣ Encabezado igual que generarRemision.js
-    doc.addImage(logo, "PNG", 10, 10, 30, 30);
-    doc.setFontSize(16);
-    doc.setTextColor(30, 30, 30);
-    doc.text(emp.nombre, 50, 20);
-    doc.setFontSize(10);
-    doc.text(emp.direccion || "", 50, 26);
-    doc.text(emp.telefono ? `Cel-Whatsapp ${emp.telefono}` : "", 50, 31);
-    doc.setLineWidth(0.5);
-    doc.line(10, 42, 200, 42);
+      // Logo
+      doc.addImage(logo, "PNG", 10, 10, 30, 30);
 
-    // 4️⃣ Subtítulo de la ruta
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...CYAN);
-    doc.text("Ruta de Entregas", 10, 50);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Fecha de entrega: ${soloFecha(fecha)}`, 10, 56);
-    const totalStr = `${ruta.length} pedido${ruta.length !== 1 ? "s" : ""}  ·  Generado: ${soloFecha(hoyISO())}`;
-    doc.text(totalStr, 200, 56, { align: "right" });
+      // Nombre empresa
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...NEGRO_RGB);
+      doc.text(emp.nombre, 50, 20);
 
-    // Tabla
-    autoTable(doc, {
-      startY: 62,
-      head: [["#", "Pedido", "Cliente", "Dirección", "Teléfono", "Fecha evento", "Notas"]],
-      body: ruta.map((o, i) => [
-        i + 1,
-        o.numero || "—",
-        o.clientes?.nombre || "—",
-        o.clientes?.direccion || "—",
-        o.clientes?.telefono || "—",
-        soloFecha(o.fecha_evento),
-        notasRuta[o.id] || "",
-      ]),
-      headStyles: {
-        fillColor: CYAN,
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 9,
-      },
-      bodyStyles: {
-        fontSize: 9,
-        textColor: NEGRO,
-      },
-      alternateRowStyles: {
-        fillColor: [240, 249, 255],
-      },
-      columnStyles: {
-        0: { cellWidth: 8, halign: "center" },
-        1: { cellWidth: 22 },
-        2: { cellWidth: 38 },
-        3: { cellWidth: 50 },
-        4: { cellWidth: 26 },
-        5: { cellWidth: 24 },
-        6: { cellWidth: 28 },
-      },
-      styles: {
-        lineColor: [229, 231, 235],
-        lineWidth: 0.2,
-        cellPadding: 3,
-        overflow: "linebreak",
-      },
-      margin: { left: 14, right: 14 },
+      // Datos empresa
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...GRIS_RGB);
+      doc.text(emp.direccion || "", 50, 26);
+      doc.text(emp.telefono ? `Cel-Whatsapp ${emp.telefono}` : "", 50, 31);
+
+      // Línea separadora
+      doc.setDrawColor(...CYAN_RGB);
+      doc.setLineWidth(0.5);
+      doc.line(10, 42, 200, 42);
+
+      // Subtítulo
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...CYAN_RGB);
+      doc.text("Ruta de Entregas", 10, 50);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...GRIS_RGB);
+      doc.text(`Fecha de entrega: ${soloFecha(fecha)}`, 10, 56);
+      const totalStr = `${pedidos.length} pedido${pedidos.length !== 1 ? "s" : ""}  ·  Generado: ${soloFecha(hoyISO())}`;
+      doc.text(totalStr, PAGE_W - MARGIN, 56, { align: "right" });
+    };
+
+    insertarPagina();
+    let y = 62;
+
+    pedidos.forEach((orden, i) => {
+      const cliente = orden.clientes || {};
+      const notas = notasRuta[orden.id] || "";
+      const CARD_H = notas ? 50 : 42;
+
+      // Saltar a nueva página si no cabe
+      if (y + CARD_H > PAGE_H - FOOTER_RESERVE) {
+        doc.addPage();
+        insertarPagina();
+        y = 62;
+      }
+
+      // Fondo alternado
+      const esPar = i % 2 === 0;
+      if (esPar) {
+        doc.setFillColor(234, 248, 251); // #EAF8FB
+      } else {
+        doc.setFillColor(255, 255, 255);
+      }
+      doc.setDrawColor(210, 210, 210);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(MARGIN, y, CARD_W, CARD_H, 3, 3, "FD");
+
+      // Franja izquierda cyan
+      doc.setFillColor(...CYAN_RGB);
+      doc.rect(MARGIN, y, 2, CARD_H, "F");
+
+      // ── Fila 1: círculo con número + OP + nombre ──
+      const cirX = MARGIN + 10;
+      const cirY = y + 9;
+      doc.setFillColor(...CYAN_RGB);
+      doc.circle(cirX, cirY, 4, "F");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text(String(i + 1), cirX, cirY + 0.8, { align: "center" });
+
+      // Número OP
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...CYAN_RGB);
+      const opText = orden.numero || "OP-???";
+      doc.text(opText, MARGIN + 17, y + 10);
+      const opW = doc.getTextWidth(opText);
+
+      // Nombre cliente
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...NEGRO_RGB);
+      const maxNombreW = CARD_W - 17 - opW - 6;
+      const nombreCompleto = cliente.nombre || "Sin cliente";
+      const nombreLine = doc.splitTextToSize(nombreCompleto, maxNombreW)[0];
+      doc.text(nombreLine, MARGIN + 17 + opW + 4, y + 10);
+
+      // ── Fila 2: dirección con link a Google Maps ──
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...GRIS_OSC_RGB);
+      const dir = cliente.direccion || "";
+      const dirText = `Dir: ${dir}`;
+      const dirLine = doc.splitTextToSize(dirText, CARD_W - 14)[0];
+      doc.text(dirLine, MARGIN + 6, y + 19);
+      if (dir) {
+        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dir)}`;
+        const dirW = doc.getTextWidth(dirLine);
+        doc.link(MARGIN + 6, y + 15, dirW, 5, { url: mapsUrl });
+      }
+
+      // ── Fila 3: teléfono | entrega | devolución ──
+      doc.setFontSize(9);
+      doc.setTextColor(...GRIS_OSC_RGB);
+      const partes = [];
+      if (cliente.telefono) partes.push(`Tel: ${cliente.telefono}`);
+      if (orden.fecha_entrega) partes.push(`Entrega: ${soloFecha(orden.fecha_entrega)}`);
+      if (orden.fecha_devolucion) partes.push(`Dev.: ${soloFecha(orden.fecha_devolucion)}`);
+      const row3 = partes.join("   |   ");
+      doc.text(row3, MARGIN + 6, y + 27);
+      if (cliente.telefono) {
+        const telW = doc.getTextWidth(`Tel: ${cliente.telefono}`);
+        doc.link(MARGIN + 6, y + 23, telW, 5, { url: `tel:${cliente.telefono}` });
+      }
+
+      // ── Fila 4: notas (opcional) ──
+      if (notas) {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(130, 130, 130);
+        const notasLine = doc.splitTextToSize(`Notas: ${notas}`, CARD_W - 12)[0];
+        doc.text(notasLine, MARGIN + 6, y + 35);
+        doc.setFont("helvetica", "normal");
+      }
+
+      y += CARD_H + CARD_GAP;
     });
 
-    // Pie
+    // ── Pie en todas las páginas ──
     const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      const footerY = PAGE_H - 14;
+      doc.setDrawColor(...GRIS_RGB);
+      doc.setLineWidth(0.2);
+      doc.line(MARGIN, footerY - 4, PAGE_W - MARGIN, footerY - 4);
       doc.setFontSize(8);
-      doc.setTextColor(...GRIS);
-      doc.text(
-        `Página ${i} de ${pageCount} · ${emp.nombre}`,
-        14,
-        doc.internal.pageSize.height - 8
-      );
+      doc.setTextColor(...GRIS_RGB);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Pagina ${p} de ${pageCount}  ·  ${emp.nombre}`, MARGIN, footerY);
+
+      const redes = [];
+      if (emp.instagram) redes.push(`Instagram: ${emp.instagram}`);
+      if (emp.facebook) redes.push(`Facebook: ${emp.facebook}`);
+      if (emp.email) redes.push(`Email: ${emp.email}`);
+      if (redes.length) {
+        doc.text(redes.join("   "), PAGE_W - MARGIN, footerY, { align: "right" });
+      }
     }
 
     doc.save(`Ruta-Entregas-${fecha}.pdf`);
@@ -295,8 +404,9 @@ export default function RutaEntregas() {
                   {ruta.length > 0 && (
                     <button
                       onClick={exportarPDFRuta}
+                      disabled={seleccionados.size === 0}
                       className="cd-btn cd-btn-azul"
-                      style={{ marginTop: "auto" }}
+                      style={{ marginTop: "auto", opacity: seleccionados.size === 0 ? 0.5 : 1 }}
                     >
                       🖨️ Exportar PDF de ruta
                     </button>
@@ -319,6 +429,41 @@ export default function RutaEntregas() {
               </div>
             </div>
           </div>
+
+          {/* CHECKBOX MAESTRO + CONTADOR */}
+          {ruta.length > 0 && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 14px",
+              background: "#f9fafb",
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              marginBottom: 10,
+            }}>
+              <input
+                ref={checkboxMaestroRef}
+                type="checkbox"
+                checked={seleccionados.size === ruta.length && ruta.length > 0}
+                onChange={toggleTodos}
+                style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#00B4D8" }}
+              />
+              <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>
+                {seleccionados.size === ruta.length
+                  ? "Seleccionar ninguno"
+                  : "Seleccionar todos"}
+              </span>
+              <span style={{
+                marginLeft: "auto",
+                fontSize: 13,
+                color: seleccionados.size > 0 ? "#0369a1" : "#9ca3af",
+                fontWeight: 600,
+              }}>
+                {seleccionados.size} de {ruta.length} seleccionados
+              </span>
+            </div>
+          )}
 
           {/* LISTA DE PEDIDOS */}
           {!cargando && ruta.length === 0 && (
@@ -343,6 +488,7 @@ export default function RutaEntregas() {
           {ruta.map((orden, index) => {
             const cliente = orden.clientes || {};
             const esUltimo = index === ruta.length - 1;
+            const estaSeleccionado = seleccionados.has(orden.id);
 
             return (
               <div
@@ -350,11 +496,12 @@ export default function RutaEntregas() {
                 style={{
                   background: "white",
                   borderRadius: 12,
-                  border: "1px solid #e5e7eb",
+                  border: `1px solid ${estaSeleccionado ? "#bae6fd" : "#e5e7eb"}`,
                   marginBottom: 12,
                   overflow: "hidden",
                   boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                  transition: "box-shadow 0.15s",
+                  transition: "box-shadow 0.15s, opacity 0.15s",
+                  opacity: estaSeleccionado ? 1 : 0.5,
                 }}
               >
                 {/* Header de la tarjeta */}
@@ -366,6 +513,14 @@ export default function RutaEntregas() {
                   borderBottom: "1px solid #bae6fd",
                   gap: 12,
                 }}>
+                  {/* Checkbox de selección */}
+                  <input
+                    type="checkbox"
+                    checked={estaSeleccionado}
+                    onChange={() => toggleSeleccion(orden.id)}
+                    style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0, accentColor: "#00B4D8" }}
+                  />
+
                   {/* Número de posición */}
                   <div style={{
                     width: 32, height: 32,
@@ -456,7 +611,17 @@ export default function RutaEntregas() {
                     {cliente.direccion && (
                       <div>
                         <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500, marginBottom: 2 }}>Dirección</div>
-                        <div style={{ fontSize: 13, color: "#111827" }}>📍 {cliente.direccion}</div>
+                        <div style={{ fontSize: 13, color: "#111827" }}>
+                          📍{" "}
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cliente.direccion)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "#0077B6", textDecoration: "none" }}
+                          >
+                            {cliente.direccion}
+                          </a>
+                        </div>
                       </div>
                     )}
                     {cliente.telefono && (
