@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { obtenerDatosTenantPDF } from "../utils/tenantPDF";
 import supabase from "../supabaseClient";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
@@ -10,6 +11,23 @@ import Protegido from "../components/Protegido";
 import "../estilos/CrearDocumentoEstilo.css";
 
 const hoyISO = () => new Date().toISOString().split("T")[0];
+
+// 🖼️ Igual que en generarRemision.js
+const procesarImagen = (src, width = 150, calidad = 1.0) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const escala = width / img.width;
+      canvas.width = width;
+      canvas.height = img.height * escala;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png", calidad));
+    };
+    img.src = src;
+  });
 
 const soloFecha = (valor) => {
   if (!valor) return "";
@@ -24,20 +42,6 @@ export default function RutaEntregas() {
   const [todasOrdenes, setTodasOrdenes] = useState([]);
   const [ruta, setRuta] = useState([]);
   const [cargando, setCargando] = useState(false);
-  const [empresa, setEmpresa] = useState({ nombre: "Mi Empresa", telefono: "" });
-
-  // Cargar datos de empresa para el PDF
-  useEffect(() => {
-    const cargarEmpresa = async () => {
-      const { data } = await supabase
-        .from("mi_empresa")
-        .select("nombre, telefono")
-        .limit(1)
-        .single();
-      if (data) setEmpresa(data);
-    };
-    cargarEmpresa().catch(() => {});
-  }, []);
 
   // Cargar órdenes no cerradas una sola vez
   useEffect(() => {
@@ -142,34 +146,52 @@ export default function RutaEntregas() {
   };
 
   // ──────────────── Exportar PDF de ruta ────────────────
-  const exportarPDFRuta = () => {
+  const exportarPDFRuta = async () => {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
     const CYAN = [0, 180, 216];
     const GRIS = [100, 100, 100];
     const NEGRO = [30, 30, 30];
 
-    // Header
-    doc.setFillColor(...CYAN);
-    doc.rect(0, 0, 210, 24, "F");
+    // 1️⃣ Cargar datos de empresa (mismo patrón que generarRemision.js)
+    const emp = await obtenerDatosTenantPDF();
+    const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
+    const fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
 
-    doc.setTextColor(255, 255, 255);
+    // 2️⃣ Marca de agua centrada (igual que generarRemision.js)
+    const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
+    const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
+    doc.saveGraphicsState();
+    doc.setGState(new doc.GState({ opacity: 0.08 }));
+    doc.addImage(fondo, "PNG", centerX, centerY, 150, 150);
+    doc.restoreGraphicsState();
+
+    // 3️⃣ Encabezado igual que generarRemision.js
+    doc.addImage(logo, "PNG", 10, 10, 30, 30);
     doc.setFontSize(16);
+    doc.setTextColor(30, 30, 30);
+    doc.text(emp.nombre, 50, 20);
+    doc.setFontSize(10);
+    doc.text(emp.direccion || "", 50, 26);
+    doc.text(emp.telefono ? `Cel-Whatsapp ${emp.telefono}` : "", 50, 31);
+    doc.setLineWidth(0.5);
+    doc.line(10, 42, 200, 42);
+
+    // 4️⃣ Subtítulo de la ruta
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text("📦 Ruta de Entregas", 14, 10);
-
-    doc.setFontSize(9);
+    doc.setTextColor(...CYAN);
+    doc.text("📦 Ruta de Entregas", 10, 50);
     doc.setFont("helvetica", "normal");
-    doc.text(empresa.nombre || "Mi Empresa", 14, 16);
-    doc.text(`Fecha de entrega: ${soloFecha(fecha)}`, 14, 21);
-
-    const totalStr = `${ruta.length} pedido${ruta.length !== 1 ? "s" : ""}`;
-    doc.text(totalStr, 210 - 14, 16, { align: "right" });
-    doc.text(`Generado: ${soloFecha(hoyISO())}`, 210 - 14, 21, { align: "right" });
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Fecha de entrega: ${soloFecha(fecha)}`, 10, 56);
+    const totalStr = `${ruta.length} pedido${ruta.length !== 1 ? "s" : ""}  ·  Generado: ${soloFecha(hoyISO())}`;
+    doc.text(totalStr, 200, 56, { align: "right" });
 
     // Tabla
     autoTable(doc, {
-      startY: 28,
+      startY: 62,
       head: [["#", "Pedido", "Cliente", "Dirección", "Teléfono", "Fecha evento", "Notas"]],
       body: ruta.map((o, i) => [
         i + 1,
@@ -218,7 +240,7 @@ export default function RutaEntregas() {
       doc.setFontSize(8);
       doc.setTextColor(...GRIS);
       doc.text(
-        `Página ${i} de ${pageCount} · ${empresa.nombre}`,
+        `Página ${i} de ${pageCount} · ${emp.nombre}`,
         14,
         doc.internal.pageSize.height - 8
       );
