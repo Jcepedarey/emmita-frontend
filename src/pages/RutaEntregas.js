@@ -185,10 +185,15 @@ export default function RutaEntregas() {
     const CARD_GAP = 4;
     const FOOTER_RESERVE = 22;
 
-    const CYAN_RGB = [0, 180, 216];
-    const NEGRO_RGB = [30, 30, 30];
-    const GRIS_RGB = [100, 100, 100];
-    const GRIS_OSC_RGB = [60, 60, 60];
+    // ── Paleta SwAlquiler ──
+    const AZUL       = [0, 119, 182];   // #0077B6
+    const AZUL_OSC   = [2, 62, 138];    // #023E8A
+    const NEGRO      = [30, 30, 30];
+    const GRIS       = [100, 100, 100];
+    const GRIS_OSC   = [60, 60, 60];
+    const SEP        = [229, 231, 235]; // #E5E7EB
+    const ROJO_PIN   = [220, 38, 38];   // pin de mapa
+    const VERDE_TEL  = [34, 197, 94];   // icono teléfono
 
     const emp = await obtenerDatosTenantPDF();
     const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
@@ -209,29 +214,29 @@ export default function RutaEntregas() {
       // Nombre empresa
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(...NEGRO_RGB);
+      doc.setTextColor(...AZUL_OSC);
       doc.text(emp.nombre, 50, 20);
 
       // Datos empresa
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.setTextColor(...GRIS_RGB);
+      doc.setTextColor(...GRIS);
       doc.text(emp.direccion || "", 50, 26);
       doc.text(emp.telefono ? `Cel-Whatsapp ${emp.telefono}` : "", 50, 31);
 
       // Línea separadora
-      doc.setDrawColor(...CYAN_RGB);
+      doc.setDrawColor(...AZUL);
       doc.setLineWidth(0.5);
       doc.line(10, 42, 200, 42);
 
       // Subtítulo
       doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(...CYAN_RGB);
+      doc.setTextColor(...AZUL);
       doc.text("Ruta de Entregas", 10, 50);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.setTextColor(...GRIS_RGB);
+      doc.setTextColor(...GRIS);
       doc.text(`Fecha de entrega: ${soloFecha(fecha)}`, 10, 56);
       const totalStr = `${pedidos.length} pedido${pedidos.length !== 1 ? "s" : ""}  ·  Generado: ${soloFecha(hoyISO())}`;
       doc.text(totalStr, PAGE_W - MARGIN, 56, { align: "right" });
@@ -243,7 +248,7 @@ export default function RutaEntregas() {
     pedidos.forEach((orden, i) => {
       const cliente = orden.clientes || {};
       const notas = notasRuta[orden.id] || "";
-      const CARD_H = notas ? 50 : 42;
+      const CARD_H = notas ? 49 : 40;
 
       // Saltar a nueva página si no cabe
       if (y + CARD_H > PAGE_H - FOOTER_RESERVE) {
@@ -252,82 +257,95 @@ export default function RutaEntregas() {
         y = 62;
       }
 
-      // Fondo alternado
-      const esPar = i % 2 === 0;
-      if (esPar) {
-        doc.setFillColor(234, 248, 251); // #EAF8FB
+      // ── Fondo alternado ──
+      if (i % 2 === 0) {
+        doc.setFillColor(240, 249, 255); // #F0F9FF
       } else {
         doc.setFillColor(255, 255, 255);
       }
-      doc.setDrawColor(210, 210, 210);
+      doc.setDrawColor(...SEP);
       doc.setLineWidth(0.3);
       doc.roundedRect(MARGIN, y, CARD_W, CARD_H, 3, 3, "FD");
 
-      // Franja izquierda cyan
-      doc.setFillColor(...CYAN_RGB);
+      // Franja izquierda azul
+      doc.setFillColor(...AZUL);
       doc.rect(MARGIN, y, 2, CARD_H, "F");
 
-      // ── Fila 1: círculo con número + OP + nombre ──
-      const cirX = MARGIN + 10;
-      const cirY = y + 9;
-      doc.setFillColor(...CYAN_RGB);
-      doc.circle(cirX, cirY, 4, "F");
-      doc.setFontSize(8);
+      // ── Fila 1: círculo numerado + OP + nombre ──
+      const cirX = MARGIN + 11;
+      const cirY = y + 10;
+      doc.setFillColor(...AZUL);
+      doc.circle(cirX, cirY, 5, "F");
+      doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(255, 255, 255);
-      doc.text(String(i + 1), cirX, cirY + 0.8, { align: "center" });
+      doc.text(String(i + 1), cirX, cirY + 1, { align: "center" });
 
       // Número OP
-      doc.setFontSize(11);
+      doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(...CYAN_RGB);
+      doc.setTextColor(...AZUL);
       const opText = orden.numero || "OP-???";
-      doc.text(opText, MARGIN + 17, y + 10);
+      doc.text(opText, MARGIN + 19, y + 11);
       const opW = doc.getTextWidth(opText);
 
       // Nombre cliente
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...NEGRO_RGB);
-      const maxNombreW = CARD_W - 17 - opW - 6;
-      const nombreCompleto = cliente.nombre || "Sin cliente";
-      const nombreLine = doc.splitTextToSize(nombreCompleto, maxNombreW)[0];
-      doc.text(nombreLine, MARGIN + 17 + opW + 4, y + 10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...NEGRO);
+      const maxNombreW = CARD_W - 19 - opW - 6;
+      const nombreLine = doc.splitTextToSize(cliente.nombre || "Sin cliente", maxNombreW)[0];
+      doc.text(nombreLine, MARGIN + 19 + opW + 4, y + 11);
 
-      // ── Fila 2: dirección con link a Google Maps ──
-      doc.setFontSize(9);
+      // Línea separadora interna
+      doc.setDrawColor(...SEP);
+      doc.setLineWidth(0.2);
+      doc.line(MARGIN + 4, y + 15, MARGIN + CARD_W - 4, y + 15);
+
+      // ── Fila 2: pin rojo + dirección con link a Google Maps ──
+      const pinX = MARGIN + 8;
+      const pinY = y + 22;
+      doc.setFillColor(...ROJO_PIN);
+      doc.circle(pinX, pinY, 1.5, "F");
+
+      doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(...GRIS_OSC_RGB);
+      doc.setTextColor(...GRIS_OSC);
       const dir = cliente.direccion || "";
-      const dirText = `Dir: ${dir}`;
-      const dirLine = doc.splitTextToSize(dirText, CARD_W - 14)[0];
-      doc.text(dirLine, MARGIN + 6, y + 19);
+      const dirLine = doc.splitTextToSize(dir || "Sin direccion", CARD_W - 18)[0];
+      doc.text(dirLine, MARGIN + 12, y + 23);
       if (dir) {
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dir)}`;
         const dirW = doc.getTextWidth(dirLine);
-        doc.link(MARGIN + 6, y + 15, dirW, 5, { url: mapsUrl });
+        doc.link(MARGIN + 12, y + 19, dirW, 5, { url: mapsUrl });
       }
 
-      // ── Fila 3: teléfono | entrega | devolución ──
-      doc.setFontSize(9);
-      doc.setTextColor(...GRIS_OSC_RGB);
+      // ── Fila 3: círculo verde + teléfono | entrega | devolución ──
+      const telIconX = MARGIN + 8;
+      const telIconY = y + 31;
+      doc.setFillColor(...VERDE_TEL);
+      doc.circle(telIconX, telIconY, 1.5, "F");
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...GRIS_OSC);
       const partes = [];
       if (cliente.telefono) partes.push(`Tel: ${cliente.telefono}`);
       if (orden.fecha_entrega) partes.push(`Entrega: ${soloFecha(orden.fecha_entrega)}`);
       if (orden.fecha_devolucion) partes.push(`Dev.: ${soloFecha(orden.fecha_devolucion)}`);
       const row3 = partes.join("   |   ");
-      doc.text(row3, MARGIN + 6, y + 27);
+      doc.text(row3, MARGIN + 12, y + 32);
       if (cliente.telefono) {
         const telW = doc.getTextWidth(`Tel: ${cliente.telefono}`);
-        doc.link(MARGIN + 6, y + 23, telW, 5, { url: `tel:${cliente.telefono}` });
+        doc.link(MARGIN + 12, y + 28, telW, 5, { url: `tel:${cliente.telefono}` });
       }
 
       // ── Fila 4: notas (opcional) ──
       if (notas) {
-        doc.setFontSize(9);
+        doc.setFontSize(10);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(130, 130, 130);
-        const notasLine = doc.splitTextToSize(`Notas: ${notas}`, CARD_W - 12)[0];
-        doc.text(notasLine, MARGIN + 6, y + 35);
+        const notasLine = doc.splitTextToSize(`Notas: ${notas}`, CARD_W - 16)[0];
+        doc.text(notasLine, MARGIN + 6, y + 42);
         doc.setFont("helvetica", "normal");
       }
 
@@ -339,11 +357,11 @@ export default function RutaEntregas() {
     for (let p = 1; p <= pageCount; p++) {
       doc.setPage(p);
       const footerY = PAGE_H - 14;
-      doc.setDrawColor(...GRIS_RGB);
+      doc.setDrawColor(...GRIS);
       doc.setLineWidth(0.2);
       doc.line(MARGIN, footerY - 4, PAGE_W - MARGIN, footerY - 4);
       doc.setFontSize(8);
-      doc.setTextColor(...GRIS_RGB);
+      doc.setTextColor(...GRIS);
       doc.setFont("helvetica", "normal");
       doc.text(`Pagina ${p} de ${pageCount}  ·  ${emp.nombre}`, MARGIN, footerY);
 
