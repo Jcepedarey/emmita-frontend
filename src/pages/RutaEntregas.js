@@ -42,6 +42,7 @@ export default function RutaEntregas() {
   const [todasOrdenes, setTodasOrdenes] = useState([]);
   const [ruta, setRuta] = useState([]);
   const [cargando, setCargando] = useState(false);
+  const [notasRuta, setNotasRuta] = useState({});
 
   // Cargar órdenes no cerradas una sola vez
   useEffect(() => {
@@ -181,7 +182,7 @@ export default function RutaEntregas() {
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...CYAN);
-    doc.text("📦 Ruta de Entregas", 10, 50);
+    doc.text("Ruta de Entregas", 10, 50);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
@@ -200,7 +201,7 @@ export default function RutaEntregas() {
         o.clientes?.direccion || "—",
         o.clientes?.telefono || "—",
         soloFecha(o.fecha_evento),
-        "",
+        notasRuta[o.id] || "",
       ]),
       headStyles: {
         fillColor: CYAN,
@@ -495,6 +496,27 @@ export default function RutaEntregas() {
                       </div>
                     )}
                   </div>
+
+                  {/* Notas por pedido */}
+                  <input
+                    type="text"
+                    placeholder="Notas..."
+                    value={notasRuta[orden.id] || ""}
+                    onChange={(e) =>
+                      setNotasRuta((prev) => ({ ...prev, [orden.id]: e.target.value }))
+                    }
+                    style={{
+                      width: "100%",
+                      marginTop: 8,
+                      padding: "6px 10px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 6,
+                      fontSize: 13,
+                      color: "#374151",
+                      background: "#fafafa",
+                      boxSizing: "border-box",
+                    }}
+                  />
 
                   {/* Botones de acción */}
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
