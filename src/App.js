@@ -36,6 +36,8 @@ import Usuarios from "./pages/Usuarios";
 import MiEmpresa from "./pages/MiEmpresa";
 import Terminos from "./pages/Terminos";
 import ResetPassword from "./pages/ResetPassword"; // ✅ NUEVO IMPORT
+import RutaEntregas from "./pages/RutaEntregas";
+import PagosPendientes from "./pages/PagosPendientes";
 
 // ✅ Componente interno que tiene acceso a useLocation
 function AppContent() {
@@ -163,6 +165,8 @@ function AppContent() {
             <Route path="/usuarios" element={<Usuarios />} />
             <Route path="/exportar" element={<Exportar />} />
             <Route path="/mi-empresa" element={<MiEmpresa />} />
+            <Route path="/ruta-entregas" element={<RutaEntregas />} />
+            <Route path="/pagos-pendientes" element={<PagosPendientes />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Suspense>
