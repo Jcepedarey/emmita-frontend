@@ -375,7 +375,7 @@ export default function Register() {
 
             <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
               <Turnstile
-                sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
+                sitekey={process.env.REACT_APP_TURNSTILE_SITE_KEY || "0x4AAAAAACgQb4Y7stbzuhZh"}
                 onVerify={(token) => setCaptchaToken(token)}
                 onExpire={() => setCaptchaToken(null)}
                 theme="light"
