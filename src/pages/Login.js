@@ -174,7 +174,7 @@ export default function Login() {
       {/* CAPTCHA Cloudflare Turnstile */}
       <div style={{ display: "inline-block", marginTop: 8 }}>
         <Turnstile
-          sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
+          sitekey={process.env.REACT_APP_TURNSTILE_SITE_KEY || "0x4AAAAAACgQb4Y7stbzuhZh"}
           onVerify={(token) => setCaptchaToken(token)}
           onExpire={() => setCaptchaToken(null)}
           theme="light"
