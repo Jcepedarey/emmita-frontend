@@ -383,7 +383,7 @@ export default function Login() {
           }}>
             www.swalquiler.com
           </a>{" "}
-          · Gestión de alquiler y eventos
+          · Sistema de gestión de alquiler y eventos
         </div>
       </div>
     </>
