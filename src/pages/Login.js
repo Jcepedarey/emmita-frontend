@@ -14,6 +14,7 @@ export default function Login() {
   const [focusEmail, setFocusEmail] = useState(false);
   const [focusPass, setFocusPass] = useState(false);
   const [mostrarPass, setMostrarPass] = useState(false);
+  const [turnstileListo, setTurnstileListo] = useState(false);
   const navigate = useNavigate();
 
   const { recargar } = useTenant();
@@ -21,6 +22,10 @@ export default function Login() {
   useEffect(() => {
     localStorage.removeItem("usuario");
     localStorage.removeItem("sesion");
+
+    // ✅ Montar Turnstile DESPUÉS de que la animación CSS termine
+    const timer = setTimeout(() => setTurnstileListo(true), 800);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleLogin = async () => {
@@ -154,36 +159,29 @@ export default function Login() {
         position: "relative",
       }}>
 
-        {/* ═══ CONTENEDOR ONDAS (overflow hidden solo aquí) ═══ */}
+        {/* ═══ CONTENEDOR ONDAS ═══ */}
         <div style={{
           position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
           overflow: "hidden", pointerEvents: "none", zIndex: 0,
         }}>
-          {/* Onda superior */}
           <svg viewBox="0 0 1440 320" preserveAspectRatio="none" style={{
             position: "absolute", top: 0, left: 0, width: "100%", height: "200px",
             opacity: 0.08, animation: "waveFloat1 9s ease-in-out infinite",
           }}>
             <path fill="#ffffff" d="M0,96L60,112C120,128,240,160,360,165.3C480,171,600,149,720,128C840,107,960,85,1080,90.7C1200,96,1320,128,1380,144L1440,160L1440,0L1380,0C1320,0,1200,0,1080,0C960,0,840,0,720,0C600,0,480,0,360,0C240,0,120,0,60,0L0,0Z" />
           </svg>
-
-          {/* Onda inferior principal */}
           <svg viewBox="0 0 1440 320" preserveAspectRatio="none" style={{
             position: "absolute", bottom: 0, left: 0, width: "100%", height: "220px",
             opacity: 0.10, animation: "waveFloat2 11s ease-in-out infinite",
           }}>
             <path fill="#ffffff" d="M0,224L48,213.3C96,203,192,181,288,186.7C384,192,480,224,576,234.7C672,245,768,235,864,213.3C960,192,1056,160,1152,154.7C1248,149,1344,171,1392,181.3L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z" />
           </svg>
-
-          {/* Onda inferior secundaria */}
           <svg viewBox="0 0 1440 320" preserveAspectRatio="none" style={{
             position: "absolute", bottom: 0, left: 0, width: "100%", height: "160px",
             opacity: 0.06, animation: "waveFloat3 14s ease-in-out infinite",
           }}>
             <path fill="#CAF0F8" d="M0,256L80,240C160,224,320,192,480,192C640,192,800,224,960,240C1120,256,1280,256,1360,256L1440,256L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z" />
           </svg>
-
-          {/* Círculo decorativo */}
           <div style={{
             position: "absolute", width: "450px", height: "450px", borderRadius: "50%",
             background: "radial-gradient(circle, rgba(144,224,239,0.10) 0%, transparent 65%)",
@@ -191,7 +189,7 @@ export default function Login() {
           }} />
         </div>
 
-        {/* ═══ CARD PRINCIPAL (SIN backdropFilter) ═══ */}
+        {/* ═══ CARD PRINCIPAL ═══ */}
         <div style={{
           background: "#ffffff",
           borderRadius: "20px",
@@ -199,41 +197,31 @@ export default function Login() {
           width: "100%",
           maxWidth: "400px",
           boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06)",
-          border: "1px solid rgba(255, 255, 255, 0.6)",
           position: "relative",
           zIndex: 1,
           animation: "cardSlideUp 0.5s ease-out",
         }}>
-          {/* Logo */}
           <img
             src="/icons/swalquiler-logo.png"
             alt="SwAlquiler"
             style={{
-              width: "120px",
-              display: "block",
-              margin: "0 auto 8px",
+              width: "120px", display: "block", margin: "0 auto 8px",
               filter: "drop-shadow(0 4px 12px rgba(0, 119, 182, 0.2))",
             }}
           />
 
           <h2 style={{
             fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
-            fontSize: "22px",
-            fontWeight: 700,
-            color: "#023E8A",
-            textAlign: "center",
-            margin: "0 0 4px 0",
+            fontSize: "22px", fontWeight: 700, color: "#023E8A",
+            textAlign: "center", margin: "0 0 4px 0",
           }}>Bienvenido</h2>
 
           <p style={{
-            fontSize: "13.5px",
-            color: "#4b5563",
-            textAlign: "center",
-            margin: "0 0 24px 0",
-            fontWeight: 400,
+            fontSize: "13.5px", color: "#4b5563",
+            textAlign: "center", margin: "0 0 24px 0",
           }}>Ingresa a tu cuenta para continuar</p>
 
-          {/* ═══ INPUT EMAIL ═══ */}
+          {/* INPUT EMAIL */}
           <div style={{ position: "relative", marginBottom: "16px" }}>
             <span style={{
               position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)",
@@ -241,7 +229,10 @@ export default function Login() {
               pointerEvents: "none", transition: "color 0.2s",
             }}>✉</span>
             <input
+              id="login-email"
+              name="email"
               type="email"
+              autoComplete="email"
               placeholder="Correo electrónico"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -260,7 +251,7 @@ export default function Login() {
             />
           </div>
 
-          {/* ═══ INPUT PASSWORD + OJITO ═══ */}
+          {/* INPUT PASSWORD + OJITO */}
           <div style={{ position: "relative", marginBottom: "16px" }}>
             <span style={{
               position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)",
@@ -268,7 +259,10 @@ export default function Login() {
               pointerEvents: "none", transition: "color 0.2s",
             }}>🔒</span>
             <input
+              id="login-password"
+              name="password"
               type={mostrarPass ? "text" : "password"}
+              autoComplete="current-password"
               placeholder="Contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -297,13 +291,11 @@ export default function Login() {
                 lineHeight: 1, transition: "color 0.2s", borderRadius: "6px",
               }}
               tabIndex={-1}
-              aria-label={mostrarPass ? "Ocultar contraseña" : "Mostrar contraseña"}
             >
               {mostrarPass ? "🙈" : "👁"}
             </button>
           </div>
 
-          {/* Olvidaste contraseña */}
           <span
             className="forgot-link"
             onClick={handleRecuperarPassword}
@@ -316,7 +308,6 @@ export default function Login() {
             ¿Olvidaste tu contraseña?
           </span>
 
-          {/* Botón entrar */}
           <button
             className="login-btn"
             onClick={handleLogin}
@@ -335,7 +326,6 @@ export default function Login() {
             {cargando ? "Ingresando..." : "Iniciar sesión"}
           </button>
 
-          {/* Registro */}
           <p style={{
             textAlign: "center", marginTop: "20px", fontSize: "14px", color: "#64748b",
           }}>
@@ -346,30 +336,35 @@ export default function Login() {
           </p>
         </div>
 
-        {/* ═══ TURNSTILE FUERA DE LA CARD (evita conflicto con glass/blur) ═══ */}
+        {/* ═══ TURNSTILE — Montaje retrasado para evitar error 300030 ═══ */}
         <div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+          display: "inline-block",
           marginTop: "16px",
           position: "relative",
           zIndex: 2,
+          textAlign: "center",
         }}>
-          <Turnstile
-            sitekey={process.env.REACT_APP_TURNSTILE_SITE_KEY || "0x4AAAAAACgQb4Y7stbzuhZh"}
-            onVerify={(token) => setCaptchaToken(token)}
-            onExpire={() => setCaptchaToken(null)}
-            onError={() => setCaptchaToken(null)}
-            retry="auto"
-            refreshExpired="auto"
-            theme="light"
-          />
+          {turnstileListo ? (
+            <Turnstile
+              sitekey={process.env.REACT_APP_TURNSTILE_SITE_KEY || "0x4AAAAAACgQb4Y7stbzuhZh"}
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+              theme="light"
+            />
+          ) : (
+            <div style={{
+              width: "300px", height: "65px", borderRadius: "4px",
+              background: "rgba(255,255,255,0.15)", display: "flex",
+              alignItems: "center", justifyContent: "center",
+              color: "rgba(255,255,255,0.7)", fontSize: "12px",
+            }}>
+              Cargando verificación...
+            </div>
+          )}
           <span style={{
-            fontSize: "11px",
-            color: "rgba(255,255,255,0.75)",
-            marginTop: "6px",
-            textAlign: "center",
-            textShadow: "0 1px 2px rgba(0,0,0,0.15)",
+            display: "block", fontSize: "11px", marginTop: "6px",
+            color: "rgba(255,255,255,0.75)", textShadow: "0 1px 2px rgba(0,0,0,0.15)",
           }}>
             {captchaToken
               ? "✅ Verificación completada"
