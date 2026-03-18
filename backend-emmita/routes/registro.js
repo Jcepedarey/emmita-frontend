@@ -198,7 +198,7 @@ router.post("/", async (req, res) => {
 
     // 📲 Notificar nuevo registro
     try {
-      await fetch("https://ntfy.sh/swalquiler-registros-secreto", {
+      await fetch(`https://ntfy.sh/${process.env.NTFY_TOPIC || "swalquiler-registros-secreto"}`, {
         method: "POST",
         body: `🏢 ${nombreEmpresa}\n👤 ${nombreUsuario}\n📧 ${emailUsuario}\n📱 ${telefonoEmpresa || "Sin teléfono"}`,
         headers: { Title: "Nueva empresa registrada en SwAlquiler", Priority: "4" }

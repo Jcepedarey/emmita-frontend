@@ -11,12 +11,13 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
+  const [focusEmail, setFocusEmail] = useState(false);
+  const [focusPass, setFocusPass] = useState(false);
   const navigate = useNavigate();
-  
+
   const { recargar } = useTenant();
 
-  // ✅ CORRECCIÓN: Limpieza suave y local. 
-  // No llamamos a supabase.auth.signOut() aquí para no disparar las alarmas antibots de Cloudflare.
+  // ✅ CORRECCIÓN: Limpieza suave y local.
   useEffect(() => {
     localStorage.removeItem("usuario");
     localStorage.removeItem("sesion");
@@ -36,7 +37,7 @@ export default function Login() {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: { captchaToken }
+        options: { captchaToken },
       });
 
       if (error || !data.session) {
@@ -51,7 +52,6 @@ export default function Login() {
 
       setCargando(false);
       navigate("/inicio");
-
     } catch (err) {
       setCargando(false);
       Swal.fire("Error de conexión", "No se pudo conectar a Supabase", "error");
@@ -79,13 +79,15 @@ export default function Login() {
 
     if (!emailRecuperar) return;
 
-    // Validar que el CAPTCHA esté completado antes de enviar la petición
     if (!captchaToken) {
-      return Swal.fire("Verificación requerida", "Completa primero la verificación de seguridad (abajo) y luego intenta recuperar tu contraseña", "info");
+      return Swal.fire(
+        "Verificación requerida",
+        "Completa primero la verificación de seguridad y luego intenta recuperar tu contraseña",
+        "info"
+      );
     }
 
     try {
-      // Enviar el captchaToken a Supabase
       const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperar, {
         redirectTo: `${window.location.origin}/reset-password`,
         captchaToken,
@@ -109,77 +111,323 @@ export default function Login() {
     }
   };
 
+  /* ═══════════════════════════════════════════════════════════════
+     ESTILOS INLINE — Inspirados en la calculadora SwAlquiler
+     ═══════════════════════════════════════════════════════════════ */
+  const styles = {
+    page: {
+      minHeight: "100vh",
+      background: "linear-gradient(170deg, #023E8A 0%, #0077B6 35%, #00B4D8 60%, #e0f7fa 100%)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "24px 16px",
+      position: "relative",
+      overflow: "hidden",
+    },
+    // Círculos decorativos de fondo
+    circle1: {
+      position: "absolute",
+      width: "400px",
+      height: "400px",
+      borderRadius: "50%",
+      background: "radial-gradient(circle, rgba(0,180,216,0.15) 0%, transparent 70%)",
+      top: "-100px",
+      right: "-100px",
+      pointerEvents: "none",
+    },
+    circle2: {
+      position: "absolute",
+      width: "300px",
+      height: "300px",
+      borderRadius: "50%",
+      background: "radial-gradient(circle, rgba(2,62,138,0.12) 0%, transparent 70%)",
+      bottom: "-50px",
+      left: "-80px",
+      pointerEvents: "none",
+    },
+    card: {
+      background: "rgba(255, 255, 255, 0.95)",
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      borderRadius: "20px",
+      padding: "36px 32px 28px",
+      width: "100%",
+      maxWidth: "400px",
+      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06)",
+      border: "1px solid rgba(255, 255, 255, 0.6)",
+      position: "relative",
+      zIndex: 1,
+      animation: "cardSlideUp 0.5s ease-out",
+    },
+    logo: {
+      width: "120px",
+      display: "block",
+      margin: "0 auto 8px",
+      filter: "drop-shadow(0 4px 12px rgba(0, 119, 182, 0.2))",
+    },
+    titulo: {
+      fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
+      fontSize: "20px",
+      fontWeight: 700,
+      color: "#023E8A",
+      textAlign: "center",
+      margin: "0 0 4px 0",
+    },
+    subtitulo: {
+      fontSize: "13px",
+      color: "#64748b",
+      textAlign: "center",
+      margin: "0 0 24px 0",
+      fontWeight: 400,
+    },
+    inputGroup: {
+      position: "relative",
+      marginBottom: "16px",
+    },
+    inputIcon: {
+      position: "absolute",
+      left: "14px",
+      top: "50%",
+      transform: "translateY(-50%)",
+      fontSize: "16px",
+      color: "#94a3b8",
+      pointerEvents: "none",
+      transition: "color 0.2s",
+    },
+    inputIconFocused: {
+      color: "#0077B6",
+    },
+    input: {
+      width: "100%",
+      padding: "14px 14px 14px 42px",
+      fontSize: "15px",
+      border: "2px solid #e2e8f0",
+      borderRadius: "12px",
+      outline: "none",
+      transition: "border-color 0.25s, box-shadow 0.25s",
+      background: "#f8fafc",
+      color: "#1e293b",
+      fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
+      boxSizing: "border-box",
+    },
+    inputFocused: {
+      borderColor: "#00B4D8",
+      boxShadow: "0 0 0 4px rgba(0, 180, 216, 0.12)",
+      background: "#ffffff",
+    },
+    forgotLink: {
+      display: "block",
+      textAlign: "right",
+      fontSize: "13px",
+      color: "#0077B6",
+      cursor: "pointer",
+      fontWeight: 500,
+      margin: "-8px 0 20px 0",
+      textDecoration: "none",
+      transition: "color 0.2s",
+    },
+    boton: {
+      width: "100%",
+      padding: "14px",
+      fontSize: "15px",
+      fontWeight: 700,
+      color: "white",
+      border: "none",
+      borderRadius: "12px",
+      cursor: "pointer",
+      background: "linear-gradient(135deg, #00B4D8, #0077B6)",
+      boxShadow: "0 4px 14px rgba(0, 119, 182, 0.3)",
+      transition: "transform 0.2s, box-shadow 0.2s, opacity 0.2s",
+      fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
+      letterSpacing: "0.3px",
+    },
+    botonDisabled: {
+      opacity: 0.55,
+      cursor: "not-allowed",
+      transform: "none",
+      boxShadow: "0 2px 8px rgba(0, 119, 182, 0.15)",
+    },
+    registro: {
+      textAlign: "center",
+      marginTop: "20px",
+      fontSize: "14px",
+      color: "#64748b",
+    },
+    registroLink: {
+      color: "#0077B6",
+      fontWeight: 700,
+      textDecoration: "none",
+    },
+    captchaWrapper: {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      marginTop: "16px",
+    },
+    captchaHint: {
+      fontSize: "11px",
+      color: "#94a3b8",
+      marginTop: "6px",
+      textAlign: "center",
+    },
+    footer: {
+      marginTop: "24px",
+      fontSize: "11px",
+      color: "rgba(255,255,255,0.7)",
+      textAlign: "center",
+      position: "relative",
+      zIndex: 1,
+    },
+    footerLink: {
+      color: "rgba(255,255,255,0.9)",
+      textDecoration: "none",
+      fontWeight: 600,
+    },
+  };
+
+  const isDisabled = cargando || !captchaToken;
+
   return (
-    <div style={{ textAlign: "center", marginTop: "100px" }}>
-      <img
-        src="/icons/swalquiler-logo.png"
-        alt="SwAlquiler"
-        className="app-logo-login"
-        style={{
-          width: "145px",
-          display: "block",
-          margin: "0 auto 16px",
-          filter: "drop-shadow(0 2px 6px rgba(0,0,0,.1))"
-        }}
-      />
+    <>
+      {/* Animación CSS inyectada */}
+      <style>{`
+        @keyframes cardSlideUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .login-btn:hover:not(:disabled) {
+          transform: translateY(-2px) !important;
+          box-shadow: 0 6px 20px rgba(0,119,182,0.4) !important;
+        }
+        .login-btn:active:not(:disabled) {
+          transform: translateY(0) !important;
+        }
+        .forgot-link:hover {
+          color: #023E8A !important;
+        }
+      `}</style>
 
-      <h2>Iniciar sesión</h2>
+      <div style={styles.page}>
+        {/* Círculos decorativos */}
+        <div style={styles.circle1} />
+        <div style={styles.circle2} />
 
-      <input
-        type="email"
-        placeholder="Correo"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        style={{ padding: "10px", marginBottom: "10px", width: "250px" }}
-      /><br />
+        {/* Card principal */}
+        <div style={styles.card}>
+          {/* Logo */}
+          <img
+            src="/icons/swalquiler-logo.png"
+            alt="SwAlquiler"
+            className="app-logo-login"
+            style={styles.logo}
+          />
 
-      <input
-        type="password"
-        placeholder="Contraseña"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-        style={{ padding: "10px", marginBottom: "10px", width: "250px" }}
-      /><br />
+          <h2 style={styles.titulo}>Bienvenido</h2>
+          <p style={styles.subtitulo}>Ingresa a tu cuenta para continuar</p>
 
-      {/* Enlace de recuperar contraseña */}
-      <p style={{ margin: "0 0 16px 0", fontSize: 13 }}>
-        <span
-          onClick={handleRecuperarPassword}
-          style={{ color: "#0077B6", cursor: "pointer", textDecoration: "underline" }}
-        >
-          ¿Olvidaste tu contraseña?
-        </span>
-      </p>
+          {/* Input Email */}
+          <div style={styles.inputGroup}>
+            <span
+              style={{
+                ...styles.inputIcon,
+                ...(focusEmail ? styles.inputIconFocused : {}),
+              }}
+            >
+              ✉
+            </span>
+            <input
+              type="email"
+              placeholder="Correo electrónico"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setFocusEmail(true)}
+              onBlur={() => setFocusEmail(false)}
+              style={{
+                ...styles.input,
+                ...(focusEmail ? styles.inputFocused : {}),
+              }}
+            />
+          </div>
 
-      <button
-        onClick={handleLogin}
-        disabled={cargando || !captchaToken}
-        style={{ 
-          padding: "10px 30px",
-          opacity: cargando || !captchaToken ? 0.5 : 1,
-          cursor: cargando || !captchaToken ? "not-allowed" : "pointer",
-        }}
-      >
-        {cargando ? "Cargando..." : "Entrar"}
-      </button>
+          {/* Input Password */}
+          <div style={styles.inputGroup}>
+            <span
+              style={{
+                ...styles.inputIcon,
+                ...(focusPass ? styles.inputIconFocused : {}),
+              }}
+            >
+              🔒
+            </span>
+            <input
+              type="password"
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              onFocus={() => setFocusPass(true)}
+              onBlur={() => setFocusPass(false)}
+              style={{
+                ...styles.input,
+                ...(focusPass ? styles.inputFocused : {}),
+              }}
+            />
+          </div>
 
-      <p style={{ marginTop: 20, fontSize: 14, color: "#6b7280" }}>
-        ¿No tienes cuenta?{" "}
-        <Link to="/registro" style={{ color: "#0077B6", fontWeight: 600 }}>
-          Registra tu empresa
-        </Link>
-      </p>
+          {/* Olvidaste contraseña */}
+          <span
+            className="forgot-link"
+            onClick={handleRecuperarPassword}
+            style={styles.forgotLink}
+          >
+            ¿Olvidaste tu contraseña?
+          </span>
 
-      {/* CAPTCHA Cloudflare Turnstile */}
-      <div style={{ display: "inline-block", marginTop: 8 }}>
-        <Turnstile
-          sitekey={process.env.REACT_APP_TURNSTILE_SITE_KEY || "0x4AAAAAACgQb4Y7stbzuhZh"}
-          onVerify={(token) => setCaptchaToken(token)}
-          onExpire={() => setCaptchaToken(null)}
-          theme="light"
-        />
+          {/* Botón entrar */}
+          <button
+            className="login-btn"
+            onClick={handleLogin}
+            disabled={isDisabled}
+            style={{
+              ...styles.boton,
+              ...(isDisabled ? styles.botonDisabled : {}),
+            }}
+          >
+            {cargando ? "Ingresando..." : "Iniciar sesión"}
+          </button>
+
+          {/* Registro */}
+          <p style={styles.registro}>
+            ¿No tienes cuenta?{" "}
+            <Link to="/registro" style={styles.registroLink}>
+              Registra tu empresa
+            </Link>
+          </p>
+
+          {/* CAPTCHA Cloudflare Turnstile */}
+          <div style={styles.captchaWrapper}>
+            <Turnstile
+              sitekey={process.env.REACT_APP_TURNSTILE_SITE_KEY || "0x4AAAAAACgQb4Y7stbzuhZh"}
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              theme="light"
+            />
+            <span style={styles.captchaHint}>
+              Verificación de seguridad · Espera a que se complete
+            </span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={styles.footer}>
+          <a href="https://www.swalquiler.com" style={styles.footerLink}>
+            www.swalquiler.com
+          </a>{" "}
+          · Gestión de alquiler y eventos
+        </div>
       </div>
-    </div>
+    </>
   );
 }
