@@ -1,4 +1,4 @@
-// src/pages/Login.js
+// src/pages/Login.js — CON CLOUDFLARE TURNSTILE (diseño completo)
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -11,6 +11,10 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
+  const [focusEmail, setFocusEmail] = useState(false);
+  const [focusPass, setFocusPass] = useState(false);
+  const [mostrarPass, setMostrarPass] = useState(false);
+  const [turnstileListo, setTurnstileListo] = useState(false);
   const navigate = useNavigate();
 
   const { recargar } = useTenant();
@@ -18,6 +22,11 @@ export default function Login() {
   useEffect(() => {
     localStorage.removeItem("usuario");
     localStorage.removeItem("sesion");
+
+    // ✅ Montar Turnstile DESPUÉS de que las animaciones CSS terminen
+    // Esto evita el error 300030 de Cloudflare
+    const timer = setTimeout(() => setTurnstileListo(true), 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleLogin = async () => {
@@ -108,98 +117,423 @@ export default function Login() {
     }
   };
 
+  const isDisabled = cargando || !captchaToken;
+
   return (
-    <div style={{ textAlign: "center", marginTop: 80, padding: "0 20px" }}>
-      <img
-        src="/icons/swalquiler-logo.png"
-        alt="SwAlquiler"
-        className="app-logo-login"
-        style={{ width: 140, marginBottom: 10 }}
-      />
-      <h2 style={{ marginBottom: 4, color: "#023E8A" }}>Bienvenido</h2>
-      <p style={{ color: "#6b7280", marginBottom: 20, fontSize: 14 }}>
-        Ingresa a tu cuenta para continuar
-      </p>
+    <>
+      {/* ═══ ANIMACIONES CSS ═══ */}
+      <style>{`
+        @keyframes cardSlideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes waveFloat1 {
+          0%, 100% { transform: translateX(0) translateY(0); }
+          50% { transform: translateX(-12px) translateY(-5px); }
+        }
+        @keyframes waveFloat2 {
+          0%, 100% { transform: translateX(0) translateY(0); }
+          50% { transform: translateX(10px) translateY(4px); }
+        }
+        @keyframes waveFloat3 {
+          0%, 100% { transform: translateX(0) translateY(0); }
+          50% { transform: translateX(-6px) translateY(-3px); }
+        }
+        .login-btn:hover:not(:disabled) {
+          transform: translateY(-2px) !important;
+          box-shadow: 0 6px 20px rgba(0,119,182,0.4) !important;
+        }
+        .login-btn:active:not(:disabled) {
+          transform: translateY(0) !important;
+        }
+        .forgot-link:hover {
+          color: #023E8A !important;
+        }
+        .eye-toggle:hover {
+          color: #0077B6 !important;
+        }
+      `}</style>
 
-      <input
-        type="email"
-        placeholder="Correo electrónico"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        style={{
-          display: "block",
-          margin: "10px auto",
-          padding: "10px 14px",
+      {/* ═══ FONDO PRINCIPAL CON GRADIENTE ═══ */}
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(160deg, #023E8A 0%, #0077B6 40%, #00B4D8 70%, #90E0EF 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px 16px",
+        position: "relative",
+      }}>
+
+        {/* ═══ CONTENEDOR DE ONDAS FLUIDAS (aislado con overflow hidden) ═══ */}
+        <div style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
           width: "100%",
-          maxWidth: 340,
-          fontSize: 15,
-          borderRadius: 8,
-          border: "1px solid #ccc",
-          boxSizing: "border-box",
-        }}
-      />
-      <input
-        type="password"
-        placeholder="Contraseña"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-        style={{
-          display: "block",
-          margin: "10px auto",
-          padding: "10px 14px",
+          height: "100%",
+          overflow: "hidden",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}>
+          {/* Onda superior — curva suave saliendo de arriba */}
+          <svg
+            viewBox="0 0 1440 320"
+            preserveAspectRatio="none"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "200px",
+              opacity: 0.08,
+              animation: "waveFloat1 9s ease-in-out infinite",
+            }}
+          >
+            <path
+              fill="#ffffff"
+              d="M0,96L60,112C120,128,240,160,360,165.3C480,171,600,149,720,128C840,107,960,85,1080,90.7C1200,96,1320,128,1380,144L1440,160L1440,0L1380,0C1320,0,1200,0,1080,0C960,0,840,0,720,0C600,0,480,0,360,0C240,0,120,0,60,0L0,0Z"
+            />
+          </svg>
+
+          {/* Onda inferior principal — curva amplia */}
+          <svg
+            viewBox="0 0 1440 320"
+            preserveAspectRatio="none"
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              width: "100%",
+              height: "220px",
+              opacity: 0.10,
+              animation: "waveFloat2 11s ease-in-out infinite",
+            }}
+          >
+            <path
+              fill="#ffffff"
+              d="M0,224L48,213.3C96,203,192,181,288,186.7C384,192,480,224,576,234.7C672,245,768,235,864,213.3C960,192,1056,160,1152,154.7C1248,149,1344,171,1392,181.3L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+            />
+          </svg>
+
+          {/* Onda inferior secundaria — más estrecha y desfasada */}
+          <svg
+            viewBox="0 0 1440 320"
+            preserveAspectRatio="none"
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              width: "100%",
+              height: "160px",
+              opacity: 0.06,
+              animation: "waveFloat3 14s ease-in-out infinite",
+            }}
+          >
+            <path
+              fill="#CAF0F8"
+              d="M0,256L80,240C160,224,320,192,480,192C640,192,800,224,960,240C1120,256,1280,256,1360,256L1440,256L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"
+            />
+          </svg>
+
+          {/* Círculo decorativo sutil */}
+          <div style={{
+            position: "absolute",
+            width: "450px",
+            height: "450px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(144,224,239,0.10) 0%, transparent 65%)",
+            top: "-120px",
+            right: "-120px",
+          }} />
+        </div>
+
+        {/* ═══ CARD PRINCIPAL ═══ */}
+        <div style={{
+          background: "#ffffff",
+          borderRadius: "20px",
+          padding: "36px 32px 28px",
           width: "100%",
-          maxWidth: 340,
-          fontSize: 15,
-          borderRadius: 8,
-          border: "1px solid #ccc",
-          boxSizing: "border-box",
-        }}
-      />
+          maxWidth: "400px",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06)",
+          position: "relative",
+          zIndex: 1,
+          animation: "cardSlideUp 0.5s ease-out",
+        }}>
+          {/* Logo */}
+          <img
+            src="/icons/swalquiler-logo.png"
+            alt="SwAlquiler"
+            style={{
+              width: "120px",
+              display: "block",
+              margin: "0 auto 8px",
+              filter: "drop-shadow(0 4px 12px rgba(0, 119, 182, 0.2))",
+            }}
+          />
 
-      <p style={{ margin: "8px 0 16px", fontSize: 13 }}>
-        <span
-          onClick={handleRecuperarPassword}
-          style={{
-            color: "#0077B6",
-            cursor: "pointer",
-            fontWeight: 500,
-            textDecoration: "underline",
-          }}
-        >
-          ¿Olvidaste tu contraseña?
-        </span>
-      </p>
+          <h2 style={{
+            fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
+            fontSize: "22px",
+            fontWeight: 700,
+            color: "#023E8A",
+            textAlign: "center",
+            margin: "0 0 4px 0",
+          }}>
+            Bienvenido
+          </h2>
 
-      {/* ✅ CAPTCHA Cloudflare Turnstile */}
-      <div style={{ display: "inline-block", marginBottom: 16 }}>
-        <Turnstile
-          sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
-          onVerify={(token) => setCaptchaToken(token)}
-          onExpire={() => setCaptchaToken(null)}
-          theme="light"
-        />
+          <p style={{
+            fontSize: "13.5px",
+            color: "#4b5563",
+            textAlign: "center",
+            margin: "0 0 24px 0",
+            fontWeight: 400,
+          }}>
+            Ingresa a tu cuenta para continuar
+          </p>
+
+          {/* ═══ INPUT EMAIL ═══ */}
+          <div style={{ position: "relative", marginBottom: "16px" }}>
+            <span style={{
+              position: "absolute",
+              left: "14px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: "15px",
+              color: focusEmail ? "#0077B6" : "#94a3b8",
+              pointerEvents: "none",
+              transition: "color 0.2s",
+            }}>
+              ✉
+            </span>
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="Correo electrónico"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setFocusEmail(true)}
+              onBlur={() => setFocusEmail(false)}
+              style={{
+                width: "100%",
+                padding: "14px 14px 14px 42px",
+                fontSize: "15px",
+                border: `2px solid ${focusEmail ? "#00B4D8" : "#e2e8f0"}`,
+                borderRadius: "12px",
+                outline: "none",
+                transition: "border-color 0.25s, box-shadow 0.25s, background 0.25s",
+                background: focusEmail ? "#ffffff" : "#f8fafc",
+                boxShadow: focusEmail ? "0 0 0 4px rgba(0, 180, 216, 0.12)" : "none",
+                color: "#1e293b",
+                fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {/* ═══ INPUT PASSWORD + OJITO ═══ */}
+          <div style={{ position: "relative", marginBottom: "16px" }}>
+            <span style={{
+              position: "absolute",
+              left: "14px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: "15px",
+              color: focusPass ? "#0077B6" : "#94a3b8",
+              pointerEvents: "none",
+              transition: "color 0.2s",
+            }}>
+              🔒
+            </span>
+            <input
+              id="login-password"
+              name="password"
+              type={mostrarPass ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              onFocus={() => setFocusPass(true)}
+              onBlur={() => setFocusPass(false)}
+              style={{
+                width: "100%",
+                padding: "14px 48px 14px 42px",
+                fontSize: "15px",
+                border: `2px solid ${focusPass ? "#00B4D8" : "#e2e8f0"}`,
+                borderRadius: "12px",
+                outline: "none",
+                transition: "border-color 0.25s, box-shadow 0.25s, background 0.25s",
+                background: focusPass ? "#ffffff" : "#f8fafc",
+                boxShadow: focusPass ? "0 0 0 4px rgba(0, 180, 216, 0.12)" : "none",
+                color: "#1e293b",
+                fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
+                boxSizing: "border-box",
+              }}
+            />
+            {/* 👁 Botón ojito para mostrar/ocultar contraseña */}
+            <button
+              type="button"
+              className="eye-toggle"
+              onClick={() => setMostrarPass(!mostrarPass)}
+              style={{
+                position: "absolute",
+                right: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "17px",
+                color: "#94a3b8",
+                padding: "4px 6px",
+                lineHeight: 1,
+                transition: "color 0.2s",
+                borderRadius: "6px",
+              }}
+              tabIndex={-1}
+              aria-label={mostrarPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {mostrarPass ? "🙈" : "👁"}
+            </button>
+          </div>
+
+          {/* Olvidaste contraseña */}
+          <span
+            className="forgot-link"
+            onClick={handleRecuperarPassword}
+            style={{
+              display: "block",
+              textAlign: "right",
+              fontSize: "13px",
+              color: "#0077B6",
+              cursor: "pointer",
+              fontWeight: 500,
+              margin: "-8px 0 20px 0",
+              textDecoration: "none",
+              transition: "color 0.2s",
+            }}
+          >
+            ¿Olvidaste tu contraseña?
+          </span>
+
+          {/* Botón Iniciar sesión */}
+          <button
+            className="login-btn"
+            onClick={handleLogin}
+            disabled={isDisabled}
+            style={{
+              width: "100%",
+              padding: "14px",
+              fontSize: "15px",
+              fontWeight: 700,
+              color: "white",
+              border: "none",
+              borderRadius: "12px",
+              cursor: isDisabled ? "not-allowed" : "pointer",
+              background: "linear-gradient(135deg, #00B4D8, #0077B6)",
+              boxShadow: isDisabled
+                ? "0 2px 8px rgba(0, 119, 182, 0.15)"
+                : "0 4px 14px rgba(0, 119, 182, 0.3)",
+              transition: "transform 0.2s, box-shadow 0.2s, opacity 0.2s",
+              fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
+              letterSpacing: "0.3px",
+              opacity: isDisabled ? 0.55 : 1,
+            }}
+          >
+            {cargando ? "Ingresando..." : "Iniciar sesión"}
+          </button>
+
+          {/* Link a registro */}
+          <p style={{
+            textAlign: "center",
+            marginTop: "20px",
+            fontSize: "14px",
+            color: "#64748b",
+          }}>
+            ¿No tienes cuenta?{" "}
+            <Link to="/registro" style={{
+              color: "#0077B6",
+              fontWeight: 700,
+              textDecoration: "none",
+            }}>
+              Registra tu empresa
+            </Link>
+          </p>
+        </div>
+
+        {/* ═══ TURNSTILE — Fuera de la card, con delay-mount ═══ */}
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          marginTop: "16px",
+          position: "relative",
+          zIndex: 2,
+        }}>
+          {turnstileListo ? (
+            <Turnstile
+              sitekey="0x4AAAAAACgQb4Y7stbzuhZh"
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              theme="light"
+            />
+          ) : (
+            <div style={{
+              width: "300px",
+              height: "65px",
+              borderRadius: "4px",
+              background: "rgba(255,255,255,0.15)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "rgba(255,255,255,0.7)",
+              fontSize: "12px",
+            }}>
+              Cargando verificación...
+            </div>
+          )}
+          <span style={{
+            display: "block",
+            fontSize: "11px",
+            marginTop: "6px",
+            color: "rgba(255,255,255,0.75)",
+            textAlign: "center",
+            textShadow: "0 1px 2px rgba(0,0,0,0.15)",
+          }}>
+            {captchaToken
+              ? "✅ Verificación completada"
+              : "Verificación de seguridad · Espera a que se complete"}
+          </span>
+        </div>
+
+        {/* ═══ FOOTER ═══ */}
+        <div style={{
+          marginTop: "16px",
+          fontSize: "12px",
+          color: "rgba(255,255,255,0.90)",
+          textAlign: "center",
+          position: "relative",
+          zIndex: 1,
+          textShadow: "0 1px 4px rgba(0,0,0,0.20)",
+        }}>
+          <a
+            href="https://www.swalquiler.com"
+            style={{
+              color: "#ffffff",
+              textDecoration: "none",
+              fontWeight: 600,
+            }}
+          >
+            www.swalquiler.com
+          </a>{" "}
+          · Gestión de alquiler y eventos
+        </div>
       </div>
-      <br />
-
-      <button
-        onClick={handleLogin}
-        disabled={cargando || !captchaToken}
-        style={{
-          padding: "10px 30px",
-          opacity: cargando || !captchaToken ? 0.5 : 1,
-          cursor: cargando || !captchaToken ? "not-allowed" : "pointer",
-        }}
-      >
-        {cargando ? "Cargando..." : "Entrar"}
-      </button>
-
-      <p style={{ marginTop: 20, fontSize: 14, color: "#6b7280" }}>
-        ¿No tienes cuenta?{" "}
-        <Link to="/registro" style={{ color: "#0077B6", fontWeight: 600 }}>
-          Registra tu empresa
-        </Link>
-      </p>
-    </div>
+    </>
   );
 }
