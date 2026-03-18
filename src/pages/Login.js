@@ -155,10 +155,20 @@ export default function Login() {
         justifyContent: "center",
         padding: "24px 16px",
         position: "relative",
-        overflow: "hidden",
+        overflow: "visible",
       }}>
 
-        {/* ═══════ ONDAS FLUIDAS SVG ═══════ */}
+        {/* ═══════ ONDAS FLUIDAS SVG (contenedor propio) ═══════ */}
+        <div style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}>
 
         {/* Onda superior — curva suave saliendo de arriba */}
         <svg
@@ -234,6 +244,7 @@ export default function Login() {
           right: "-120px",
           pointerEvents: "none",
         }} />
+        </div>{/* Fin contenedor ondas */}
 
         {/* ═══════ CARD PRINCIPAL ═══════ */}
         <div style={{
@@ -451,11 +462,16 @@ export default function Login() {
             flexDirection: "column",
             alignItems: "center",
             marginTop: "16px",
+            minHeight: "80px",
           }}>
             <Turnstile
+              key="sw-login-turnstile"
               sitekey={process.env.REACT_APP_TURNSTILE_SITE_KEY || "0x4AAAAAACgQb4Y7stbzuhZh"}
               onVerify={(token) => setCaptchaToken(token)}
               onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+              retry="auto"
+              refreshExpired="auto"
               theme="light"
             />
             <span style={{
@@ -464,7 +480,9 @@ export default function Login() {
               marginTop: "6px",
               textAlign: "center",
             }}>
-              Verificación de seguridad · Espera a que se complete
+              {captchaToken
+                ? "✅ Verificación completada"
+                : "Verificación de seguridad · Espera a que se complete"}
             </span>
           </div>
         </div>

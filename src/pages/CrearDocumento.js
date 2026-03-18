@@ -1090,7 +1090,7 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
       }
     }
 
-    if (ordenIdFinal) {
+    if (ordenIdFinal && tipoDocumento !== "cotizacion") {
       // ✅ FIX: Siempre leer datos FRESCOS de la BD (no del estado local que puede estar desactualizado)
       const { data: ordenFresca } = await supabase
         .from(tabla)
