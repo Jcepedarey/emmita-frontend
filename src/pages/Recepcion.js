@@ -343,15 +343,31 @@ useEffect(() => {
         abonos_recepcion: ingresosAdicionales.filter((a) => Number(a.valor) > 0),
       };
 
-      if (cerrar) {
-        updateData.revisada = true;
-        updateData.cerrada = true;
-      }
+      // (revisada y cerrada se guardan en llamada separada abajo)
 
-      await supabase
+      const { error: errorUpdate } = await supabase
         .from("ordenes_pedido")
         .update(updateData)
         .eq("id", ordenSeleccionada.id);
+
+      if (errorUpdate) {
+        console.error("❌ Error actualizando datos de recepción:", errorUpdate);
+      }
+
+      // 1.5️⃣ Marcar revisada/cerrada en llamada SEPARADA (garantiza que no falle por otros campos)
+      if (cerrar) {
+        const { error: errorCerrar } = await supabase
+          .from("ordenes_pedido")
+          .update({ revisada: true, cerrada: true })
+          .eq("id", ordenSeleccionada.id);
+
+        if (errorCerrar) {
+          console.error("❌ Error marcando orden como cerrada:", errorCerrar);
+          Swal.fire("Error", "No se pudo marcar la recepción como cerrada. Intenta de nuevo.", "error");
+          setGuardando(false);
+          return;
+        }
+      }
 
       // 2️⃣ Descontar stock (solo al cerrar definitivamente)
       if (cerrar) {

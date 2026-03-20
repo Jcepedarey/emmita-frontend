@@ -781,22 +781,6 @@ const Inicio = () => {
                 </button>
               </div>
 
-              {/* 🆕 Alerta de devoluciones vencidas */}
-              {devolucionesVencidas.length > 0 && tabDerecha !== "devoluciones" && (
-                <div
-                  onClick={() => setTabDerecha("devoluciones")}
-                  style={{
-                    padding: "8px 12px", margin: "0 12px 8px", borderRadius: 8,
-                    background: "linear-gradient(135deg, #fef2f2, #fee2e2)",
-                    border: "1px solid rgba(239,68,68,0.2)",
-                    fontSize: 12, color: "#991b1b", cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 6,
-                  }}
-                >
-                  🚨 {devolucionesVencidas.length} pedido{devolucionesVencidas.length > 1 ? "s" : ""} con devolución vencida — click para ver
-                </div>
-              )}
-
               {/* Contenido según pestaña */}
               <div style={estilos.cardBody}>
                 {tabDerecha === "revisar" ? (
