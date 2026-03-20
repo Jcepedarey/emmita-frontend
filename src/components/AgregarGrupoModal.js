@@ -8,7 +8,6 @@ const AgregarGrupoModal = ({
   onClose,
   stockDisponible = {},
   grupoEnEdicion,
-  persistOpen = true,
 }) => {
   const [nombreGrupo, setNombreGrupo] = useState("");
   const [cantidadGrupo, setCantidadGrupo] = useState("");
@@ -17,6 +16,9 @@ const AgregarGrupoModal = ({
   const [busqueda, setBusqueda] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [editandoNombre, setEditandoNombre] = useState(null);
+  const [mostrarFormTemporal, setMostrarFormTemporal] = useState(false);
+  const [formTemporal, setFormTemporal] = useState({ nombre: "", precio: "" });
   const buscarRef = useRef(null);
 
   // Precarga para edición
@@ -26,22 +28,24 @@ const AgregarGrupoModal = ({
       setCantidadGrupo(
         grupoEnEdicion.cantidad != null ? String(grupoEnEdicion.cantidad) : ""
       );
-      const items = (grupoEnEdicion.productos || []).map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        descripcion: p.descripcion || "",
-        precio: typeof p.precio === "number" ? p.precio : Number(p.precio || 0),
-        cantidad: typeof p.cantidad === "number" ? p.cantidad : Number(p.cantidad || 1),
-        subtotal:
-          (typeof p.subtotal === "number"
-            ? p.subtotal
-            : Number(p.precio || 0) * Number(p.cantidad || 1)) || 0,
-        temporal: !!p.temporal,
-        es_proveedor: !!p.es_proveedor,
-        multiplicar: p.multiplicar !== undefined ? !!p.multiplicar : true,
-        precio_compra: p.precio_compra || 0,
-        proveedor_nombre: p.proveedor_nombre || "",
-      }));
+      // ✅ Fix: forzar recálculo de subtotal desde precio × cantidad
+      const items = (grupoEnEdicion.productos || []).map((p) => {
+        const precio = Number(p.precio || 0);
+        const cantidad = Number(p.cantidad || 1);
+        return {
+          id: p.id,
+          nombre: p.nombre,
+          descripcion: p.descripcion || "",
+          precio,
+          cantidad,
+          subtotal: precio * cantidad,
+          temporal: !!p.temporal,
+          es_proveedor: !!p.es_proveedor,
+          multiplicar: p.multiplicar !== undefined ? !!p.multiplicar : true,
+          precio_compra: Number(p.precio_compra || 0),
+          proveedor_nombre: p.proveedor_nombre || "",
+        };
+      });
       setSeleccionados(items);
     }
   }, [grupoEnEdicion]);
@@ -107,6 +111,7 @@ const AgregarGrupoModal = ({
     buscarRef.current?.focus();
   }, []);
 
+  // ✅ Sin límite — muestra todos los resultados
   const filtrados = useMemo(() => {
     const t = (busqueda || "").toLowerCase();
     if (!t) return [];
@@ -130,60 +135,92 @@ const AgregarGrupoModal = ({
     buscarRef.current?.focus();
   };
 
+  // ✅ Fix: inmutabilidad correcta — crea objeto nuevo en vez de mutar
   const actualizarCampo = (index, campo, valor) => {
-    setSeleccionados((prev) => {
-      const arr = [...prev];
+    setSeleccionados((prev) =>
+      prev.map((item, i) => {
+        if (i !== index) return item;
 
-      if (campo === "temporal") {
-        arr[index][campo] = !!valor;
-      } else if (campo === "multiplicar") {
-        arr[index][campo] = !!valor;
-      } else if (campo === "cantidad") {
-        const raw = valor;
-        if (raw === "") {
-          arr[index].cantidad = "";
-        } else {
-          const n = parseInt(raw, 10);
-          if (isNaN(n) || n <= 0) {
-            arr[index].cantidad = "";
+        const updated = { ...item };
+
+        if (campo === "temporal") {
+          updated.temporal = !!valor;
+        } else if (campo === "multiplicar") {
+          updated.multiplicar = !!valor;
+        } else if (campo === "cantidad") {
+          if (valor === "") {
+            updated.cantidad = "";
           } else {
-            arr[index].cantidad = n;
+            const n = parseInt(valor, 10);
+            updated.cantidad = (!isNaN(n) && n > 0) ? n : "";
           }
+        } else if (campo === "precio_compra") {
+          if (valor === "") {
+            updated.precio_compra = "";
+          } else {
+            const n = Number(valor);
+            updated.precio_compra = (!isNaN(n) && n >= 0) ? n : 0;
+          }
+        } else if (campo === "precio") {
+          if (valor === "") {
+            updated.precio = "";
+          } else {
+            const n = Number(valor);
+            updated.precio = (!isNaN(n) && n >= 0) ? n : 0;
+          }
+        } else if (campo === "nombre") {
+          updated.nombre = valor;
         }
-      } else if (campo === "precio_compra") {
-        const raw = valor;
-        if (raw === "") {
-          arr[index].precio_compra = "";
-        } else {
-          const n = Number(raw);
-          arr[index].precio_compra = !isNaN(n) && n >= 0 ? n : 0;
-        }
-      } else if (campo === "precio") {
-        const raw = valor;
-        if (raw === "") {
-          arr[index].precio = "";
-        } else {
-          const n = Number(raw);
-          arr[index].precio = !isNaN(n) && n >= 0 ? n : 0;
-        }
-      }
 
-      arr[index].subtotal =
-        Number(arr[index].precio || 0) * Number(arr[index].cantidad || 0);
+        // ✅ Recalcular subtotal siempre
+        updated.subtotal = Number(updated.precio || 0) * Number(updated.cantidad || 0);
 
-      return arr;
-    });
+        return updated;
+      })
+    );
   };
 
   const eliminarDelGrupo = (index) => {
     setSeleccionados((prev) => prev.filter((_, i) => i !== index));
+    if (editandoNombre === index) setEditandoNombre(null);
   };
 
+  // ✅ Fix: recalcular siempre desde valores actuales
   const subtotalGrupo = useMemo(
-    () => seleccionados.reduce((acc, it) => acc + Number(it.subtotal || 0), 0),
+    () => seleccionados.reduce((acc, it) => {
+      return acc + (Number(it.precio || 0) * Number(it.cantidad || 0));
+    }, 0),
     [seleccionados]
   );
 
+  // ✅ Agregar artículo temporal rápido
+  const agregarTemporal = () => {
+    if (!formTemporal.nombre.trim()) {
+      alert("Escribe un nombre para el artículo.");
+      return;
+    }
+    const precio = Number(formTemporal.precio || 0);
+    const id = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const nuevo = {
+      id,
+      nombre: formTemporal.nombre.trim(),
+      descripcion: "",
+      precio,
+      cantidad: "",
+      subtotal: 0,
+      temporal: true,
+      es_proveedor: false,
+      multiplicar: true,
+      precio_compra: 0,
+      proveedor_nombre: "",
+    };
+    setSeleccionados((prev) => [...prev, nuevo]);
+    setFormTemporal({ nombre: "", precio: "" });
+    setMostrarFormTemporal(false);
+    buscarRef.current?.focus();
+  };
+
+  // ✅ Siempre cierra al guardar
   const guardarGrupo = () => {
     if (!nombreGrupo || seleccionados.length === 0) {
       alert("Debes nombrar el grupo y agregar artículos.");
@@ -200,16 +237,7 @@ const AgregarGrupoModal = ({
     };
 
     onAgregarGrupo?.(grupo);
-
-    if (persistOpen) {
-      setNombreGrupo("");
-      setCantidadGrupo("");
-      setSeleccionados([]);
-      setBusqueda("");
-      buscarRef.current?.focus();
-    } else {
-      onClose?.();
-    }
+    onClose?.();
   };
 
   const onKeyDownBuscar = (e) => {
@@ -227,7 +255,7 @@ const AgregarGrupoModal = ({
   };
 
   return (
-    <div className="modal-overlay"> {/* <--- AQUÍ LE QUITAMOS EL ONCLICK */}
+    <div className="modal-overlay">
       <div className="modal-contenedor ancho-grande" onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}
@@ -294,11 +322,14 @@ const AgregarGrupoModal = ({
           {loading && <div style={{ color: "#6b7280", marginBottom: 12 }}>Cargando productos...</div>}
           {error && <div style={{ color: "#dc2626", marginBottom: 12 }}>{error}</div>}
 
-          {/* Resultados de búsqueda */}
+          {/* ✅ Resultados de búsqueda — SIN LÍMITE, con scroll */}
           {busqueda && filtrados.length > 0 && (
             <div className="modal-seccion">
-              <ul className="lista-sugerencias">
-                {filtrados.slice(0, 10).map((p) => (
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>
+                {filtrados.length} resultado{filtrados.length !== 1 ? "s" : ""}
+              </div>
+              <ul className="lista-sugerencias" style={{ maxHeight: "40vh", overflowY: "auto" }}>
+                {filtrados.map((p) => (
                   <li key={p.id} onClick={() => agregarAlGrupo(p)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <strong>{p.nombre}</strong>
@@ -319,6 +350,55 @@ const AgregarGrupoModal = ({
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* ✅ Crear artículo temporal */}
+          {!mostrarFormTemporal ? (
+            <button
+              onClick={() => setMostrarFormTemporal(true)}
+              className="btn-modal btn-dashed"
+              style={{ marginBottom: 12, fontSize: 12 }}
+            >
+              ➕ Crear artículo temporal (sin inventario)
+            </button>
+          ) : (
+            <div className="form-expandible" style={{ marginBottom: 12 }}>
+              <div className="form-expandible-titulo">➕ Artículo temporal</div>
+              <div className="form-grid form-grid-2" style={{ marginBottom: 8 }}>
+                <input
+                  type="text"
+                  placeholder="Nombre del artículo"
+                  value={formTemporal.nombre}
+                  onChange={(e) => setFormTemporal({ ...formTemporal, nombre: e.target.value })}
+                  className="modal-input"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter") agregarTemporal(); }}
+                />
+                <input
+                  type="number"
+                  placeholder="Precio (opcional)"
+                  min="0"
+                  value={formTemporal.precio}
+                  onChange={(e) => setFormTemporal({ ...formTemporal, precio: e.target.value })}
+                  className="modal-input"
+                  onKeyDown={(e) => { if (e.key === "Enter") agregarTemporal(); }}
+                />
+              </div>
+              <div className="form-acciones">
+                <button onClick={agregarTemporal} className="btn-modal btn-verde btn-pequeno">
+                  ➕ Agregar
+                </button>
+                <button
+                  onClick={() => {
+                    setMostrarFormTemporal(false);
+                    setFormTemporal({ nombre: "", precio: "" });
+                  }}
+                  className="btn-modal btn-secundario btn-pequeno"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           )}
 
@@ -357,17 +437,44 @@ const AgregarGrupoModal = ({
                     />
                   </div>
 
-                  {/* Info del producto */}
+                  {/* ✅ Nombre editable con click */}
                   <div className="item-editable-info">
-                    <div className="item-editable-nombre">{item.nombre}</div>
+                    {editandoNombre === index ? (
+                      <input
+                        type="text"
+                        value={item.nombre}
+                        onChange={(e) => actualizarCampo(index, "nombre", e.target.value)}
+                        onBlur={() => setEditandoNombre(null)}
+                        onKeyDown={(e) => { if (e.key === "Enter") setEditandoNombre(null); }}
+                        className="modal-input"
+                        style={{ fontSize: 13, padding: "4px 8px", marginBottom: 2 }}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        className="item-editable-nombre"
+                        onClick={() => setEditandoNombre(index)}
+                        title="Click para editar nombre"
+                        style={{ cursor: "pointer" }}
+                      >
+                        {item.nombre}
+                        <span style={{ fontSize: 10, color: "#9ca3af", marginLeft: 6 }}>✏️</span>
+                      </div>
+                    )}
                     <div className="item-editable-meta">
-                      {item.es_proveedor ? (
+                      {item.temporal ? (
+                        <span className="badge badge-gris">Temporal</span>
+                      ) : item.es_proveedor ? (
                         <span className="badge badge-morado">{item.proveedor_nombre || "Proveedor"}</span>
                       ) : (
                         <span className="badge badge-gris">Inventario</span>
                       )}
-                      {" · Stock: "}
-                      {stockDisponible?.[item.id] ?? "N/A"}
+                      {!item.temporal && (
+                        <>
+                          {" · Stock: "}
+                          {stockDisponible?.[item.id] ?? "N/A"}
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -430,7 +537,7 @@ const AgregarGrupoModal = ({
             Cancelar
           </button>
           <button onClick={guardarGrupo} className="btn-modal btn-verde">
-            ➕ {grupoEnEdicion ? "Guardar cambios" : "Agregar grupo"}
+            {grupoEnEdicion ? "💾 Guardar cambios" : "➕ Agregar grupo"}
           </button>
         </div>
       </div>
