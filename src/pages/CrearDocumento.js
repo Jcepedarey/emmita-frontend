@@ -163,6 +163,7 @@ const [pagosProveedores, setPagosProveedores] = useState([]);
     // Edición de grupo
     const [grupoEnEdicion, setGrupoEnEdicion] = useState(null);
     const [indiceGrupoEnEdicion, setIndiceGrupoEnEdicion] = useState(null);
+    const [editandoNombreIndex, setEditandoNombreIndex] = useState(null);
 
     // Input refs (pequeñas mejoras UX)
     const inputFechaUnDiaRef = useRef(null);
@@ -1453,7 +1454,31 @@ mostrar_notas: mostrarNotas
           <td style={{ textAlign: "center" }}>
             <span className={sobrepasado ? "stock-alerta" : "stock-ok"}>{stockDisp}</span>
           </td>
-          <td>{item.nombre}</td>
+          <td>
+                    {editandoNombreIndex === index ? (
+                      <input
+                        type="text"
+                        value={item.nombre}
+                        onChange={(e) => {
+                          const nuevos = [...productosAgregados];
+                          nuevos[index] = { ...nuevos[index], nombre: e.target.value };
+                          setProductosAgregados(nuevos);
+                        }}
+                        onBlur={() => setEditandoNombreIndex(null)}
+                        onKeyDown={(e) => { if (e.key === "Enter") setEditandoNombreIndex(null); }}
+                        autoFocus
+                        style={{ width: "100%", padding: "4px 6px", fontSize: "13px" }}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => setEditandoNombreIndex(index)}
+                        style={{ cursor: "pointer" }}
+                        title="Click para editar nombre"
+                      >
+                        {item.nombre} <span style={{ fontSize: 10, color: "#9ca3af" }}>✏️</span>
+                      </span>
+                    )}
+                  </td>
 
           {mostrarNotas && (
             <td>
