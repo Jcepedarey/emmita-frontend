@@ -35,6 +35,7 @@ import Agenda from "./pages/Agenda";
 import Usuarios from "./pages/Usuarios";
 import MiEmpresa from "./pages/MiEmpresa";
 import Terminos from "./pages/Terminos";
+import PreguntasFrecuentes from "./pages/PreguntasFrecuentes";
 import ResetPassword from "./pages/ResetPassword"; // ✅ NUEVO IMPORT
 import RutaEntregas from "./pages/RutaEntregas";
 import PagosPendientes from "./pages/PagosPendientes";
@@ -51,7 +52,7 @@ function AppContent() {
 
   // ✅ Detectar si estamos en páginas públicas (sin sesión)
   // ✅ MODIFICADO: Se agregó "/login"
-  const esPaginaPublica = ["/", "/login", "/registro", "/terminos", "/reset-password"].includes(location.pathname);
+  const esPaginaPublica = ["/", "/login", "/registro", "/terminos", "/faq", "/reset-password"].includes(location.pathname);
 
   // ✅ Detectar recovery de contraseña desde email de Supabase
   const navigate = useNavigate();
@@ -147,6 +148,7 @@ function AppContent() {
             <Route path="/login" element={<Login />} /> {/* ✅ NUEVA RUTA LOGIN */}
             <Route path="/registro" element={<Register />} />
             <Route path="/terminos" element={<Terminos />} />
+            <Route path="/faq" element={<PreguntasFrecuentes />} />
             <Route path="/reset-password" element={<ResetPassword />} /> 
             <Route path="/inicio" element={<Inicio />} />
             <Route path="/crear-documento" element={<CrearDocumento />} />

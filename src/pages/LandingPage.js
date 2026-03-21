@@ -198,6 +198,7 @@ export default function LandingPage() {
           <a href="#precios" style={navLink}>Precios</a>
           <a href="#calculadora" style={navLink}>Ahorro</a>
           <a href="#contacto" style={navLink}>Contacto</a>
+          <a href="/faq" style={navLink}>FAQ</a>
           <button onClick={() => navigate("/login")} style={navBtnSecundario}>Iniciar sesión</button>
           <button onClick={() => navigate("/registro")} style={navBtnPrimario}>Prueba gratis</button>
         </div>
@@ -223,6 +224,7 @@ export default function LandingPage() {
           <a href="#precios" onClick={() => setMenuMovil(false)} style={{ ...navLink, fontSize: 20 }}>Precios</a>
           <a href="#calculadora" onClick={() => setMenuMovil(false)} style={{ ...navLink, fontSize: 20 }}>Ahorro</a>
           <a href="#contacto" onClick={() => setMenuMovil(false)} style={{ ...navLink, fontSize: 20 }}>Contacto</a>
+          <a href="/faq" onClick={() => setMenuMovil(false)} style={{ ...navLink, fontSize: 20 }}>Preguntas frecuentes</a>
           <button onClick={() => { setMenuMovil(false); navigate("/login"); }} style={{ ...navBtnSecundario, fontSize: 18, padding: "12px 32px" }}>Iniciar sesión</button>
           <button onClick={() => { setMenuMovil(false); navigate("/registro"); }} style={{ ...navBtnPrimario, fontSize: 18, padding: "12px 32px" }}>Prueba gratis</button>
         </div>
@@ -766,7 +768,8 @@ export default function LandingPage() {
             <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, color: "#cbd5e1" }}>LEGAL</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <a href="/terminos" style={footerLink}>Términos y condiciones</a>
-              <a href="/terminos" style={footerLink}>Política de privacidad</a>
+              <a href="/terminos#privacidad" style={footerLink}>Política de privacidad</a>
+              <a href="/faq" style={footerLink}>Preguntas frecuentes</a>
             </div>
           </div>
 
