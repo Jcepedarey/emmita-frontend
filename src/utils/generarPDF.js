@@ -9,6 +9,16 @@ import jsPDF from "jspdf";
     sage: [140, 153, 135],
   };
 
+  // ─── Config de redes sociales para PDF ──────────────────────────────────
+  const REDES_PDF = {
+    instagram: { sigla: "IG", color: [225, 48, 108] },
+    facebook: { sigla: "FB", color: [24, 119, 242] },
+    tiktok: { sigla: "TK", color: [1, 1, 1] },
+    youtube: { sigla: "YT", color: [255, 0, 0] },
+    whatsapp: { sigla: "WA", color: [37, 211, 102] },
+    web: { sigla: "WEB", color: [0, 119, 182] },
+  };
+
   /**
    * Devuelve el color de encabezado de tabla según el tipo de documento
    * @param {string} tipo - "cotizacion" o "pedido"
@@ -285,8 +295,8 @@ const head = (() => {
 let y = (doc.lastAutoTable?.finalY || 100) + 10;
     // ===== Pre-cálculo de espacio para Garantía + Abonos + Totales + Redes =====
   const pageHeight0 = doc.internal.pageSize.getHeight();
-  const footerHeight = 15;    // 3 líneas de redes (5px c/u)
-  const bottomMargin = 15;    // margen inferior
+  const footerHeight = 30;    // redes + condiciones
+  const bottomMargin = 12;    // margen inferior
   const safeBottom0 = pageHeight0 - bottomMargin - footerHeight;
 
   // Flags para totales (las usamos también para calcular altura)
@@ -461,10 +471,65 @@ let y = (doc.lastAutoTable?.finalY || 100) + 10;
   const pageHeight2 = doc.internal.pageSize.getHeight();
   const yFooter2    = pageHeight2 - bottomMargin - footerHeight;
 
-  doc.setFontSize(10);
-  if (emp.instagram) doc.text(`Instagram: ${emp.instagram}`, 10, yFooter2);
-  if (emp.facebook) doc.text(`Facebook: ${emp.facebook}`, 10, yFooter2 + 5);
-  if (emp.email) doc.text(`Email: ${emp.email}`, 10, yFooter2 + 10);
+  // ─── Pie de página moderno: condiciones + redes sociales ─────────────────
+  let yPie = yFooter2;
+
+  // 📄 Texto de condiciones (si existe)
+  if (emp.textoCondicionesPdf) {
+    doc.setFontSize(7.5);
+    doc.setTextColor(107, 114, 128);
+    const lineas = doc.splitTextToSize(emp.textoCondicionesPdf, 190);
+    const lineasMostrar = lineas.slice(0, 3); // máx 3 líneas
+    lineasMostrar.forEach((linea, i) => {
+      doc.text(linea, 10, yPie + (i * 3.5));
+    });
+    yPie += lineasMostrar.length * 3.5 + 4;
+  }
+
+  // 📱 Redes sociales como pills con sigla de color
+  const redes = emp.redesSociales || [];
+  if (redes.length > 0) {
+    let xPill = 10;
+    const pillH = 5;
+    const pillY = yPie;
+
+    redes.forEach((red) => {
+      const cfg = REDES_PDF[red.red];
+      if (!cfg || !red.usuario) return;
+
+      const texto = red.usuario;
+      const sigla = cfg.sigla;
+      const textoAncho = doc.getStringUnitWidth(texto) * 7.5 / doc.internal.scaleFactor;
+      const siglaAncho = doc.getStringUnitWidth(sigla) * 7 / doc.internal.scaleFactor;
+      const pillW = siglaAncho + textoAncho + 12;
+
+      // No dibujar si se sale de la página
+      if (xPill + pillW > 200) return;
+
+      // Cuadro de sigla (color)
+      doc.setFillColor(...cfg.color);
+      doc.roundedRect(xPill, pillY - 3.5, siglaAncho + 5, pillH, 1.2, 1.2, "F");
+      doc.setFontSize(7);
+      doc.setTextColor(255, 255, 255);
+      doc.text(sigla, xPill + 2.5, pillY);
+
+      // Texto del usuario
+      doc.setFontSize(7.5);
+      doc.setTextColor(75, 85, 99);
+      doc.text(texto, xPill + siglaAncho + 7, pillY);
+
+      xPill += pillW + 6;
+    });
+  }
+
+  // Si no hay redes ni condiciones, mostrar email como fallback
+  if (redes.length === 0 && !emp.textoCondicionesPdf && emp.email) {
+    doc.setFontSize(8);
+    doc.setTextColor(107, 114, 128);
+    doc.text(emp.email, 10, yPie);
+  }
+
+  doc.setTextColor(0, 0, 0); // restaurar
 
   // ─── Guardar PDF ─────────────────────────────────────────────────────────────
   const fechaSegura = documento.fecha_creacion || new Date();

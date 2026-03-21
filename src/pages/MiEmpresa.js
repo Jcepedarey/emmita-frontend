@@ -7,6 +7,16 @@ import { limpiarCacheTenant } from "../utils/tenantPDF";
 import Protegido from "../components/Protegido";
 import useLimites from "../hooks/useLimites";
 
+// ─── Configuración de redes sociales disponibles ──────────────────
+const REDES_CONFIG = {
+  instagram: { nombre: "Instagram", sigla: "IG", color: "#E1306C", placeholder: "@tuempresa" },
+  facebook: { nombre: "Facebook", sigla: "FB", color: "#1877F2", placeholder: "facebook.com/tuempresa" },
+  tiktok: { nombre: "TikTok", sigla: "TK", color: "#010101", placeholder: "@tuempresa" },
+  youtube: { nombre: "YouTube", sigla: "YT", color: "#FF0000", placeholder: "youtube.com/@tucanal" },
+  whatsapp: { nombre: "WhatsApp", sigla: "WA", color: "#25D366", placeholder: "3001234567" },
+  web: { nombre: "Sitio web", sigla: "WEB", color: "#0077B6", placeholder: "www.tuempresa.com" },
+};
+
 // ─── Comprime imagen en el navegador antes de subir ───────────────────
 function comprimirImagen(file, maxAncho, maxAlto, calidad = 0.8) {
   return new Promise((resolve, reject) => {
@@ -55,10 +65,11 @@ export default function MiEmpresa() {
     direccion: "",
     telefono: "",
     email: "",
-    instagram: "",
-    facebook: "",
     nit: "",
+    texto_condiciones_pdf: "",
   });
+  const [redesSociales, setRedesSociales] = useState([]);
+  const [nuevaRed, setNuevaRed] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [subiendoLogo, setSubiendoLogo] = useState(false);
   const [subiendoFondo, setSubiendoFondo] = useState(false);
@@ -75,10 +86,18 @@ export default function MiEmpresa() {
         direccion: tenant.direccion || "",
         telefono: tenant.telefono || "",
         email: tenant.email || "",
-        instagram: tenant.instagram || "",
-        facebook: tenant.facebook || "",
         nit: tenant.nit || "",
+        texto_condiciones_pdf: tenant.texto_condiciones_pdf || "",
       });
+      // Cargar redes sociales (con fallback a campos legacy)
+      let redes = tenant.redes_sociales || [];
+      if ((!redes || redes.length === 0)) {
+        const legacy = [];
+        if (tenant.instagram) legacy.push({ red: "instagram", usuario: tenant.instagram });
+        if (tenant.facebook) legacy.push({ red: "facebook", usuario: tenant.facebook });
+        if (legacy.length > 0) redes = legacy;
+      }
+      setRedesSociales(redes);
       setLogoPreview(tenant.logo_url || null);
       setFondoPreview(tenant.fondo_url || null);
     }
@@ -192,9 +211,12 @@ export default function MiEmpresa() {
           direccion: form.direccion.trim(),
           telefono: form.telefono.trim(),
           email: form.email.trim(),
-          instagram: form.instagram.trim(),
-          facebook: form.facebook.trim(),
           nit: form.nit.trim(),
+          redes_sociales: redesSociales,
+          texto_condiciones_pdf: form.texto_condiciones_pdf.trim(),
+          // Mantener campos legacy por compatibilidad
+          instagram: (redesSociales.find(r => r.red === "instagram")?.usuario || "").trim(),
+          facebook: (redesSociales.find(r => r.red === "facebook")?.usuario || "").trim(),
         })
         .eq("id", tenant.id);
 
@@ -497,21 +519,110 @@ export default function MiEmpresa() {
           placeholder="email@empresa.com"
         />
 
-        <label style={label}>Instagram</label>
-        <input
-          style={input}
-          value={form.instagram}
-          onChange={(e) => handleChange("instagram", e.target.value)}
-          placeholder="@tuempresa"
-        />
+        <div style={{ borderBottom: "1px solid #e5e7eb", marginTop: 20, marginBottom: 4 }} />
 
-        <label style={label}>Facebook</label>
-        <input
-          style={input}
-          value={form.facebook}
-          onChange={(e) => handleChange("facebook", e.target.value)}
-          placeholder="facebook.com/tuempresa"
+        {/* ─── SECCIÓN: Redes sociales ──────────────────────── */}
+        <div style={sectionTitle}>📱 Redes sociales (aparecen en PDFs)</div>
+        <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 12px 0" }}>
+          Selecciona las redes que quieres mostrar en tus cotizaciones y pedidos.
+        </p>
+
+        {/* Redes agregadas */}
+        {redesSociales.map((red, index) => (
+          <div key={index} style={{
+            display: "flex", alignItems: "center", gap: 10, marginBottom: 8,
+            padding: "8px 12px", background: "#f8fafc", borderRadius: 8,
+            border: "1px solid #e5e7eb",
+          }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 32, height: 32, borderRadius: 8, color: "white", fontSize: 11, fontWeight: 700,
+              background: REDES_CONFIG[red.red]?.color || "#6b7280", flexShrink: 0,
+            }}>
+              {REDES_CONFIG[red.red]?.sigla || "?"}
+            </span>
+            <span style={{ fontSize: 12, color: "#6b7280", minWidth: 70 }}>
+              {REDES_CONFIG[red.red]?.nombre || red.red}
+            </span>
+            <input
+              style={{ ...input, flex: 1, marginTop: 0 }}
+              value={red.usuario}
+              onChange={(e) => {
+                const nuevas = [...redesSociales];
+                nuevas[index] = { ...nuevas[index], usuario: e.target.value };
+                setRedesSociales(nuevas);
+              }}
+              placeholder={REDES_CONFIG[red.red]?.placeholder || "Usuario o URL"}
+            />
+            <button
+              onClick={() => setRedesSociales(redesSociales.filter((_, i) => i !== index))}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 16, color: "#ef4444", padding: 4, minHeight: "auto",
+              }}
+              title="Eliminar"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+
+        {/* Agregar nueva red */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+          <select
+            value={nuevaRed}
+            onChange={(e) => setNuevaRed(e.target.value)}
+            style={{
+              ...input, flex: 1, marginTop: 0, color: nuevaRed ? "#111827" : "#9ca3af",
+            }}
+          >
+            <option value="">Agregar red social...</option>
+            {Object.entries(REDES_CONFIG)
+              .filter(([key]) => !redesSociales.some(r => r.red === key))
+              .map(([key, cfg]) => (
+                <option key={key} value={key}>{cfg.nombre}</option>
+              ))
+            }
+          </select>
+          <button
+            onClick={() => {
+              if (nuevaRed && !redesSociales.some(r => r.red === nuevaRed)) {
+                setRedesSociales([...redesSociales, { red: nuevaRed, usuario: "" }]);
+                setNuevaRed("");
+              }
+            }}
+            disabled={!nuevaRed}
+            style={{
+              padding: "10px 16px", borderRadius: 8, border: "none",
+              background: nuevaRed ? "#0077B6" : "#d1d5db", color: "white",
+              fontSize: 13, fontWeight: 600, cursor: nuevaRed ? "pointer" : "not-allowed",
+              minHeight: "auto", whiteSpace: "nowrap",
+            }}
+          >
+            + Agregar
+          </button>
+        </div>
+
+        <div style={{ borderBottom: "1px solid #e5e7eb", marginTop: 20, marginBottom: 4 }} />
+
+        {/* ─── SECCIÓN: Condiciones para PDFs ──────────────── */}
+        <div style={sectionTitle}>📄 Condiciones en documentos PDF</div>
+        <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 8px 0" }}>
+          Este texto aparecerá al final de tus cotizaciones y pedidos. Máx 3 líneas recomendado.
+        </p>
+        <textarea
+          style={{
+            ...input, minHeight: 70, resize: "vertical",
+            fontFamily: "inherit", lineHeight: 1.5,
+          }}
+          value={form.texto_condiciones_pdf}
+          onChange={(e) => handleChange("texto_condiciones_pdf", e.target.value)}
+          placeholder="Ej: Toda demora en la devolución genera un cargo adicional del 20% diario. Los daños a la mercancía serán cobrados según avalúo."
+          maxLength={500}
         />
+        <span style={{ fontSize: 11, color: "#9ca3af" }}>
+          {form.texto_condiciones_pdf.length}/500 caracteres
+        </span>
 
         <button style={btnGuardar} onClick={guardar} disabled={guardando}>
           {guardando ? "Guardando..." : "Guardar cambios"}

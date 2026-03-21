@@ -28,6 +28,15 @@ export async function obtenerDatosTenantPDF() {
 
     if (!tenant) return datosPorDefecto();
 
+    // ✅ Migrar datos legacy: si redes_sociales está vacío pero hay instagram/facebook
+    let redesSociales = tenant.redes_sociales || [];
+    if ((!redesSociales || redesSociales.length === 0)) {
+      const legacy = [];
+      if (tenant.instagram) legacy.push({ red: "instagram", usuario: tenant.instagram });
+      if (tenant.facebook) legacy.push({ red: "facebook", usuario: tenant.facebook });
+      if (legacy.length > 0) redesSociales = legacy;
+    }
+
     _cachedTenant = {
       nombre: tenant.nombre || "Mi Empresa",
       direccion: tenant.direccion || "",
@@ -39,6 +48,9 @@ export async function obtenerDatosTenantPDF() {
       // Usar URLs de Storage si existen, si no usar imágenes estáticas locales
       logoUrl: tenant.logo_url || "/icons/logo.png",
       fondoUrl: tenant.fondo_url || "/icons/fondo_emmita.png",
+      // 🆕 Nuevos campos
+      redesSociales: redesSociales,
+      textoCondicionesPdf: tenant.texto_condiciones_pdf || "",
     };
 
     return _cachedTenant;
@@ -61,6 +73,8 @@ function datosPorDefecto() {
     nit: "",
     logoUrl: "/icons/logo.png",
     fondoUrl: "/icons/fondo_emmita.png",
+    redesSociales: [],
+    textoCondicionesPdf: "",
   };
 }
 
