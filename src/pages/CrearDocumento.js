@@ -65,6 +65,7 @@
 
     // 🔒 Protección contra doble clic
     const [guardando, setGuardando] = useState(false);
+    const guardandoRef = useRef(false); // ✅ Protección síncrona contra doble clic
 
     // 👉 Helpers de fecha para abonos
   const hoyISO = () => {
@@ -858,11 +859,12 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
 
     // ✅ Guardar documento
     const guardarDocumento = async () => {
-      // 🔒 Protección contra doble clic
-      if (guardando) {
+      // 🔒 Protección SÍNCRONA contra doble clic (ref se actualiza inmediatamente)
+      if (guardandoRef.current) {
         console.log("⚠️ Ya se está guardando, ignorando clic adicional");
         return;
       }
+      guardandoRef.current = true;
 
       // 🛑 AQUÍ PONEMOS LA VERIFICACIÓN DEL PLAN DE PRUEBA 🛑
       // Solo lo bloqueamos si es un documento nuevo (!esEdicion)
@@ -876,12 +878,12 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
       try {
       // ✅ VALIDACIÓN 1: Cliente y productos
       if (!clienteSeleccionado) {
-        setGuardando(false);
+        guardandoRef.current = false; setGuardando(false);
         return Swal.fire("Falta cliente", "Debes seleccionar un cliente antes de guardar.", "warning");
       }
       
       if (productosAgregados.length === 0) {
-        setGuardando(false);
+        guardandoRef.current = false; setGuardando(false);
         return Swal.fire("Sin productos", "Debes agregar al menos un producto.", "warning");
       }
 
@@ -891,7 +893,7 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
         : (fechaEvento && fechaEvento.trim() !== "");
       
       if (!tieneFechaEvento) {
-        setGuardando(false);
+        guardandoRef.current = false; setGuardando(false);
         return Swal.fire("Falta fecha", "Debes seleccionar la fecha del evento antes de guardar.", "warning");
       }
 
@@ -903,7 +905,7 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
       
       if (productosConCantidadCero.length > 0) {
         const nombres = productosConCantidadCero.map(p => p.nombre).join(", ");
-        setGuardando(false);
+        guardandoRef.current = false; setGuardando(false);
         return Swal.fire("Cantidad inválida", `Los siguientes productos tienen cantidad 0 o vacía: ${nombres}`, "warning");
       }
 
@@ -926,7 +928,7 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
       const redondear = (num) => Math.round(num * 100) / 100;
       const totalAbonos = abonos.reduce((acc, ab) => acc + Number(ab.valor || 0), 0);
       if (redondear(totalAbonos) > redondear(totalNeto)) {
-        setGuardando(false);
+        guardandoRef.current = false; setGuardando(false);
         return Swal.fire("Error", "El total de abonos no puede superar el valor del pedido.", "warning");
       }
       const estadoFinal = redondear(totalAbonos) === redondear(totalNeto) ? "pagado" : "pendiente";
@@ -991,7 +993,7 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
       cancelButtonText: "Cancelar",
     });
     if (!confirmar.isConfirmed) {
-      setGuardando(false); // ✅ Liberar bloqueo si cancela
+      guardandoRef.current = false; setGuardando(false); // ✅ Liberar bloqueo si cancela
       return;
     }
 
@@ -1166,7 +1168,7 @@ if (tipoDocumento !== "cotizacion" && pagosProveedores && pagosProveedores.lengt
 }
     } finally {
       // 🔓 Siempre liberar el bloqueo al terminar
-      setGuardando(false);
+      guardandoRef.current = false; setGuardando(false);
     }
   }; // 👈 CERRAR guardarDocumento AQUÍ
 
