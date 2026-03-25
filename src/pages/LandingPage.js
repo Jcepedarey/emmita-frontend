@@ -50,7 +50,7 @@ const PLANES = [
     color: "#64748b",
     destacado: false,
     caracteristicas: [
-      "50 productos",
+      "200 productos",
       "Clientes ilimitados",
       "Cotizaciones y pedidos",
       "1 usuario",
@@ -60,12 +60,12 @@ const PLANES = [
   },
   {
     nombre: "Básico",
-    precio: "$49.000",
+    precio: "$59.000",
     periodo: "COP / mes",
     color: "#0077B6",
     destacado: false,
     caracteristicas: [
-      "50 productos",
+      "200 productos",
       "Clientes ilimitados",
       "Documentos ilimitados",
       "2 usuarios",
@@ -81,53 +81,25 @@ const PLANES = [
     color: "#00B4D8",
     destacado: true,
     caracteristicas: [
-      "Productos ilimitados",
+      "1.000 productos",
       "Clientes ilimitados",
       "Documentos ilimitados",
-      "5 usuarios",
+      "10 usuarios",
       "Asistente con IA",
       "Reportes avanzados",
       "Dashboard completo",
       "Soporte prioritario 24/7",
-    ],
-  },
-  {
-    nombre: "Enterprise",
-    precio: "$149.000",
-    periodo: "COP / mes",
-    color: "#0077B6",
-    destacado: false,
-    caracteristicas: [
-      "Todo en Profesional",
-      "10 usuarios",
-      "Marca de agua en PDFs",
-      "Backup dedicado",
-      "Capacitación incluida",
-      "Soporte personalizado",
+      "Prioridad en funciones nuevas",
     ],
   },
 ];
 
 const TESTIMONIOS = [
   {
-    nombre: "Santiago P.",
-    empresa: "Eventos Royal Prestige",
-    ciudad: "Bogotá",
+    nombre: "Jorge C.",
+    empresa: "Alquiler & Eventos Emmita",
+    ciudad: "Villavicencio",
     texto: "Antes manejaba todo en cuadernos y WhatsApp. Con SwAlquiler tengo control total de mi inventario y mis clientes. ¡Increíble!",
-    avatar: "👨‍💼",
-  },
-  {
-    nombre: "María L.",
-    empresa: "Deco Fiestas Luxury",
-    ciudad: "Medellín",
-    texto: "La generación de cotizaciones en PDF con mi logo le da un nivel profesional a mi negocio que antes no tenía.",
-    avatar: "👩‍💼",
-  },
-  {
-    nombre: "Andrés R.",
-    empresa: "Eventos & Alquiler la Sucursal",
-    ciudad: "Cali",
-    texto: "El calendario de agenda me salvó. Ya no se me cruzan los pedidos ni pierdo fechas de entrega.",
     avatar: "👨‍💼",
   },
 ];
