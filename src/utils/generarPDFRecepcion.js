@@ -57,11 +57,12 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
 
   // Recursos gráficos (MISMO tratamiento que Remisión)
   const emp = await obtenerDatosTenantPDF();
-  const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
-  const fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
+  const logo = emp.logoUrl ? await procesarImagen(emp.logoUrl, 250, 1.0) : null;
+  const fondo = emp.fondoUrl ? await procesarImagen(emp.fondoUrl, 300, 0.9) : null;
 
   // ⚠️ CRÍTICO: insertarFondo() solo UNA VEZ al inicio
   const insertarFondo = () => {
+    if (!fondo) return;
     const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
     const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
     doc.saveGraphicsState();
@@ -75,7 +76,7 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
   const cliente = clienteInput || {};
 
   // ─── Encabezado (EXACTO como Remisión) ───
-  doc.addImage(logo, "PNG", 10, 10, 30, 30);
+  if (logo) doc.addImage(logo, "PNG", 10, 10, 30, 30);
   doc.setFontSize(16);
   doc.text(emp.nombre, 50, 20);
   doc.setFontSize(10);

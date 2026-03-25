@@ -45,9 +45,9 @@ export async function obtenerDatosTenantPDF() {
       instagram: tenant.instagram || "",
       facebook: tenant.facebook || "",
       nit: tenant.nit || "",
-      // Usar URLs de Storage si existen, si no usar imágenes estáticas locales
-      logoUrl: tenant.logo_url || "/icons/logo.png",
-      fondoUrl: tenant.fondo_url || "/icons/fondo_emmita.png",
+      // Si no hay imagen subida, queda null (no mostrar nada en el PDF)
+      logoUrl: tenant.logo_url || null,
+      fondoUrl: tenant.fondo_url || null,
       // 🆕 Nuevos campos
       redesSociales: redesSociales,
       textoCondicionesPdf: tenant.texto_condiciones_pdf || "",
@@ -71,8 +71,8 @@ function datosPorDefecto() {
     instagram: "",
     facebook: "",
     nit: "",
-    logoUrl: "/icons/logo.png",
-    fondoUrl: "/icons/fondo_emmita.png",
+    logoUrl: null,
+    fondoUrl: null,
     redesSociales: [],
     textoCondicionesPdf: "",
   };

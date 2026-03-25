@@ -62,11 +62,11 @@ export async function generarPDFDashboard(data) {
   let logo = null, fondo = null;
   // ✅ CORRECCIÓN: Declaramos 'emp' aquí afuera con valores por defecto
   let emp = { 
-    nombre: "Alquiler & Eventos Emmita", 
-    direccion: "Villavicencio, Meta",
+    nombre: "Mi Empresa", 
+    direccion: "",
     telefono: "",
-    logoUrl: "/icons/logo.png",
-    fondoUrl: "/icons/fondo_emmita.png"
+    logoUrl: null,
+    fondoUrl: null
   };
 
   try {
@@ -75,8 +75,8 @@ export async function generarPDFDashboard(data) {
     if (datosTenant) {
         emp = datosTenant; // Si existen, sobrescribimos los valores por defecto
     }
-    logo = await procesarImagen(emp.logoUrl, 250, 1.0);
-    fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
+    logo = emp.logoUrl ? await procesarImagen(emp.logoUrl, 250, 1.0) : null;
+    fondo = emp.fondoUrl ? await procesarImagen(emp.fondoUrl, 300, 0.9) : null;
   } catch (error) {
     console.error("Error cargando recursos PDF:", error);
   }

@@ -63,11 +63,12 @@ import { jsPDF } from "jspdf";
   export const generarRemisionPDF = async (documento) => {
     const doc = new jsPDF();
     const emp = await obtenerDatosTenantPDF();
-    const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
-    const fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
+    const logo = emp.logoUrl ? await procesarImagen(emp.logoUrl, 250, 1.0) : null;
+    const fondo = emp.fondoUrl ? await procesarImagen(emp.fondoUrl, 300, 0.9) : null;
 
     // Marca de agua
     const insertarFondo = () => {
+      if (!fondo) return;
       const centerX = (doc.internal.pageSize.getWidth() - 150) / 2;
       const centerY = (doc.internal.pageSize.getHeight() - 150) / 2;
       doc.saveGraphicsState();
@@ -88,7 +89,7 @@ import { jsPDF } from "jspdf";
   const fechaEvento   = documento.fecha_evento   ? soloFecha(documento.fecha_evento)   : "-";
 
     // ─── Encabezado ──────────────────────────────────────────────────────────────
-    doc.addImage(logo, "PNG", 10, 10, 30, 30);
+    if (logo) doc.addImage(logo, "PNG", 10, 10, 30, 30);
     doc.setFontSize(16);
     doc.text(emp.nombre, 50, 20);
     doc.setFontSize(10);

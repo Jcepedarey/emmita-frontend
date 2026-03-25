@@ -66,8 +66,8 @@ export async function generarPDFContable(movimientos, opciones = {}) {
 
   // Recursos gráficos
   const emp = await obtenerDatosTenantPDF();
-  const logo = await procesarImagen(emp.logoUrl, 250, 1.0);
-  const fondo = await procesarImagen(emp.fondoUrl, 300, 0.9);
+  const logo = emp.logoUrl ? await procesarImagen(emp.logoUrl, 250, 1.0) : null;
+  const fondo = emp.fondoUrl ? await procesarImagen(emp.fondoUrl, 300, 0.9) : null;
 
   // Marca de agua en cada página
   const insertarFondo = () => {
