@@ -5,6 +5,9 @@ import { useTenant } from "../context/TenantContext";
 import supabase from "../supabaseClient";
 
 // ─── Definición de planes (valores por defecto) ──────────────────────
+// NOTA: La key "profesional" se mantiene por compatibilidad con la BD,
+// pero se muestra como "Estándar" al usuario.
+// Enterprise se mantiene oculto por ahora.
 const PLANES = {
   trial: {
     nombre: "Prueba gratuita",
@@ -17,7 +20,7 @@ const PLANES = {
   basico: {
     nombre: "Básico",
     duracionDias: null,
-    maxProductos: 50,
+    maxProductos: 200,
     maxUsuarios: 2,
     maxClientes: Infinity,
     maxDocumentos: Infinity,
@@ -25,8 +28,8 @@ const PLANES = {
   profesional: {
     nombre: "Profesional",
     duracionDias: null,
-    maxProductos: Infinity,
-    maxUsuarios: 5,
+    maxProductos: 1000,
+    maxUsuarios: 10,
     maxClientes: Infinity,
     maxDocumentos: Infinity,
   },
@@ -34,7 +37,7 @@ const PLANES = {
     nombre: "Enterprise",
     duracionDias: null,
     maxProductos: Infinity,
-    maxUsuarios: 10,
+    maxUsuarios: 20,
     maxClientes: Infinity,
     maxDocumentos: Infinity,
   },
