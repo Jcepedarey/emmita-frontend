@@ -361,6 +361,7 @@
 .sw-mov-badge.recurrente { background: #ede9fe; color: #6d28d9; }
 .sw-mov-badge.editado { background: #fef3c7; color: #92400e; }
 .sw-mov-badge.categoria { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.sw-mov-badge.categoria-gasto { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 .sw-mov-badge.recepcion { background: #fff7ed; color: #c2410c; }
 .sw-mov-badge.proveedor { background: #f0f9ff; color: #0369a1; }
 

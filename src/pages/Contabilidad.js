@@ -744,7 +744,7 @@ const Contabilidad = () => {
                                 : ""}
                             </div>
                             <div className="sw-mov-badges">
-                              {m.categoria && <span className="sw-mov-badge categoria">{m.categoria}</span>}
+                              {m.categoria && <span className={`sw-mov-badge ${m.tipo === "gasto" ? "categoria-gasto" : "categoria"}`}>{m.categoria}</span>}
                               {m.estado === "editado" && <span className="sw-mov-badge editado">editado</span>}
                               {m.origen === "automatico" && <span className="sw-mov-badge auto">automático</span>}
                               {m.origen === "recurrente" && <span className="sw-mov-badge recurrente">🔄 recurrente</span>}

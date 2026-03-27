@@ -220,8 +220,11 @@ export async function generarPDFRecepcion(revision, clienteInput, productosRecib
   ingresosAdicionales.forEach((ing, i) => {
     const valor = Number(ing.valor || 0);
     if (valor > 0) {
+      const concepto = ing.motivo?.trim()
+        ? ing.motivo.trim()
+        : `Pago en recepción ${i + 1}`;
       ingresosRows.push([
-        `Pago en recepción ${i + 1}`,
+        concepto,
         ing.fecha ? soloFecha(ing.fecha) : "—",
         money(valor),
       ]);

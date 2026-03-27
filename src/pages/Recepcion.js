@@ -142,12 +142,14 @@ const Recepcion = () => {
       setIngresosAdicionales([]);
     }
 
-    // ✅ Precargar garantía retenida
-    if (orden.garantia !== undefined && orden.garantia_devuelta !== undefined) {
+    // ✅ Precargar garantía retenida (solo si ya se guardó antes, si no queda en 0)
+    if (orden.garantia_devuelta != null && orden.garantia_devuelta !== undefined) {
+      // Ya pasó por recepción antes (guardado parcial o cerrado) → recalcular
       const retenida = Number(orden.garantia || 0) - Number(orden.garantia_devuelta || 0);
       if (retenida > 0) setGarantiaRetenida(String(retenida));
       else setGarantiaRetenida("");
     } else {
+      // Primera vez en recepción → retención en cero por defecto
       setGarantiaRetenida("");
     }
 
@@ -503,6 +505,9 @@ useEffect(() => {
           for (const ingreso of ingresosAdicionales) {
             const valorNumerico = Number(ingreso.valor);
             if (valorNumerico > 0) {
+              const textoMotivo = ingreso.motivo?.trim()
+                ? ingreso.motivo.trim()
+                : "Abono recibido en recepción";
               await insertMC(
                 {
                   orden_id: ordenSeleccionada.id,
@@ -510,7 +515,7 @@ useEffect(() => {
                   fecha: ingreso.fecha || fechaHoy,
                   tipo: "ingreso",
                   monto: valorNumerico,
-                  descripcion: `[${numeroLimpio}] Abono recibido en recepción`,
+                  descripcion: `[${numeroLimpio}] ${textoMotivo}`,
                   categoria: "Abonos",
                   estado: "activo",
                   usuario: usuario?.nombre || "Administrador",
@@ -1028,37 +1033,50 @@ useEffect(() => {
                 </div>
 
                 {ingresosAdicionales.map((ingreso, index) => (
-                  <div key={index} className="cd-abono-fila">
+                  <div key={index} style={{ marginBottom: "8px" }}>
+                    <div className="cd-abono-fila">
+                      <input
+                        type="number"
+                        placeholder="Monto"
+                        value={ingreso.valor}
+                        onChange={(e) => {
+                          const nuevos = [...ingresosAdicionales];
+                          nuevos[index].valor = e.target.value;
+                          setIngresosAdicionales(nuevos);
+                        }}
+                        style={{ width: "120px" }}
+                      />
+                      <input
+                        type="date"
+                        value={ingreso.fecha}
+                        onChange={(e) => {
+                          const nuevos = [...ingresosAdicionales];
+                          nuevos[index].fecha = e.target.value;
+                          setIngresosAdicionales(nuevos);
+                        }}
+                        style={{ width: "150px" }}
+                      />
+                      <button
+                        onClick={() => {
+                          const nuevos = [...ingresosAdicionales];
+                          nuevos.splice(index, 1);
+                          setIngresosAdicionales(nuevos);
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
                     <input
-                      type="number"
-                      placeholder="Monto"
-                      value={ingreso.valor}
+                      type="text"
+                      placeholder="Justificación (opcional) — ej: pago por daño, saldo pendiente..."
+                      value={ingreso.motivo || ""}
                       onChange={(e) => {
                         const nuevos = [...ingresosAdicionales];
-                        nuevos[index].valor = e.target.value;
+                        nuevos[index].motivo = e.target.value;
                         setIngresosAdicionales(nuevos);
                       }}
-                      style={{ width: "120px" }}
+                      style={{ width: "100%", marginTop: "4px", padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: "6px", fontSize: "13px" }}
                     />
-                    <input
-                      type="date"
-                      value={ingreso.fecha}
-                      onChange={(e) => {
-                        const nuevos = [...ingresosAdicionales];
-                        nuevos[index].fecha = e.target.value;
-                        setIngresosAdicionales(nuevos);
-                      }}
-                      style={{ width: "150px" }}
-                    />
-                    <button
-                      onClick={() => {
-                        const nuevos = [...ingresosAdicionales];
-                        nuevos.splice(index, 1);
-                        setIngresosAdicionales(nuevos);
-                      }}
-                    >
-                      🗑️
-                    </button>
                   </div>
                 ))}
 
@@ -1067,7 +1085,7 @@ useEffect(() => {
                   onClick={() =>
                     setIngresosAdicionales([
                       ...ingresosAdicionales,
-                      { valor: "", fecha: new Date().toISOString().slice(0, 10) },
+                      { valor: "", fecha: new Date().toISOString().slice(0, 10), motivo: "" },
                     ])
                   }
                 >
