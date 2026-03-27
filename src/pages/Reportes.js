@@ -272,8 +272,13 @@ export default function Reportes() {
     const aIng = aAct.filter((m) => m.tipo === "ingreso").reduce((s, m) => s + (Number(m.monto) || 0), 0);
     const aGas = aAct.filter((m) => m.tipo === "gasto").reduce((s, m) => s + (Number(m.monto) || 0), 0);
     const aPed = (ordenesAnterior || []).length;
+    const ticketPromedio = ped > 0 ? Math.round(ing / ped) : 0;
+    const margen = ing > 0 ? Math.round((gan / ing) * 100) : 0;
+    const aTicket = aPed > 0 ? Math.round(aIng / aPed) : 0;
+    const aMargen = aIng > 0 ? Math.round(((aIng - aGas) / aIng) * 100) : 0;
     const pct = (a, b) => { if (!b) return a > 0 ? 100 : 0; return Math.round(((a - b) / Math.abs(b)) * 100); };
-    return { ingresos: ing, gastos: gas, ganancia: gan, pedidos: ped, pctIng: pct(ing, aIng), pctGas: pct(gas, aGas), pctGan: pct(gan, aIng - aGas), pctPed: pct(ped, aPed) };
+    const pctPts = (a, b) => a - b; // para margen en puntos porcentuales
+    return { ingresos: ing, gastos: gas, ganancia: gan, pedidos: ped, ticketPromedio, margen, pctIng: pct(ing, aIng), pctGas: pct(gas, aGas), pctGan: pct(gan, aIng - aGas), pctPed: pct(ped, aPed), pctTicket: pct(ticketPromedio, aTicket), pctMargen: pctPts(margen, aMargen) };
   }, [movsFiltrados, movsAnterior, ordenesAnterior]);
 
   /* ─── Financiero por mes ─── */
@@ -339,18 +344,38 @@ export default function Reportes() {
       }
     }
     const toTop = (m, c) => Object.entries(m).map(([n, v]) => ({ nombre: n, [c]: v })).sort((a, b) => b[c] - a[c]).slice(0, 10);
-    return { topUsoPropios: toTop(usP, "cantidad"), topUsoProveedor: toTop(usV, "cantidad"), topRecaudoPropios: toTop(rcP, "valor"), topRecaudoProv: toTop(rcV, "valor") };
+    const toBottom = (m, c) => Object.entries(m).map(([n, v]) => ({ nombre: n, [c]: v })).sort((a, b) => a[c] - b[c]).slice(0, 10);
+    return {
+      topUsoPropios: toTop(usP, "cantidad"), topUsoProveedor: toTop(usV, "cantidad"),
+      topRecaudoPropios: toTop(rcP, "valor"), topRecaudoProv: toTop(rcV, "valor"),
+      bottomUsoPropios: toBottom(usP, "cantidad"), bottomUsoProveedor: toBottom(usV, "cantidad"),
+    };
   }, [ordenes]);
 
-  /* ─── Proveedores (pagos reales) ─── */
+  /* ─── Proveedores (pagos reales + rentabilidad) ─── */
   const resumenProveedores = useMemo(() => {
     const adeud = {};
+    const facturacion = {}; // cuánto facturamos con artículos de cada proveedor
     for (const ord of ordenes || []) {
       for (const p of (ord.pagos_proveedores || [])) {
         const k = p.proveedor_nombre || "Sin proveedor";
         if (!adeud[k]) adeud[k] = { total: 0, ordenes: new Set() };
         adeud[k].total += Number(p.total || 0);
         adeud[k].ordenes.add(ord.id);
+      }
+      // Calcular facturación por proveedor (precio de venta × cantidad)
+      for (const it of flattenItems(ord.productos || [])) {
+        if (it.es_proveedor && it.nombre) {
+          // El recaudo es lo que cobramos al cliente por artículos de proveedor
+          const provNombre = it.nombre; // usamos el artículo para mapear
+          // Intentar encontrar proveedor del producto en pagos_proveedores
+          for (const pp of (ord.pagos_proveedores || [])) {
+            const tieneProducto = (pp.productos || []).some(pr => pr.nombre === it.nombre);
+            if (tieneProducto) {
+              facturacion[pp.proveedor_nombre] = (facturacion[pp.proveedor_nombre] || 0) + it.recaudo;
+            }
+          }
+        }
       }
     }
     const pagado = {};
@@ -362,7 +387,9 @@ export default function Reportes() {
     return Array.from(all).map((n) => {
       const a = adeud[n] || { total: 0, ordenes: new Set() };
       const p = pagado[n] || 0;
-      return { nombre: n, total: a.total, pagado: p, pendiente: Math.max(0, a.total - p), ordenes: a.ordenes?.size || 0 };
+      const fact = facturacion[n] || 0;
+      const rentabilidad = fact > 0 ? Math.round(((fact - a.total) / fact) * 100) : 0;
+      return { nombre: n, total: a.total, pagado: p, pendiente: Math.max(0, a.total - p), ordenes: a.ordenes?.size || 0, facturacion: fact, rentabilidad };
     }).sort((a, b) => b.total - a.total);
   }, [ordenes, movsFiltrados]);
 
@@ -372,6 +399,66 @@ export default function Reportes() {
   // artD y recD se definen aquí para que los resúmenes los puedan usar
   const artD = subTabArt === "propios" ? resumenArticulos.topUsoPropios : resumenArticulos.topUsoProveedor;
   const recD = subTabArt === "propios" ? resumenArticulos.topRecaudoPropios : resumenArticulos.topRecaudoProv;
+  const artBottom = subTabArt === "propios" ? resumenArticulos.bottomUsoPropios : resumenArticulos.bottomUsoProveedor;
+
+  /* ─── Top clientes por frecuencia ─── */
+  const topClientesFrecuencia = useMemo(() => {
+    const acum = {};
+    for (const m of movsFiltrados) {
+      if (m.tipo !== "ingreso" || !m.cliente_id) continue;
+      if (!acum[m.cliente_id]) acum[m.cliente_id] = { recaudo: 0, ordenIds: new Set() };
+      acum[m.cliente_id].recaudo += Number(m.monto || 0);
+      if (m.orden_id) acum[m.cliente_id].ordenIds.add(m.orden_id);
+    }
+    return Object.entries(acum)
+      .map(([id, v]) => ({
+        id, nombre: (clientesMap[id]?.nombre && String(clientesMap[id].nombre).trim()) || "(Sin nombre)",
+        pedidos: v.ordenIds.size, recaudo: v.recaudo,
+      }))
+      .sort((a, b) => b.pedidos - a.pedidos)
+      .slice(0, 10);
+  }, [movsFiltrados, clientesMap]);
+
+  /* ─── Alertas inteligentes ─── */
+  const alertas = useMemo(() => {
+    const list = [];
+    // Gastos vs ingresos
+    if (kpis.ingresos > 0 && kpis.gastos > kpis.ingresos * 0.5) {
+      list.push({ tipo: "negativa", icono: "⚠️", texto: `Los gastos representan el ${Math.round((kpis.gastos / kpis.ingresos) * 100)}% de los ingresos. Revisa las categorías de gasto.` });
+    }
+    // Crecimiento de gastos
+    if (kpis.pctGas > 30) {
+      list.push({ tipo: "negativa", icono: "📈", texto: `Los gastos crecieron un ${kpis.pctGas}% vs el período anterior.` });
+    }
+    // Crecimiento de ingresos
+    if (kpis.pctIng > 20) {
+      list.push({ tipo: "positiva", icono: "🚀", texto: `Los ingresos crecieron un ${kpis.pctIng}% vs el período anterior. ¡Buen ritmo!` });
+    }
+    if (kpis.pctIng < -10) {
+      list.push({ tipo: "negativa", icono: "📉", texto: `Los ingresos disminuyeron un ${Math.abs(kpis.pctIng)}% vs el período anterior.` });
+    }
+    // Margen
+    if (kpis.margen > 0 && kpis.margen < 30) {
+      list.push({ tipo: "negativa", icono: "💸", texto: `Margen de ganancia bajo (${kpis.margen}%). Considera ajustar precios o reducir costos.` });
+    }
+    if (kpis.margen >= 60) {
+      list.push({ tipo: "positiva", icono: "💰", texto: `Excelente margen de ganancia (${kpis.margen}%). El negocio es muy rentable.` });
+    }
+    // Proveedores pendientes
+    const totalPendienteProv = resumenProveedores.reduce((s, p) => s + p.pendiente, 0);
+    if (totalPendienteProv > 0) {
+      list.push({ tipo: "info", icono: "🏢", texto: `Hay ${money(totalPendienteProv)} pendientes de pago a proveedores.` });
+    }
+    // Concentración de clientes
+    if (topClientes.length >= 3) {
+      const totalRec = topClientes.reduce((s, c) => s + c.recaudo, 0);
+      const top1Pct = totalRec > 0 ? Math.round((topClientes[0].recaudo / totalRec) * 100) : 0;
+      if (top1Pct > 50) {
+        list.push({ tipo: "info", icono: "👤", texto: `${topClientes[0].nombre} concentra el ${top1Pct}% del recaudo. Diversificar clientes reduciría el riesgo.` });
+      }
+    }
+    return list;
+  }, [kpis, resumenProveedores, topClientes]);
 
   const periodoTexto = useMemo(() => {
     if (!desde || !hasta) return "el período seleccionado";
@@ -729,6 +816,18 @@ export default function Reportes() {
     }],
   };
 
+  // ── Artículos bottom (menos alquilados) ──
+  const dataArtBottom = {
+    labels: (artBottom || []).map((t) => t.nombre),
+    datasets: [{ label: "Cantidad", data: (artBottom || []).map((t) => t.cantidad), backgroundColor: "rgba(239,68,68,0.55)", borderColor: "rgba(239,68,68,1)", borderWidth: 1.5, borderRadius: 5 }],
+  };
+
+  // ── Clientes por frecuencia ──
+  const dataClientesFrecuencia = {
+    labels: topClientesFrecuencia.map((t) => t.nombre),
+    datasets: [{ label: "Pedidos", data: topClientesFrecuencia.map((t) => t.pedidos), backgroundColor: "rgba(167,139,250,0.6)", borderColor: "rgba(167,139,250,1)", borderWidth: 1.5, borderRadius: 5 }],
+  };
+
   // ── Artículos ──
   const dataArtUso = {
     labels: artD.map((t) => t.nombre),
@@ -836,6 +935,22 @@ export default function Reportes() {
                 <div className="sw-kpi-label">PEDIDOS CON ABONO</div>
                 <div className="sw-kpi-valor">{kpis.pedidos}</div>
                 {renderTrend(kpis.pctPed)}
+              </div>
+              <div className="sw-kpi-card kpi-ticket">
+                <div className="sw-kpi-label">TICKET PROMEDIO</div>
+                <div className="sw-kpi-valor">{money(kpis.ticketPromedio)}</div>
+                {renderTrend(kpis.pctTicket)}
+                <div className="sw-kpi-sub">Ingreso promedio por pedido</div>
+              </div>
+              <div className="sw-kpi-card kpi-margen">
+                <div className="sw-kpi-label">MARGEN DE GANANCIA</div>
+                <div className="sw-kpi-valor">{kpis.margen}%</div>
+                {kpis.pctMargen !== 0 && (
+                  <span className={`sw-kpi-trend ${kpis.pctMargen > 0 ? "positivo" : "negativo"}`}>
+                    {kpis.pctMargen > 0 ? "▲" : "▼"} {Math.abs(kpis.pctMargen)} pts
+                  </span>
+                )}
+                <div className="sw-kpi-sub">Ganancia / Ingresos</div>
               </div>
             </div>
           )}
@@ -976,7 +1091,19 @@ export default function Reportes() {
                     )}
                   </div>
 
-                  {/* Donut gastos por categoría + Tabla mensual */}
+                  {/* Alertas inteligentes */}
+                  {alertas.length > 0 && (
+                    <div className="sw-alertas-grid">
+                      {alertas.map((a, i) => (
+                        <div key={i} className={`sw-alerta sw-alerta-${a.tipo}`}>
+                          <span className="sw-alerta-icono">{a.icono}</span>
+                          <span>{a.texto}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Donut gastos por categoría + Tabla mensual con comparativa */}
                   <div className="sw-charts-duo">
                     {gastosPorCategoria.length > 0 && (
                       <div className="sw-chart-wrapper">
@@ -989,16 +1116,28 @@ export default function Reportes() {
                     {serieMes.meses.length > 0 && (
                       <div className="sw-tabla-resumen">
                         <table>
-                          <thead><tr><th>Mes</th><th style={{ textAlign: "right" }}>Ingresos</th><th style={{ textAlign: "right" }}>Gastos</th><th style={{ textAlign: "right" }}>Ganancia</th></tr></thead>
+                          <thead><tr><th>Mes</th><th style={{ textAlign: "right" }}>Ingresos</th><th style={{ textAlign: "right" }}>Gastos</th><th style={{ textAlign: "right" }}>Ganancia</th><th style={{ textAlign: "center" }}>vs anterior</th></tr></thead>
                           <tbody>
-                            {serieMes.meses.map((k, i) => (
-                              <tr key={k}>
-                                <td>{nombreMes(k)}</td>
-                                <td style={{ textAlign: "right", color: "var(--sw-verde)" }}>{money(serieMes.ingresos[i])}</td>
-                                <td style={{ textAlign: "right", color: "var(--sw-rojo)" }}>{money(serieMes.gastos[i])}</td>
-                                <td style={{ textAlign: "right", fontWeight: 600, color: serieMes.ganancia[i] >= 0 ? "var(--sw-verde)" : "var(--sw-rojo)" }}>{money(serieMes.ganancia[i])}</td>
-                              </tr>
-                            ))}
+                            {serieMes.meses.map((k, i) => {
+                              const ganActual = serieMes.ganancia[i];
+                              const ganAnterior = i > 0 ? serieMes.ganancia[i - 1] : null;
+                              const cambio = ganAnterior != null && ganAnterior !== 0 ? Math.round(((ganActual - ganAnterior) / Math.abs(ganAnterior)) * 100) : null;
+                              return (
+                                <tr key={k}>
+                                  <td>{nombreMes(k)}</td>
+                                  <td style={{ textAlign: "right", color: "var(--sw-verde)" }}>{money(serieMes.ingresos[i])}</td>
+                                  <td style={{ textAlign: "right", color: "var(--sw-rojo)" }}>{money(serieMes.gastos[i])}</td>
+                                  <td style={{ textAlign: "right", fontWeight: 600, color: ganActual >= 0 ? "var(--sw-verde)" : "var(--sw-rojo)" }}>{money(ganActual)}</td>
+                                  <td style={{ textAlign: "center", fontSize: 12 }}>
+                                    {cambio != null ? (
+                                      <span style={{ color: cambio >= 0 ? "var(--sw-verde)" : "var(--sw-rojo)", fontWeight: 600 }}>
+                                        {cambio >= 0 ? "▲" : "▼"} {Math.abs(cambio)}%
+                                      </span>
+                                    ) : <span style={{ color: "#d1d5db" }}>—</span>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1035,6 +1174,16 @@ export default function Reportes() {
                       <div className="sw-empty"><div className="sw-empty-icono">👥</div><div className="sw-empty-texto">No hay ingresos de clientes en este período</div></div>
                     )}
                   </div>
+                  {/* Top clientes por frecuencia de pedidos */}
+                  {topClientesFrecuencia.length > 0 && (
+                    <div className="sw-chart-wrapper">
+                      <h3 className="sw-chart-titulo">Top 10 clientes — Por frecuencia de pedidos</h3>
+                      <div style={{ height: chartHeight }}>
+                        <Bar data={dataClientesFrecuencia} options={chartOptsCantH} plugins={plugins} />
+                      </div>
+                    </div>
+                  )}
+
                   {topClientes.length > 0 && (
                     <div className="sw-tabla-resumen">
                       <div className="sw-tabla-nota">💡 Click en un cliente para ver el detalle de sus pedidos.</div>
@@ -1087,10 +1236,43 @@ export default function Reportes() {
                       {artD.length > 0 ? <div style={{ height: chartHeight }}><Bar data={dataArtUso} options={chartOptsCantH} plugins={plugins} /></div> : <div className="sw-empty"><div className="sw-empty-texto">Sin datos</div></div>}
                     </div>
                     <div className="sw-chart-wrapper">
-                      <h3 className="sw-chart-titulo">Mayor valor cotizado ({subTabArt})</h3>
+                      <h3 className="sw-chart-titulo">Top ingresos por artículo ({subTabArt})</h3>
                       {recD.length > 0 ? <div style={{ height: chartHeight }}><Bar data={dataArtRec} options={chartOptsH} plugins={plugins} /></div> : <div className="sw-empty"><div className="sw-empty-texto">Sin datos</div></div>}
                     </div>
                   </div>
+
+                  {/* Menos alquilados */}
+                  <div className="sw-chart-wrapper">
+                    <h3 className="sw-chart-titulo">Menos alquilados ({subTabArt}) — Inventario con baja rotación</h3>
+                    {(artBottom || []).length > 0 ? (
+                      <div style={{ height: chartHeight }}>
+                        <Bar data={dataArtBottom} options={chartOptsCantH} plugins={plugins} />
+                      </div>
+                    ) : <div className="sw-empty"><div className="sw-empty-texto">Sin datos</div></div>}
+                  </div>
+
+                  {/* Tabla resumen de artículos con ingresos */}
+                  {recD.length > 0 && (
+                    <div className="sw-tabla-resumen">
+                      <h3 className="sw-chart-titulo" style={{ padding: "0 0 8px 0" }}>Detalle de ingresos por artículo</h3>
+                      <table>
+                        <thead><tr><th>#</th><th>Artículo</th><th style={{ textAlign: "right" }}>Unidades</th><th style={{ textAlign: "right" }}>Ingreso cotizado</th></tr></thead>
+                        <tbody>
+                          {recD.map((t, i) => {
+                            const uso = artD.find(a => a.nombre === t.nombre);
+                            return (
+                              <tr key={t.nombre}>
+                                <td style={{ fontWeight: 600, color: "var(--sw-texto-secundario)" }}>{i + 1}</td>
+                                <td style={{ fontWeight: 500 }}>{t.nombre}</td>
+                                <td style={{ textAlign: "right" }}>{(uso?.cantidad || 0).toLocaleString("es-CO")}</td>
+                                <td style={{ textAlign: "right", fontWeight: 600, color: "var(--sw-verde)" }}>{money(t.valor)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   {/* Resumen inteligente - Artículos */}
                   {resumenArticulosTexto && (
                     <div className={`sw-resumen-box ${resumenAbierto.articulos ? "abierto" : ""}`} onClick={() => toggleResumen("articulos")}>
@@ -1129,15 +1311,17 @@ export default function Reportes() {
                     <div className="sw-tabla-resumen">
                       <div className="sw-tabla-nota">💡 Click en un proveedor para filtrar los movimientos asociados.</div>
                       <table>
-                        <thead><tr><th>Proveedor</th><th style={{ textAlign: "center" }}>Órdenes</th><th style={{ textAlign: "right" }}>Adeudado</th><th style={{ textAlign: "right" }}>Pagado real</th><th style={{ textAlign: "right" }}>Pendiente</th></tr></thead>
+                        <thead><tr><th>Proveedor</th><th style={{ textAlign: "center" }}>Órdenes</th><th style={{ textAlign: "right" }}>Costo</th><th style={{ textAlign: "right" }}>Facturación</th><th style={{ textAlign: "right" }}>Pagado</th><th style={{ textAlign: "right" }}>Pendiente</th><th style={{ textAlign: "center" }}>Margen</th></tr></thead>
                         <tbody>
                           {resumenProveedores.map((p, i) => (
                             <tr key={i} className="sw-row-clickable" onClick={() => { setFiltroProveedor(p.nombre); setTab("financiero"); }}>
                               <td style={{ fontWeight: 500 }}>{p.nombre}</td>
                               <td style={{ textAlign: "center" }}>{p.ordenes}</td>
                               <td style={{ textAlign: "right" }}>{money(p.total)}</td>
+                              <td style={{ textAlign: "right", color: p.facturacion > 0 ? "var(--sw-verde)" : "var(--sw-texto-terciario)" }}>{p.facturacion > 0 ? money(p.facturacion) : "—"}</td>
                               <td style={{ textAlign: "right", color: "var(--sw-verde)" }}>{money(p.pagado)}</td>
                               <td style={{ textAlign: "right", color: p.pendiente > 0 ? "var(--sw-rojo)" : "var(--sw-verde)", fontWeight: 600 }}>{p.pendiente > 0 ? money(p.pendiente) : "✓ Pagado"}</td>
+                              <td style={{ textAlign: "center", fontWeight: 600, color: p.rentabilidad >= 40 ? "var(--sw-verde)" : p.rentabilidad > 0 ? "var(--sw-texto-secundario)" : "var(--sw-texto-terciario)" }}>{p.facturacion > 0 ? `${p.rentabilidad}%` : "—"}</td>
                             </tr>
                           ))}
                         </tbody>

@@ -5,7 +5,7 @@
 /* ========== KPI CARDS ========== */
 .sw-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -31,6 +31,17 @@
 .sw-kpi-card.kpi-gasto { border-left-color: var(--sw-rojo); }
 .sw-kpi-card.kpi-balance { border-left-color: var(--sw-azul); }
 .sw-kpi-card.kpi-pendiente { border-left-color: var(--sw-amarillo); }
+.sw-kpi-card.kpi-ticket { border-left-color: #8b5cf6; }
+.sw-kpi-card.kpi-margen { border-left-color: #06b6d4; }
+.sw-kpi-sub { font-size: 11px; color: var(--sw-texto-terciario); margin-top: 2px; }
+
+/* ── Alertas inteligentes ── */
+.sw-alertas-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.sw-alerta { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+.sw-alerta-positiva { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.sw-alerta-negativa { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.sw-alerta-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+.sw-alerta-icono { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
 
 .sw-kpi-label {
   font-size: 12px;
