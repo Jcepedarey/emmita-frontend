@@ -707,11 +707,12 @@
 }
 
 .sw-chart-titulo {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--sw-texto, #111827);
   text-align: center;
   margin-bottom: 12px;
+  letter-spacing: -0.01em;
 }
 
 .sw-tabla-nota {
@@ -752,13 +753,14 @@
   transition: all 0.15s ease;
 }
 
-.sw-toggle-btn:hover { background: #e2e8f0; }
+.sw-toggle-btn:hover { background: #e2e8f0; color: #1e293b; }
 .sw-toggle-btn.activo {
   background: white;
   color: var(--sw-cyan, #0077B6);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 4px rgba(0,119,182,0.15);
   font-weight: 600;
 }
+.sw-toggle-btn:active { transform: scale(0.96); }
 
 /* ========== CLICKABLE ROWS ========== */
 .sw-row-clickable {
@@ -1076,14 +1078,27 @@
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Chart wrapper subtle entrance */
+/* Chart wrapper entrance */
 .sw-chart-wrapper {
-  animation: sw-fadeIn 0.3s ease-out;
+  animation: sw-slideUp 0.4s ease-out;
+  transition: box-shadow 0.2s ease;
+}
+.sw-chart-wrapper:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
 
 @keyframes sw-fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+@keyframes sw-slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Canvas de Chart.js: transición suave al redimensionar */
+.sw-chart-wrapper canvas {
+  transition: height 0.3s ease;
 }
 
 /* Resumen box smooth expand */

@@ -17,6 +17,7 @@
     "cors": "^2.8.5",
     "dompurify": "^3.3.0",
     "eslint-webpack-plugin": "^5.0.0",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "html-webpack-plugin": "^5.6.3",
     "jspdf": "^2.5.1",

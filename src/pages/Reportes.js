@@ -7,9 +7,10 @@ import { Bar, Line, Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, PointElement, LineElement,
-  ArcElement, Filler, Tooltip, Legend,
+  ArcElement, Filler, Tooltip, Legend, Title,
 } from "chart.js";
 import { exportarCSV } from "../utils/exportarCSV";
+import { exportarFinancieroXLSX, exportarClientesXLSX, exportarArticulosXLSX, exportarProveedoresXLSX } from "../utils/exportarXLSX";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
 import { generarPDFDashboard } from "../utils/generarPDFDashboard";
@@ -18,7 +19,7 @@ import "../estilos/ReportesContabilidad.css";
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, PointElement, LineElement,
-  ArcElement, Filler, Tooltip, Legend
+  ArcElement, Filler, Tooltip, Legend, Title
 );
 
 /* ═══════════════════════════════════════════════════════════════
@@ -528,7 +529,10 @@ export default function Reportes() {
      ═══════════════════════════════════════════════════════════════ */
   const yTickCallback = (v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}K` : v;
 
-  // Plugin inline para mostrar valores encima de barras (usa ref para estado actual)
+  // ── ¿Solo hay 1 punto de datos? (fix para líneas/área) ──
+  const soloPunto = serieMes.meses.length === 1;
+
+  // Plugin inline para mostrar valores encima de barras
   const valuesPlugin = useMemo(() => ({
     id: "swValues",
     afterDatasetsDraw(chart) {
@@ -540,15 +544,15 @@ export default function Reportes() {
           const val = ds.data[i];
           if (!val || val === 0) return;
           ctx.save();
-          ctx.font = "bold 10px sans-serif";
+          ctx.font = "600 11px -apple-system, BlinkMacSystemFont, sans-serif";
           ctx.fillStyle = "#374151";
           ctx.textAlign = "center";
           const label = val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : val >= 1000 ? `${Math.round(val / 1000)}K` : val;
           if (chart.options.indexAxis === "y") {
             ctx.textAlign = "left";
-            ctx.fillText(label, el.x + 4, el.y + 4);
+            ctx.fillText(label, el.x + 6, el.y + 4);
           } else {
-            ctx.fillText(label, el.x, el.y - 8);
+            ctx.fillText(label, el.x, el.y - 10);
           }
           ctx.restore();
         });
@@ -557,42 +561,150 @@ export default function Reportes() {
   }), []);
   const plugins = [valuesPlugin];
 
-  // Tooltip para gráficas VERTICALES (valor en eje Y)
-  const tooltipMoneyV = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y)}` } };
-  // Tooltip para gráficas HORIZONTALES (valor en eje X)
-  const tooltipMoneyH = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.x)}` } };
-  // Tooltip para CANTIDADES (sin signo $)
-  const tooltipCantH = { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.x).toLocaleString("es-CO")}` } };
+  // ── Tooltips mejorados ──
+  const tooltipStyle = {
+    backgroundColor: "rgba(15,23,42,0.92)",
+    titleFont: { size: 13, weight: "600" },
+    bodyFont: { size: 12 },
+    padding: 12,
+    cornerRadius: 8,
+    displayColors: true,
+    boxPadding: 4,
+  };
+  const tooltipMoneyV = { ...tooltipStyle, callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${money(ctx.parsed.y)}` } };
+  const tooltipMoneyH = { ...tooltipStyle, callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${money(ctx.parsed.x)}` } };
+  const tooltipCantH = { ...tooltipStyle, callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${Number(ctx.parsed.x).toLocaleString("es-CO")}` } };
 
-  const chartOptsBase = { responsive: true, maintainAspectRatio: false, animation: { duration: showValues ? 1 : 300 }, plugins: { legend: { position: "top" }, tooltip: tooltipMoneyV }, scales: { y: { ticks: { callback: yTickCallback } } } };
+  // ── Estilos comunes de ejes ──
+  const gridStyle = { color: "rgba(0,0,0,0.04)", drawBorder: false };
+  const tickFont = { size: 11, family: "-apple-system, BlinkMacSystemFont, sans-serif" };
+
+  // ── Opciones base (barras verticales / líneas / área) ──
+  const chartOptsBase = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: showValues ? 50 : 600, easing: "easeOutQuart" },
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: {
+        position: "top",
+        labels: { usePointStyle: true, pointStyle: "circle", padding: 16, font: { size: 12, weight: "500" } },
+      },
+      tooltip: tooltipMoneyV,
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: tickFont, color: "#6b7280" } },
+      y: { grid: gridStyle, ticks: { callback: yTickCallback, font: tickFont, color: "#6b7280", padding: 8 }, border: { display: false } },
+    },
+  };
+
+  // ── Opciones horizontales (dinero) ──
   const chartOptsH = {
-    responsive: true, maintainAspectRatio: false, animation: { duration: showValues ? 1 : 300 }, indexAxis: "y",
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: showValues ? 50 : 600, easing: "easeOutQuart" },
+    indexAxis: "y",
+    interaction: { mode: "index", intersect: false },
     plugins: { legend: { display: false }, tooltip: tooltipMoneyH },
-    scales: { x: { ticks: { callback: yTickCallback } } },
+    scales: {
+      x: { grid: gridStyle, ticks: { callback: yTickCallback, font: tickFont, color: "#6b7280" }, border: { display: false } },
+      y: { grid: { display: false }, ticks: { font: { ...tickFont, weight: "500" }, color: "#374151", padding: 4 } },
+    },
   };
+
+  // ── Opciones horizontales (cantidades) ──
   const chartOptsCantH = {
-    responsive: true, maintainAspectRatio: false, animation: { duration: showValues ? 1 : 300 }, indexAxis: "y",
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: showValues ? 50 : 600, easing: "easeOutQuart" },
+    indexAxis: "y",
+    interaction: { mode: "index", intersect: false },
     plugins: { legend: { display: false }, tooltip: tooltipCantH },
-    scales: { x: { ticks: { callback: (v) => Number(v).toLocaleString("es-CO") } } },
+    scales: {
+      x: { grid: gridStyle, ticks: { callback: (v) => Number(v).toLocaleString("es-CO"), font: tickFont, color: "#6b7280" }, border: { display: false } },
+      y: { grid: { display: false }, ticks: { font: { ...tickFont, weight: "500" }, color: "#374151", padding: 4 } },
+    },
   };
+
+  // ── Opciones donut ──
   const doughnutOpts = {
-    responsive: true, maintainAspectRatio: true,
-    plugins: { legend: { position: "right", labels: { boxWidth: 12, padding: 10, font: { size: 11 } } }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${money(ctx.raw)}` } } },
-    cutout: "60%",
+    responsive: true,
+    maintainAspectRatio: true,
+    animation: { duration: 700, easing: "easeOutQuart", animateRotate: true },
+    plugins: {
+      legend: {
+        position: "right",
+        labels: { usePointStyle: true, pointStyle: "circle", boxWidth: 10, padding: 12, font: { size: 11, weight: "500" } },
+      },
+      tooltip: { ...tooltipStyle, callbacks: { label: (ctx) => ` ${ctx.label}: ${money(ctx.raw)}` } },
+    },
+    cutout: "65%",
   };
+
+  // ═══ DATASETS ═══
 
   // ── Financiero ──
-  const dsIngresos = { label: "Ingresos", data: serieMes.ingresos, backgroundColor: "rgba(16,185,129,0.5)", borderColor: "rgba(16,185,129,1)", borderWidth: 2, tension: 0.3, fill: tipoGrafFin === "area" };
-  const dsGastos = { label: "Gastos", data: serieMes.gastos, backgroundColor: "rgba(239,68,68,0.5)", borderColor: "rgba(239,68,68,1)", borderWidth: 2, tension: 0.3, fill: tipoGrafFin === "area" };
-  const dsGanancia = { label: "Ganancia", data: serieMes.ganancia, backgroundColor: "rgba(59,130,246,0.5)", borderColor: "rgba(59,130,246,1)", borderWidth: 2, tension: 0.3, fill: tipoGrafFin === "area" };
+  const esLinea = tipoGrafFin === "lineas" || tipoGrafFin === "area";
+  const dsIngresos = {
+    label: "Ingresos",
+    data: serieMes.ingresos,
+    backgroundColor: esLinea ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.7)",
+    borderColor: "rgba(16,185,129,1)",
+    borderWidth: esLinea ? 3 : 0,
+    borderRadius: esLinea ? 0 : 6,
+    tension: 0.4,
+    fill: tipoGrafFin === "area",
+    pointRadius: soloPunto ? 8 : 4,
+    pointHoverRadius: soloPunto ? 10 : 6,
+    pointBackgroundColor: "rgba(16,185,129,1)",
+    pointBorderColor: "#fff",
+    pointBorderWidth: 2,
+  };
+  const dsGastos = {
+    label: "Gastos",
+    data: serieMes.gastos,
+    backgroundColor: esLinea ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.7)",
+    borderColor: "rgba(239,68,68,1)",
+    borderWidth: esLinea ? 3 : 0,
+    borderRadius: esLinea ? 0 : 6,
+    tension: 0.4,
+    fill: tipoGrafFin === "area",
+    pointRadius: soloPunto ? 8 : 4,
+    pointHoverRadius: soloPunto ? 10 : 6,
+    pointBackgroundColor: "rgba(239,68,68,1)",
+    pointBorderColor: "#fff",
+    pointBorderWidth: 2,
+  };
+  const dsGanancia = {
+    label: "Ganancia",
+    data: serieMes.ganancia,
+    backgroundColor: esLinea ? "rgba(59,130,246,0.12)" : "rgba(59,130,246,0.7)",
+    borderColor: "rgba(59,130,246,1)",
+    borderWidth: esLinea ? 3 : 0,
+    borderRadius: esLinea ? 0 : 6,
+    tension: 0.4,
+    fill: tipoGrafFin === "area",
+    pointRadius: soloPunto ? 8 : 4,
+    pointHoverRadius: soloPunto ? 10 : 6,
+    pointBackgroundColor: "rgba(59,130,246,1)",
+    pointBorderColor: "#fff",
+    pointBorderWidth: 2,
+  };
   const dataFinanciero = { labels: serieMes.labels, datasets: [dsIngresos, dsGastos, dsGanancia] };
 
+  // ── Donut gastos ──
+  const donutColors = [
+    "rgba(59,130,246,0.75)", "rgba(239,68,68,0.75)", "rgba(234,179,8,0.75)",
+    "rgba(16,185,129,0.75)", "rgba(167,139,250,0.75)", "rgba(244,114,182,0.75)",
+    "rgba(251,146,60,0.75)", "rgba(56,189,248,0.75)",
+  ];
+  const donutBorders = donutColors.map((c) => c.replace("0.75)", "1)"));
   const dataDonutGastos = {
     labels: gastosPorCategoria.map(([c]) => c),
-    datasets: [{ data: gastosPorCategoria.map(([, v]) => v), backgroundColor: PALETA.slice(0, gastosPorCategoria.length), borderColor: PALETA_SOLIDA.slice(0, gastosPorCategoria.length), borderWidth: 1 }],
+    datasets: [{ data: gastosPorCategoria.map(([, v]) => v), backgroundColor: donutColors.slice(0, gastosPorCategoria.length), borderColor: donutBorders.slice(0, gastosPorCategoria.length), borderWidth: 2, hoverOffset: 6 }],
   };
 
-  // ── Clientes (con click para drill-down — Sesión 13) ──
+  // ── Clientes (con click para drill-down) ──
   const chartOptsHClientes = {
     ...chartOptsH,
     onClick: (_evt, elements) => {
@@ -606,33 +718,71 @@ export default function Reportes() {
   };
   const dataTopClientes = {
     labels: topClientes.map((t) => t.nombre),
-    datasets: [{ label: "Recaudo real ($)", data: topClientes.map((t) => t.recaudo), backgroundColor: PALETA.slice(0, topClientes.length), borderColor: PALETA_SOLIDA.slice(0, topClientes.length), borderWidth: 1 }],
+    datasets: [{
+      label: "Recaudo real ($)",
+      data: topClientes.map((t) => t.recaudo),
+      backgroundColor: PALETA.slice(0, topClientes.length),
+      borderColor: PALETA_SOLIDA.slice(0, topClientes.length),
+      borderWidth: 0,
+      borderRadius: 4,
+      hoverBackgroundColor: PALETA_SOLIDA.slice(0, topClientes.length),
+    }],
   };
 
-  // ── Artículos (artD y recD definidos arriba, antes de los resúmenes) ──
-  const dataArtUso = { labels: artD.map((t) => t.nombre), datasets: [{ label: `Cantidad`, data: artD.map((t) => t.cantidad), backgroundColor: PALETA.slice(0, artD.length), borderColor: PALETA_SOLIDA.slice(0, artD.length), borderWidth: 1 }] };
-  const dataArtRec = { labels: recD.map((t) => t.nombre), datasets: [{ label: `Valor cotizado ($)`, data: recD.map((t) => t.valor), backgroundColor: PALETA.slice(0, recD.length), borderColor: PALETA_SOLIDA.slice(0, recD.length), borderWidth: 1 }] };
+  // ── Artículos ──
+  const dataArtUso = {
+    labels: artD.map((t) => t.nombre),
+    datasets: [{
+      label: "Cantidad",
+      data: artD.map((t) => t.cantidad),
+      backgroundColor: PALETA.slice(0, artD.length),
+      borderColor: PALETA_SOLIDA.slice(0, artD.length),
+      borderWidth: 0,
+      borderRadius: 4,
+      hoverBackgroundColor: PALETA_SOLIDA.slice(0, artD.length),
+    }],
+  };
+  const dataArtRec = {
+    labels: recD.map((t) => t.nombre),
+    datasets: [{
+      label: "Valor cotizado ($)",
+      data: recD.map((t) => t.valor),
+      backgroundColor: PALETA.slice(0, recD.length),
+      borderColor: PALETA_SOLIDA.slice(0, recD.length),
+      borderWidth: 0,
+      borderRadius: 4,
+      hoverBackgroundColor: PALETA_SOLIDA.slice(0, recD.length),
+    }],
+  };
 
   // ── Proveedores ──
   const dataProv = {
     labels: resumenProveedores.map((p) => p.nombre),
     datasets: [
-      { label: "Adeudado", data: resumenProveedores.map((p) => p.total), backgroundColor: "rgba(100,116,139,0.5)", borderColor: "rgba(100,116,139,1)", borderWidth: 1 },
-      { label: "Pagado", data: resumenProveedores.map((p) => p.pagado), backgroundColor: "rgba(16,185,129,0.5)", borderColor: "rgba(16,185,129,1)", borderWidth: 1 },
-      { label: "Pendiente", data: resumenProveedores.map((p) => Math.max(0, p.pendiente)), backgroundColor: "rgba(239,68,68,0.5)", borderColor: "rgba(239,68,68,1)", borderWidth: 1 },
+      { label: "Adeudado", data: resumenProveedores.map((p) => p.total), backgroundColor: "rgba(100,116,139,0.6)", borderColor: "rgba(100,116,139,1)", borderWidth: 0, borderRadius: 4 },
+      { label: "Pagado", data: resumenProveedores.map((p) => p.pagado), backgroundColor: "rgba(16,185,129,0.6)", borderColor: "rgba(16,185,129,1)", borderWidth: 0, borderRadius: 4 },
+      { label: "Pendiente", data: resumenProveedores.map((p) => Math.max(0, p.pendiente)), backgroundColor: "rgba(239,68,68,0.6)", borderColor: "rgba(239,68,68,1)", borderWidth: 0, borderRadius: 4 },
     ],
   };
   const dataDonutProv = {
     labels: resumenProveedores.slice(0, 8).map((p) => p.nombre),
-    datasets: [{ data: resumenProveedores.slice(0, 8).map((p) => p.pagado), backgroundColor: PALETA.slice(0, 8), borderColor: PALETA_SOLIDA.slice(0, 8), borderWidth: 1 }],
+    datasets: [{ data: resumenProveedores.slice(0, 8).map((p) => p.pagado), backgroundColor: donutColors.slice(0, 8), borderColor: donutBorders.slice(0, 8), borderWidth: 2, hoverOffset: 6 }],
   };
 
-  /* ─── Exportar CSV ─── */
+  /* ─── Exportar CSV (legacy) ─── */
   const exportarCSVActual = () => {
     if (tab === "financiero") exportarCSV(serieMes.meses.map((k, i) => ({ Mes: nombreMes(k), Ingresos: serieMes.ingresos[i], Gastos: serieMes.gastos[i], Ganancia: serieMes.ganancia[i] })), "financiero_por_mes");
     else if (tab === "clientes") exportarCSV(topClientes.map((t) => ({ Cliente: t.nombre, Pedidos: t.pedidos, "Recaudo real": t.recaudo, Promedio: t.promedio })), "top_clientes_real");
     else if (tab === "articulos") exportarCSV(artD.map((t) => ({ Artículo: t.nombre, Cantidad: t.cantidad })), `top_articulos_${subTabArt}`);
     else if (tab === "proveedores") exportarCSV(resumenProveedores.map((p) => ({ Proveedor: p.nombre, Adeudado: p.total, "Pagado real": p.pagado, Pendiente: p.pendiente, Órdenes: p.ordenes })), "proveedores_real");
+  };
+
+  /* ─── Exportar XLSX (profesional) ─── */
+  const exportarExcel = () => {
+    if (tab === "financiero") exportarFinancieroXLSX(serieMes, kpis, periodoTexto);
+    else if (tab === "clientes") exportarClientesXLSX(topClientes, periodoTexto);
+    else if (tab === "articulos") exportarArticulosXLSX(artD, subTabArt, periodoTexto);
+    else if (tab === "proveedores") exportarProveedoresXLSX(resumenProveedores, periodoTexto);
   };
 
   /* ─── Exportar PDF Dashboard ─── */
@@ -795,7 +945,8 @@ export default function Reportes() {
                 </button>
               </div>
               <button className="sw-btn sw-btn-secundario" onClick={exportarPDFDashboard}>📄 PDF</button>
-              <button className="sw-btn sw-btn-secundario" onClick={exportarCSVActual}>📥 CSV</button>
+              <button className="sw-btn sw-btn-secundario" onClick={exportarExcel}>📊 Excel</button>
+              <button className="sw-btn sw-btn-secundario" onClick={exportarCSVActual} style={{ fontSize: 11, padding: "6px 10px", opacity: 0.7 }}>CSV</button>
             </div>
           </div>
 
