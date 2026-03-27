@@ -9,7 +9,6 @@ import {
   CategoryScale, LinearScale, BarElement, PointElement, LineElement,
   ArcElement, Filler, Tooltip, Legend, Title,
 } from "chart.js";
-import { exportarCSV } from "../utils/exportarCSV";
 import { exportarFinancieroXLSX, exportarClientesXLSX, exportarArticulosXLSX, exportarProveedoresXLSX } from "../utils/exportarXLSX";
 import { generarPDF } from "../utils/generarPDF";
 import { generarRemisionPDF as generarRemision } from "../utils/generarRemision";
@@ -645,16 +644,17 @@ export default function Reportes() {
 
   // ── Financiero ──
   const esLinea = tipoGrafFin === "lineas" || tipoGrafFin === "area";
+  const esArea = tipoGrafFin === "area";
   const dsIngresos = {
     label: "Ingresos",
     data: serieMes.ingresos,
-    backgroundColor: esLinea ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.7)",
+    backgroundColor: esArea ? "rgba(16,185,129,0.35)" : esLinea ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.7)",
     borderColor: "rgba(16,185,129,1)",
     borderWidth: esLinea ? 3 : 0,
     borderRadius: esLinea ? 0 : 6,
     tension: 0.4,
-    fill: tipoGrafFin === "area",
-    pointRadius: soloPunto ? 8 : 4,
+    fill: esArea ? "origin" : false,
+    pointRadius: soloPunto ? 8 : esArea ? 0 : 4,
     pointHoverRadius: soloPunto ? 10 : 6,
     pointBackgroundColor: "rgba(16,185,129,1)",
     pointBorderColor: "#fff",
@@ -663,13 +663,13 @@ export default function Reportes() {
   const dsGastos = {
     label: "Gastos",
     data: serieMes.gastos,
-    backgroundColor: esLinea ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.7)",
+    backgroundColor: esArea ? "rgba(239,68,68,0.30)" : esLinea ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.7)",
     borderColor: "rgba(239,68,68,1)",
     borderWidth: esLinea ? 3 : 0,
     borderRadius: esLinea ? 0 : 6,
     tension: 0.4,
-    fill: tipoGrafFin === "area",
-    pointRadius: soloPunto ? 8 : 4,
+    fill: esArea ? "origin" : false,
+    pointRadius: soloPunto ? 8 : esArea ? 0 : 4,
     pointHoverRadius: soloPunto ? 10 : 6,
     pointBackgroundColor: "rgba(239,68,68,1)",
     pointBorderColor: "#fff",
@@ -678,13 +678,13 @@ export default function Reportes() {
   const dsGanancia = {
     label: "Ganancia",
     data: serieMes.ganancia,
-    backgroundColor: esLinea ? "rgba(59,130,246,0.12)" : "rgba(59,130,246,0.7)",
+    backgroundColor: esArea ? "rgba(59,130,246,0.30)" : esLinea ? "rgba(59,130,246,0.12)" : "rgba(59,130,246,0.7)",
     borderColor: "rgba(59,130,246,1)",
     borderWidth: esLinea ? 3 : 0,
     borderRadius: esLinea ? 0 : 6,
     tension: 0.4,
-    fill: tipoGrafFin === "area",
-    pointRadius: soloPunto ? 8 : 4,
+    fill: esArea ? "origin" : false,
+    pointRadius: soloPunto ? 8 : esArea ? 0 : 4,
     pointHoverRadius: soloPunto ? 10 : 6,
     pointBackgroundColor: "rgba(59,130,246,1)",
     pointBorderColor: "#fff",
@@ -767,14 +767,6 @@ export default function Reportes() {
   const dataDonutProv = {
     labels: resumenProveedores.slice(0, 8).map((p) => p.nombre),
     datasets: [{ data: resumenProveedores.slice(0, 8).map((p) => p.pagado), backgroundColor: donutColors.slice(0, 8), borderColor: donutBorders.slice(0, 8), borderWidth: 2, hoverOffset: 6 }],
-  };
-
-  /* ─── Exportar CSV (legacy) ─── */
-  const exportarCSVActual = () => {
-    if (tab === "financiero") exportarCSV(serieMes.meses.map((k, i) => ({ Mes: nombreMes(k), Ingresos: serieMes.ingresos[i], Gastos: serieMes.gastos[i], Ganancia: serieMes.ganancia[i] })), "financiero_por_mes");
-    else if (tab === "clientes") exportarCSV(topClientes.map((t) => ({ Cliente: t.nombre, Pedidos: t.pedidos, "Recaudo real": t.recaudo, Promedio: t.promedio })), "top_clientes_real");
-    else if (tab === "articulos") exportarCSV(artD.map((t) => ({ Artículo: t.nombre, Cantidad: t.cantidad })), `top_articulos_${subTabArt}`);
-    else if (tab === "proveedores") exportarCSV(resumenProveedores.map((p) => ({ Proveedor: p.nombre, Adeudado: p.total, "Pagado real": p.pagado, Pendiente: p.pendiente, Órdenes: p.ordenes })), "proveedores_real");
   };
 
   /* ─── Exportar XLSX (profesional) ─── */
@@ -946,7 +938,6 @@ export default function Reportes() {
               </div>
               <button className="sw-btn sw-btn-secundario" onClick={exportarPDFDashboard}>📄 PDF</button>
               <button className="sw-btn sw-btn-secundario" onClick={exportarExcel}>📊 Excel</button>
-              <button className="sw-btn sw-btn-secundario" onClick={exportarCSVActual} style={{ fontSize: 11, padding: "6px 10px", opacity: 0.7 }}>CSV</button>
             </div>
           </div>
 
