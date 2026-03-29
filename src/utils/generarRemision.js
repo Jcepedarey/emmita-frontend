@@ -60,7 +60,7 @@ import { jsPDF } from "jspdf";
     return "-";
   };
 
-  export const generarRemisionPDF = async (documento) => {
+  export const generarRemisionPDF = async (documento, incluirServicios = true) => {
     const doc = new jsPDF();
     const emp = await obtenerDatosTenantPDF();
     const logo = emp.logoUrl ? await procesarImagen(emp.logoUrl, 250, 1.0) : null;
@@ -152,21 +152,26 @@ import { jsPDF } from "jspdf";
     // 📋 Tabla de artículos (con grupos y soporte de notas)
 const filas = [];
 (documento.productos || []).forEach((p) => {
+  // ✅ Filtrar servicios si no se quieren incluir
+  if (!incluirServicios && p.es_servicio) return;
+
   if (p.es_grupo && Array.isArray(p.productos)) {
     const factorGrupo = Number(p.cantidad) || 1;
+    const subItems = incluirServicios ? p.productos : p.productos.filter((s) => !s.es_servicio);
+    if (subItems.length === 0) return; // no mostrar grupo vacío
 
     // Título del grupo (centrado). El colSpan depende de si hay columna de Notas.
     filas.push([
       {
         content: p.nombre || "Grupo sin nombre",
         colSpan: mostrarNotas ? 3 : 2,
-        _grupo: true, // ← marcador para estilos en el hook
+        _grupo: true,
       },
     ]);
 
     // Sub-items del grupo
-    p.productos.forEach((sub) => {
-      const cantSub = (Number(sub.cantidad) || 0) * factorGrupo; // 👈 MULTIPLICA
+    subItems.forEach((sub) => {
+      const cantSub = (Number(sub.cantidad) || 0) * factorGrupo;
       if (cantSub > 0) {
         if (mostrarNotas) {
           filas.push([

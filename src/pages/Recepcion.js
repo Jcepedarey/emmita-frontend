@@ -84,10 +84,12 @@ const Recepcion = () => {
         const cantidadGrupo = Number(p.cantidad || 1);
 
         p.productos.forEach((sub) => {
-          const cantidadSub = Number(sub.cantidad || 0);
-          const multiplicarSub = sub.multiplicar !== false; // por defecto true
+          // ✅ Servicios no entran en la tabla de revisión física
+          if (sub.es_servicio) return;
 
-          // ✅ Calcular cantidad esperada según checkbox
+          const cantidadSub = Number(sub.cantidad || 0);
+          const multiplicarSub = sub.multiplicar !== false;
+
           const cantidadEsperada = multiplicarSub
             ? cantidadSub * cantidadGrupo
             : cantidadSub;
@@ -104,6 +106,9 @@ const Recepcion = () => {
           });
         });
       } else {
+        // ✅ Servicios no entran en la tabla de revisión física
+        if (p.es_servicio) return;
+
         productosConCampo.push({
           nombre: p.nombre,
           esperado: p.cantidad,
@@ -924,6 +929,78 @@ useEffect(() => {
                 )}
               </div>
             </div>
+
+            {/* 🔧 SERVICIOS PRESTADOS */}
+            {ordenSeleccionada && (() => {
+              // Extraer servicios de los productos de la orden
+              const servicios = [];
+              (ordenSeleccionada.productos || []).forEach((p) => {
+                if (p.es_grupo && Array.isArray(p.productos)) {
+                  p.productos.forEach((sub) => {
+                    if (sub.es_servicio) servicios.push({ nombre: sub.nombre, precio: Number(sub.precio || 0), costo: Number(sub.costo_interno || 0) });
+                  });
+                } else if (p.es_servicio) {
+                  servicios.push({ nombre: p.nombre, precio: Number(p.precio || 0), costo: Number(p.costo_interno || 0) });
+                }
+              });
+              const costosOrden = ordenSeleccionada.costos_produccion || [];
+
+              if (servicios.length === 0 && costosOrden.length === 0) return null;
+
+              return (
+                <div className="cd-card">
+                  <div className="cd-card-header" style={{ background: "linear-gradient(135deg, #16a34a, #15803d)", color: "white", borderBottom: "none" }}>
+                    🔧 Servicios Prestados
+                  </div>
+                  <div className="cd-card-body">
+                    {servicios.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+                          Servicios incluidos en este pedido (no requieren devolución física):
+                        </div>
+                        {servicios.map((s, i) => (
+                          <div key={i} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            padding: "8px 12px", marginBottom: 4, borderRadius: 8,
+                            background: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+                            border: "1px solid #bbf7d0",
+                          }}>
+                            <span style={{ fontWeight: 500, fontSize: 13 }}>🔧 {s.nombre}</span>
+                            <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
+                              <span style={{ color: "#15803d", fontWeight: 600 }}>Venta: ${s.precio.toLocaleString("es-CO")}</span>
+                              {s.costo > 0 && <span style={{ color: "#dc2626" }}>Costo: ${s.costo.toLocaleString("es-CO")}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {costosOrden.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+                          Costos de producción registrados al crear el pedido:
+                        </div>
+                        {costosOrden.map((c, i) => (
+                          <div key={i} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            padding: "6px 12px", marginBottom: 4, borderRadius: 6,
+                            background: "#fff7ed", border: "1px solid #fed7aa",
+                          }}>
+                            <span style={{ fontSize: 13 }}>{c.es_servicio ? "🔧" : "📦"} {c.nombre}</span>
+                            <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
+                              <span style={{ color: "#dc2626", fontWeight: 600 }}>${Number(c.costo || 0).toLocaleString("es-CO")}</span>
+                              <span style={{ color: "#9ca3af" }}>{c.fecha || "—"}</span>
+                            </div>
+                          </div>
+                        ))}
+                        <div style={{ marginTop: 6, fontSize: 11, color: "#9ca3af" }}>
+                          ℹ️ Estos costos ya están registrados en contabilidad.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 📊 RESUMEN DE PAGOS */}
             <div className="cd-card">

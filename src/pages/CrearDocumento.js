@@ -1911,7 +1911,26 @@ mostrar_notas: mostrarNotas
 
             {tipoDocumento === "orden" && productosAgregados.length > 0 && (
               <button
-                onClick={() => generarRemisionPDF(obtenerDatosPDF())}
+                onClick={async () => {
+                  // Verificar si hay servicios en los productos
+                  const tieneServicios = productosAgregados.some((p) =>
+                    p.es_servicio || (p.es_grupo && (p.productos || []).some((s) => s.es_servicio))
+                  );
+                  let incluir = true;
+                  if (tieneServicios) {
+                    const { value } = await Swal.fire({
+                      title: "Servicios en la remisión",
+                      text: "Este pedido incluye servicios. ¿Deseas incluirlos en la remisión?",
+                      icon: "question",
+                      showCancelButton: true,
+                      confirmButtonText: "Sí, incluir servicios",
+                      cancelButtonText: "No, solo artículos físicos",
+                      confirmButtonColor: "#16a34a",
+                    });
+                    incluir = !!value;
+                  }
+                  generarRemisionPDF(obtenerDatosPDF(), incluir);
+                }}
                 className="cd-btn cd-btn-verde"
               >
                 📦 Generar Remisión
