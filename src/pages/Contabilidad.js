@@ -69,7 +69,7 @@ const getPreset = (desde, hasta) => {
 /* ─── Categorías predefinidas ─── */
 const CATEGORIAS_GASTO = [
   "Arriendo", "Servicios públicos", "Transporte / Flete", "Nómina / Salarios",
-  "Mantenimiento", "Compra de inventario", "Publicidad", "Impuestos", "Papelería", "Otro gasto"
+  "Mantenimiento", "Compra de inventario", "Costo de producción", "Publicidad", "Impuestos", "Papelería", "Otro gasto"
 ];
 const CATEGORIAS_INGRESO = [
   "Alquiler de artículos", "Garantía", "Transporte cobrado", "Ingreso adicional", "Otro ingreso"

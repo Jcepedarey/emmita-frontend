@@ -55,6 +55,28 @@
 
     const [productosAgregados, setProductosAgregados] = useState([]);
 
+    // 🔧 Sincronizar costos cuando cambian los productos
+    useEffect(() => {
+      const itemsConCosto = [];
+      const recoger = (items) => {
+        for (const it of items || []) {
+          if (it.es_grupo && Array.isArray(it.productos)) {
+            recoger(it.productos);
+          } else if (Number(it.costo_interno || 0) > 0 || it.es_servicio) {
+            const yaExiste = costosProduccion.find((c) => c.nombre === it.nombre);
+            itemsConCosto.push({
+              nombre: it.nombre,
+              costo: yaExiste?.costo ?? Number(it.costo_interno || 0),
+              fecha: yaExiste?.fecha || new Date().toISOString().slice(0, 10),
+              es_servicio: !!it.es_servicio,
+            });
+          }
+        }
+      };
+      recoger(productosAgregados);
+      setCostosProduccion(itemsConCosto);
+    }, [productosAgregados]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Garantía
     const [garantia, setGarantia] = useState("");
     const [garantiaRecibida, setGarantiaRecibida] = useState(false);
@@ -62,6 +84,9 @@
 
     // Abonos con fecha
     const [abonos, setAbonos] = useState([]); // {valor, fecha}
+
+    // 🔧 Costos de producción (servicios y artículos con costo)
+    const [costosProduccion, setCostosProduccion] = useState([]);
 
     // 🔒 Protección contra doble clic
     const [guardando, setGuardando] = useState(false);
@@ -229,6 +254,11 @@ useEffect(() => {
       // 🆕 Cargar fechas de entrega y devolución
       if (documento.fecha_entrega) setFechaEntrega(norm(documento.fecha_entrega));
       if (documento.fecha_devolucion) setFechaDevolucion(norm(documento.fecha_devolucion));
+
+      // 🔧 Cargar costos de producción
+      if (Array.isArray(documento.costos_produccion)) {
+        setCostosProduccion(documento.costos_produccion);
+      }
 
       // 🔧 FIX: Precargar descuento y retención al editar
       const descVal = Number(documento.descuento || 0);
@@ -1131,6 +1161,44 @@ const sincronizarPagosProveedoresContabilidad = async (pagosActuales, pagosAnter
         .eq("id", ordenIdFinal);
     }
 
+    // 🔧 REGISTRAR COSTOS DE PRODUCCIÓN EN CONTABILIDAD
+    if (tipoDocumento !== "cotizacion" && costosProduccion.length > 0 && ordenIdFinal) {
+      try {
+        // Borrar costos anteriores de esta orden para evitar duplicados
+        await supabase
+          .from("movimientos_contables")
+          .delete()
+          .eq("orden_id", ordenIdFinal)
+          .eq("categoria", "Costo de producción");
+
+        // Insertar costos actuales
+        for (const costo of costosProduccion) {
+          const valorCosto = Number(costo.costo || 0);
+          if (valorCosto > 0) {
+            await supabase.from("movimientos_contables").insert([{
+              orden_id: ordenIdFinal,
+              cliente_id: clienteSeleccionado?.id || null,
+              fecha: costo.fecha || new Date().toISOString().slice(0, 10),
+              tipo: "gasto",
+              monto: valorCosto,
+              descripcion: `[${numeroDocumento}] Costo de producción: ${costo.nombre}`,
+              categoria: "Costo de producción",
+              estado: "activo",
+              usuario: usuario?.nombre || "Administrador",
+            }]);
+          }
+        }
+
+        // Guardar costos en la orden para referencia
+        await supabase
+          .from(tabla)
+          .update({ costos_produccion: costosProduccion })
+          .eq("id", ordenIdFinal);
+      } catch (errorCostos) {
+        console.error("❌ Error registrando costos de producción:", errorCostos);
+      }
+    }
+
     // 🆕 REGISTRAR PAGOS A PROVEEDORES EN CONTABILIDAD
     // 🔧 CORREGIDO: Solo para ordenes_pedido (cotizaciones no tienen este campo)
 if (tipoDocumento !== "cotizacion" && pagosProveedores && pagosProveedores.length > 0) {
@@ -1445,9 +1513,10 @@ mostrar_notas: mostrarNotas
         : null;
 
       const isTemporal = !!item.temporal || !!item.es_proveedor;
+      const esServicio = !!item.es_servicio;
 
       return (
-        <tr key={index} className={isTemporal ? "fila-temporal" : ""}>
+        <tr key={index} className={isTemporal ? "fila-temporal" : ""} style={esServicio ? { background: "linear-gradient(135deg, #f0fdf4f0, #dcfce7a0)" } : undefined}>
           <td>
             <input
               type="number"
@@ -1482,6 +1551,8 @@ mostrar_notas: mostrarNotas
                         title="Click para editar nombre"
                       >
                         {item.nombre} <span style={{ fontSize: 10, color: "#9ca3af" }}>✏️</span>
+                        {esServicio && <span style={{ fontSize: 9, marginLeft: 6, padding: "1px 6px", borderRadius: 10, background: "#dcfce7", color: "#16a34a", fontWeight: 600 }}>🔧 Servicio</span>}
+                        {item.es_proveedor && <span style={{ fontSize: 9, marginLeft: 6, padding: "1px 6px", borderRadius: 10, background: "#f3e8ff", color: "#7c3aed", fontWeight: 600 }}>🏢 Proveedor</span>}
                       </span>
                     )}
                   </td>
@@ -1587,6 +1658,64 @@ mostrar_notas: mostrarNotas
               💰 Pagos a Proveedores
             </button>
           </div>
+
+          {/* ========== COSTOS DE PRODUCCIÓN ========== */}
+          {costosProduccion.length > 0 && tipoDocumento !== "cotizacion" && (
+            <div className="cd-card" style={{ marginTop: "16px" }}>
+              <div className="cd-card-header" style={{ background: "linear-gradient(135deg, #16a34a, #15803d)", color: "white", borderBottom: "none" }}>
+                🔧 Costos de Producción
+              </div>
+              <div className="cd-card-body">
+                <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "12px" }}>
+                  Costos internos de servicios y artículos con costo de producción. Se registran automáticamente en contabilidad al guardar.
+                </div>
+                {costosProduccion.map((costo, idx) => (
+                  <div key={idx} style={{
+                    display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                    padding: "10px 12px", marginBottom: 8, borderRadius: 8,
+                    background: costo.es_servicio ? "linear-gradient(135deg, #f0fdf4, #dcfce7)" : "#f8fafc",
+                    border: "1px solid #e5e7eb",
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, flex: "1 1 180px", minWidth: 140, color: "#111827" }}>
+                      {costo.es_servicio ? "🔧" : "📦"} {costo.nombre}
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>Costo:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="$0"
+                        value={costo.costo}
+                        onChange={(e) => {
+                          const nuevos = [...costosProduccion];
+                          nuevos[idx] = { ...nuevos[idx], costo: e.target.value };
+                          setCostosProduccion(nuevos);
+                        }}
+                        style={{ width: 110, padding: "6px 8px", border: "1px solid #fca5a5", borderRadius: 6, fontSize: 13 }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>Fecha:</span>
+                      <input
+                        type="date"
+                        value={costo.fecha}
+                        onChange={(e) => {
+                          const nuevos = [...costosProduccion];
+                          nuevos[idx] = { ...nuevos[idx], fecha: e.target.value };
+                          setCostosProduccion(nuevos);
+                        }}
+                        style={{ padding: "6px 8px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <div style={{ marginTop: 8, padding: "8px 12px", background: "#fef2f2", borderRadius: 6, fontSize: 12, color: "#991b1b", display: "flex", justifyContent: "space-between" }}>
+                  <span>Total costos de producción:</span>
+                  <strong>${costosProduccion.reduce((s, c) => s + Number(c.costo || 0), 0).toLocaleString("es-CO")}</strong>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ========== GARANTÍA Y ABONOS ========== */}
           <div className="cd-card" style={{ marginTop: "16px" }}>
