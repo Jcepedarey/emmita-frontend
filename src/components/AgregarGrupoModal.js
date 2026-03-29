@@ -18,7 +18,8 @@ const AgregarGrupoModal = ({
   const [error, setError] = useState("");
   const [editandoNombre, setEditandoNombre] = useState(null);
   const [mostrarFormTemporal, setMostrarFormTemporal] = useState(false);
-  const [formTemporal, setFormTemporal] = useState({ nombre: "", precio: "" });
+  const [formTemporal, setFormTemporal] = useState({ nombre: "", precio: "", tipo: "articulo" });
+  const [filtroTipoBusqueda, setFiltroTipoBusqueda] = useState(""); // "" = todos
   const buscarRef = useRef(null);
 
   // Precarga para edición
@@ -41,9 +42,12 @@ const AgregarGrupoModal = ({
           subtotal: precio * cantidad,
           temporal: !!p.temporal,
           es_proveedor: !!p.es_proveedor,
+          es_servicio: !!p.es_servicio || (p.tipo === "servicio"),
           multiplicar: p.multiplicar !== undefined ? !!p.multiplicar : true,
           precio_compra: Number(p.precio_compra || 0),
           proveedor_nombre: p.proveedor_nombre || "",
+          costo_interno: Number(p.costo_interno || p.costo || 0),
+          tipo: p.tipo || (p.es_servicio ? "servicio" : "articulo"),
         };
       });
       setSeleccionados(items);
@@ -58,9 +62,9 @@ const AgregarGrupoModal = ({
       setError("");
       try {
         const [{ data: inventario, error: e1 }, { data: proveedores, error: e2 }] = await Promise.all([
-          supabase.from("productos").select("id, nombre, descripcion, precio"),
+          supabase.from("productos").select("id, nombre, descripcion, precio, tipo, costo"),
           supabase.from("productos_proveedores")
-            .select("id, nombre, precio_venta, precio_compra, proveedor_id, proveedores ( id, nombre )"),
+            .select("id, nombre, precio_venta, precio_compra, proveedor_id, tipo, proveedores ( id, nombre )"),
         ]);
 
         if (e1 || e2) {
@@ -75,6 +79,9 @@ const AgregarGrupoModal = ({
           descripcion: p.descripcion || "",
           precio: Number(p.precio || 0),
           es_proveedor: false,
+          es_servicio: p.tipo === "servicio",
+          tipo: p.tipo || "articulo",
+          costo_interno: Number(p.costo || 0),
         }));
 
         const proveedoresNormalizado = (proveedores || []).map((p) => ({
@@ -84,8 +91,11 @@ const AgregarGrupoModal = ({
           precio: Number(p.precio_venta || 0),
           precio_compra: Number(p.precio_compra || 0),
           es_proveedor: true,
+          es_servicio: p.tipo === "servicio",
+          tipo: p.tipo || "articulo",
           proveedor_id: p.proveedor_id || p.proveedores?.id || null,
           proveedor_nombre: p.proveedores?.nombre || "",
+          costo_interno: 0,
         }));
 
         if (!cancel) {
@@ -111,14 +121,22 @@ const AgregarGrupoModal = ({
     buscarRef.current?.focus();
   }, []);
 
-  // ✅ Sin límite — muestra todos los resultados
+  // ✅ Filtrado con soporte de tipo
   const filtrados = useMemo(() => {
     const t = (busqueda || "").toLowerCase();
     if (!t) return [];
-    return productos.filter(
+    let lista = productos.filter(
       (p) => p.nombre?.toLowerCase().includes(t) || p.descripcion?.toLowerCase().includes(t)
     );
-  }, [productos, busqueda]);
+    if (filtroTipoBusqueda) {
+      if (filtroTipoBusqueda === "servicio") {
+        lista = lista.filter((p) => p.es_servicio || p.tipo === "servicio");
+      } else if (filtroTipoBusqueda === "articulo") {
+        lista = lista.filter((p) => !p.es_servicio && (p.tipo || "articulo") === "articulo");
+      }
+    }
+    return lista;
+  }, [productos, busqueda, filtroTipoBusqueda]);
 
   const agregarAlGrupo = (producto) => {
     if (seleccionados.some((p) => p.id === producto.id)) return;
@@ -129,6 +147,9 @@ const AgregarGrupoModal = ({
       temporal: false,
       multiplicar: true,
       precio_compra: producto.precio_compra || 0,
+      costo_interno: producto.costo_interno || 0,
+      es_servicio: !!producto.es_servicio || producto.tipo === "servicio",
+      tipo: producto.tipo || "articulo",
     };
     setSeleccionados((prev) => [...prev, nuevo]);
     setBusqueda("");
@@ -160,6 +181,13 @@ const AgregarGrupoModal = ({
           } else {
             const n = Number(valor);
             updated.precio_compra = (!isNaN(n) && n >= 0) ? n : 0;
+          }
+        } else if (campo === "costo_interno") {
+          if (valor === "") {
+            updated.costo_interno = "";
+          } else {
+            const n = Number(valor);
+            updated.costo_interno = (!isNaN(n) && n >= 0) ? n : 0;
           }
         } else if (campo === "precio") {
           if (valor === "") {
@@ -200,6 +228,7 @@ const AgregarGrupoModal = ({
       return;
     }
     const precio = Number(formTemporal.precio || 0);
+    const esServicio = formTemporal.tipo === "servicio";
     const id = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const nuevo = {
       id,
@@ -210,12 +239,15 @@ const AgregarGrupoModal = ({
       subtotal: 0,
       temporal: true,
       es_proveedor: false,
+      es_servicio: esServicio,
+      tipo: formTemporal.tipo || "articulo",
       multiplicar: true,
       precio_compra: 0,
+      costo_interno: 0,
       proveedor_nombre: "",
     };
     setSeleccionados((prev) => [...prev, nuevo]);
-    setFormTemporal({ nombre: "", precio: "" });
+    setFormTemporal({ nombre: "", precio: "", tipo: "articulo" });
     setMostrarFormTemporal(false);
     buscarRef.current?.focus();
   };
@@ -260,7 +292,7 @@ const AgregarGrupoModal = ({
         
         {/* Header */}
         <div className="modal-header header-naranja">
-          <h2>📦 {grupoEnEdicion ? "Editar" : "Crear"} Grupo de Artículos</h2>
+          <h2>📦 {grupoEnEdicion ? "Editar" : "Crear"} Grupo</h2>
           <button className="btn-cerrar-modal" onClick={handleClose}>✕</button>
         </div>
 
@@ -307,11 +339,32 @@ const AgregarGrupoModal = ({
 
           {/* Búsqueda de productos */}
           <div className="modal-seccion">
-            <label className="modal-label">🔍 Buscar productos para agregar:</label>
+            <label className="modal-label">🔍 Buscar productos y servicios:</label>
+            {/* Filtro tipo en búsqueda */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+              {[
+                { id: "", label: "Todos" },
+                { id: "articulo", label: "📦 Artículos" },
+                { id: "servicio", label: "🔧 Servicios" },
+              ].map((t) => (
+                <button key={t.id} type="button"
+                  onClick={() => setFiltroTipoBusqueda(t.id)}
+                  style={{
+                    padding: "4px 10px", borderRadius: 6, cursor: "pointer",
+                    fontSize: 11, fontWeight: 600,
+                    border: filtroTipoBusqueda === t.id ? "2px solid var(--sw-azul)" : "1px solid #e5e7eb",
+                    background: filtroTipoBusqueda === t.id ? "var(--sw-cyan-muy-claro)" : "white",
+                    color: filtroTipoBusqueda === t.id ? "var(--sw-azul)" : "#9ca3af",
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
             <input
               ref={buscarRef}
               type="text"
-              placeholder="Buscar productos..."
+              placeholder="Buscar..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               onKeyDown={onKeyDownBuscar}
@@ -322,7 +375,7 @@ const AgregarGrupoModal = ({
           {loading && <div style={{ color: "#6b7280", marginBottom: 12 }}>Cargando productos...</div>}
           {error && <div style={{ color: "#dc2626", marginBottom: 12 }}>{error}</div>}
 
-          {/* ✅ Resultados de búsqueda — SIN LÍMITE, con scroll */}
+          {/* ✅ Resultados de búsqueda — con scroll y badges de tipo */}
           {busqueda && filtrados.length > 0 && (
             <div className="modal-seccion">
               <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>
@@ -333,6 +386,14 @@ const AgregarGrupoModal = ({
                   <li key={p.id} onClick={() => agregarAlGrupo(p)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <strong>{p.nombre}</strong>
+                      {/* Badge de tipo */}
+                      <span style={{
+                        fontSize: 9, padding: "1px 6px", borderRadius: 20, fontWeight: 600, marginLeft: 6,
+                        background: p.es_servicio ? "#f3e8ff" : p.es_proveedor ? "#faf5ff" : "#eff6ff",
+                        color: p.es_servicio ? "#7c3aed" : p.es_proveedor ? "#7c3aed" : "#2563eb",
+                      }}>
+                        {p.es_servicio ? "🔧" : p.es_proveedor ? "🏢" : "📦"}
+                      </span>
                       {p.es_proveedor && (
                         <>
                           <span className="badge badge-gris" style={{ marginLeft: 8 }}>
@@ -342,6 +403,11 @@ const AgregarGrupoModal = ({
                             {p.proveedor_nombre || "Proveedor"}
                           </span>
                         </>
+                      )}
+                      {p.es_servicio && Number(p.costo_interno || 0) > 0 && (
+                        <span className="badge badge-gris" style={{ marginLeft: 8 }}>
+                          Costo: ${Number(p.costo_interno).toLocaleString("es-CO")}
+                        </span>
                       )}
                     </div>
                     <span className="badge badge-verde">
@@ -353,22 +419,42 @@ const AgregarGrupoModal = ({
             </div>
           )}
 
-          {/* ✅ Crear artículo temporal */}
+          {/* ✅ Crear artículo/servicio temporal */}
           {!mostrarFormTemporal ? (
             <button
               onClick={() => setMostrarFormTemporal(true)}
               className="btn-modal btn-dashed"
               style={{ marginBottom: 12, fontSize: 12 }}
             >
-              ➕ Crear artículo temporal (sin inventario)
+              ➕ Crear item temporal (sin inventario)
             </button>
           ) : (
             <div className="form-expandible" style={{ marginBottom: 12 }}>
-              <div className="form-expandible-titulo">➕ Artículo temporal</div>
+              <div className="form-expandible-titulo">➕ Item temporal</div>
+              {/* Tipo */}
+              <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                {[
+                  { id: "articulo", label: "📦 Artículo" },
+                  { id: "servicio", label: "🔧 Servicio" },
+                ].map((t) => (
+                  <button key={t.id} type="button"
+                    onClick={() => setFormTemporal({ ...formTemporal, tipo: t.id })}
+                    style={{
+                      padding: "4px 10px", borderRadius: 6, cursor: "pointer",
+                      fontSize: 11, fontWeight: 600,
+                      border: formTemporal.tipo === t.id ? "2px solid var(--sw-azul)" : "1px solid #e5e7eb",
+                      background: formTemporal.tipo === t.id ? "var(--sw-cyan-muy-claro)" : "white",
+                      color: formTemporal.tipo === t.id ? "var(--sw-azul)" : "#9ca3af",
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 8 }}>
                 <input
                   type="text"
-                  placeholder="Nombre del artículo"
+                  placeholder={formTemporal.tipo === "servicio" ? "Nombre del servicio" : "Nombre del artículo"}
                   value={formTemporal.nombre}
                   onChange={(e) => setFormTemporal({ ...formTemporal, nombre: e.target.value })}
                   className="modal-input"
@@ -392,7 +478,7 @@ const AgregarGrupoModal = ({
                 <button
                   onClick={() => {
                     setMostrarFormTemporal(false);
-                    setFormTemporal({ nombre: "", precio: "" });
+                    setFormTemporal({ nombre: "", precio: "", tipo: "articulo" });
                   }}
                   className="btn-modal btn-secundario btn-pequeno"
                 >
@@ -404,12 +490,12 @@ const AgregarGrupoModal = ({
 
           {/* Artículos del grupo */}
           <div className="modal-seccion">
-            <div className="modal-seccion-titulo">📋 Artículos del grupo ({seleccionados.length})</div>
+            <div className="modal-seccion-titulo">📋 Items del grupo ({seleccionados.length})</div>
             
             {seleccionados.length === 0 ? (
               <div className="mensaje-vacio">
                 <div className="mensaje-vacio-icono">📭</div>
-                <div className="mensaje-vacio-texto">Busca y agrega productos al grupo</div>
+                <div className="mensaje-vacio-texto">Busca y agrega productos o servicios al grupo</div>
               </div>
             ) : (
               seleccionados.map((item, index) => (
@@ -462,14 +548,16 @@ const AgregarGrupoModal = ({
                       </div>
                     )}
                     <div className="item-editable-meta">
-                      {item.temporal ? (
+                      {item.es_servicio ? (
+                        <span className="badge" style={{ background: "#f3e8ff", color: "#7c3aed" }}>🔧 Servicio</span>
+                      ) : item.temporal ? (
                         <span className="badge badge-gris">Temporal</span>
                       ) : item.es_proveedor ? (
                         <span className="badge badge-morado">{item.proveedor_nombre || "Proveedor"}</span>
                       ) : (
                         <span className="badge badge-gris">Inventario</span>
                       )}
-                      {!item.temporal && (
+                      {!item.temporal && !item.es_servicio && (
                         <>
                           {" · Stock: "}
                           {stockDisponible?.[item.id] ?? "N/A"}
@@ -487,6 +575,19 @@ const AgregarGrupoModal = ({
                         min="0"
                         value={item.precio_compra || ""}
                         onChange={(e) => actualizarCampo(index, "precio_compra", e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Costo interno (servicios con costo o artículos con costo) */}
+                  {(item.es_servicio || Number(item.costo_interno || 0) > 0) && !item.es_proveedor && (
+                    <div className="item-editable-campo">
+                      <label>Costo:</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={item.costo_interno || ""}
+                        onChange={(e) => actualizarCampo(index, "costo_interno", e.target.value)}
                       />
                     </div>
                   )}

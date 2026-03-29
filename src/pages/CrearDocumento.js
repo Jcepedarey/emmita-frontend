@@ -509,6 +509,8 @@ useEffect(() => {
       precio: parseFloat(producto.precio),     // mantiene el precio del inventario
       es_grupo: false,
       temporal: false,
+      es_servicio: producto.tipo === "servicio",
+      costo_interno: Number(producto.costo || 0),
       multiplicarPorDias: multiDias ? true : undefined,
     };
       const items = [...productosAgregados, nuevo];
@@ -546,7 +548,9 @@ useEffect(() => {
     es_grupo: false,
     temporal: !!producto.temporal,
     es_proveedor: !!producto.es_proveedor,
-    multiplicarPorDias: multiDias ? true : undefined, // 👈 nuevo
+    es_servicio: !!producto.es_servicio,
+    costo_interno: Number(producto.costo_interno || 0),
+    multiplicarPorDias: multiDias ? true : undefined,
   };
     const items = [...productosAgregados, nuevo];
     setProductosAgregados(recomputarSubtotales(items));
