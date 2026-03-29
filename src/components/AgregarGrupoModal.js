@@ -383,7 +383,11 @@ const AgregarGrupoModal = ({
               </div>
               <ul className="lista-sugerencias" style={{ maxHeight: "40vh", overflowY: "auto" }}>
                 {filtrados.map((p) => (
-                  <li key={p.id} onClick={() => agregarAlGrupo(p)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <li key={p.id} onClick={() => agregarAlGrupo(p)} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    background: p.es_servicio ? "linear-gradient(135deg, #f0fdf4, #dcfce7)" : p.es_proveedor ? "linear-gradient(135deg, #faf5ff, #f3e8ff)" : undefined,
+                    borderLeft: p.es_servicio ? "3px solid #22c55e" : p.es_proveedor ? "3px solid #a78bfa" : undefined,
+                  }}>
                     <div>
                       <strong>{p.nombre}</strong>
                       {/* Badge de tipo */}
@@ -499,7 +503,11 @@ const AgregarGrupoModal = ({
               </div>
             ) : (
               seleccionados.map((item, index) => (
-                <div key={`${item.id}-${index}`} className="item-editable">
+                <div key={`${item.id}-${index}`} className="item-editable" style={{
+                  background: item.es_servicio ? "linear-gradient(135deg, #f0fdf4f0, #dcfce7a0)" : item.es_proveedor ? "linear-gradient(135deg, #faf5fff0, #f3e8ffa0)" : undefined,
+                  borderLeft: item.es_servicio ? "3px solid #22c55e" : item.es_proveedor ? "3px solid #a78bfa" : undefined,
+                  borderRadius: 8,
+                }}>
                   
                   {/* Checkbox multiplicar */}
                   <div className="checkbox-multiplicar" title="Multiplicar por cantidad del grupo">
@@ -579,15 +587,17 @@ const AgregarGrupoModal = ({
                     </div>
                   )}
 
-                  {/* Costo interno (servicios con costo o artículos con costo) */}
+                  {/* Costo interno (servicios siempre, artículos si tienen costo) */}
                   {(item.es_servicio || Number(item.costo_interno || 0) > 0) && !item.es_proveedor && (
                     <div className="item-editable-campo">
-                      <label>Costo:</label>
+                      <label style={{ color: "#dc2626" }}>Costo:</label>
                       <input
                         type="number"
                         min="0"
+                        placeholder="0"
                         value={item.costo_interno || ""}
                         onChange={(e) => actualizarCampo(index, "costo_interno", e.target.value)}
+                        style={{ borderColor: Number(item.costo_interno || 0) > 0 ? "#fca5a5" : undefined }}
                       />
                     </div>
                   )}

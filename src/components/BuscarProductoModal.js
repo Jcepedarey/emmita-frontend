@@ -272,7 +272,10 @@ export default function BuscarProductoModal({
               {resultados.map((p) => {
                 const esServicio = p.tipo === "servicio";
                 return (
-                  <div key={p.id} className="item-card">
+                  <div key={p.id} className="item-card" style={{
+                    background: esServicio ? "linear-gradient(135deg, #f0fdf4, #dcfce7)" : "white",
+                    borderLeft: esServicio ? "3px solid #22c55e" : undefined,
+                  }}>
                     <div className="item-card-info">
                       <div className="item-card-titulo" style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         {p.nombre}
