@@ -12,7 +12,7 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
   const [productos, setProductos] = useState([]);
   const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
 
-  const [formProd, setFormProd] = useState({ nombre: "", precio_compra: "", precio_venta: "" });
+  const [formProd, setFormProd] = useState({ nombre: "", precio_compra: "", precio_venta: "", tipo: "articulo" });
 
   const [productoEditando, setProductoEditando] = useState(null);
   const [productoForm, setProductoForm] = useState({ nombre: "", precio_compra: "", precio_venta: "", stock: 0 });
@@ -64,7 +64,7 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
 
     const { data, error } = await supabase
       .from("productos_proveedores")
-      .insert([{ ...formProd, proveedor_id: proveedorSeleccionado.id, stock: 0 }])
+      .insert([{ ...formProd, proveedor_id: proveedorSeleccionado.id, stock: 0, tipo: formProd.tipo || "articulo" }])
       .select();
 
     if (error) return Swal.fire("Error", "No se pudo guardar el producto", "error");
@@ -88,7 +88,7 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
       }
     });
 
-    setFormProd({ nombre: "", precio_compra: "", precio_venta: "" });
+    setFormProd({ nombre: "", precio_compra: "", precio_venta: "", tipo: "articulo" });
     setMostrarFormNuevo(false);
 
     const { data: productosActualizados } = await supabase
@@ -210,14 +210,34 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
                 />
               </div>
 
-              {/* Formulario nuevo producto */}
+              {/* Formulario nuevo producto/servicio */}
               {mostrarFormNuevo && (
                 <div className="form-expandible">
-                  <div className="form-expandible-titulo">➕ Crear nuevo producto</div>
+                  <div className="form-expandible-titulo">➕ Crear nuevo producto o servicio</div>
+                  {/* Selector tipo */}
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                    {[
+                      { id: "articulo", label: "📦 Artículo" },
+                      { id: "servicio", label: "🔧 Servicio" },
+                    ].map((t) => (
+                      <button key={t.id} type="button"
+                        onClick={() => setFormProd({ ...formProd, tipo: t.id })}
+                        style={{
+                          flex: 1, padding: "7px 10px", borderRadius: 8, cursor: "pointer",
+                          fontSize: 12, fontWeight: 600,
+                          border: formProd.tipo === t.id ? `2px solid ${t.id === "servicio" ? "#7c3aed" : "var(--sw-azul)"}` : "1px solid #e5e7eb",
+                          background: formProd.tipo === t.id ? (t.id === "servicio" ? "#f3e8ff" : "#eff6ff") : "white",
+                          color: formProd.tipo === t.id ? (t.id === "servicio" ? "#7c3aed" : "var(--sw-azul)") : "#6b7280",
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
                   <div className="form-grid">
                     <input
                       type="text"
-                      placeholder="Nombre del producto"
+                      placeholder={formProd.tipo === "servicio" ? "Nombre del servicio" : "Nombre del producto"}
                       value={formProd.nombre}
                       onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })}
                       className="modal-input"
@@ -241,12 +261,12 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
                   </div>
                   <div className="form-acciones">
                     <button onClick={guardarProductoProveedor} className="btn-modal btn-verde">
-                      💾 Guardar
+                      💾 Guardar {formProd.tipo === "servicio" ? "servicio" : "producto"}
                     </button>
                     <button
                       onClick={() => {
                         setMostrarFormNuevo(false);
-                        setFormProd({ nombre: "", precio_compra: "", precio_venta: "" });
+                        setFormProd({ nombre: "", precio_compra: "", precio_venta: "", tipo: "articulo" });
                       }}
                       className="btn-modal btn-secundario"
                     >
@@ -272,7 +292,10 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
                       prod.nombre.toLowerCase().includes(busquedaProducto.toLowerCase())
                     )
                     .map((prod) => (
-                    <div key={prod.id} className="item-card">
+                    <div key={prod.id} className="item-card" style={{
+                      background: (prod.tipo || "articulo") === "servicio" ? "linear-gradient(135deg, #f0fdf4, #dcfce7)" : undefined,
+                      borderLeft: (prod.tipo || "articulo") === "servicio" ? "3px solid #22c55e" : undefined,
+                    }}>
                       {productoEditando === prod.id ? (
                         <div style={{ width: '100%' }}>
                           <div className="form-grid" style={{ marginBottom: 10 }}>
@@ -318,7 +341,16 @@ const BuscarProveedorYProductoModal = ({ onSelect, onClose }) => {
                       ) : (
                         <>
                           <div className="item-card-info">
-                            <div className="item-card-titulo">{prod.nombre}</div>
+                            <div className="item-card-titulo" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              {prod.nombre}
+                              <span style={{
+                                fontSize: 9, padding: "1px 6px", borderRadius: 20, fontWeight: 600,
+                                background: (prod.tipo || "articulo") === "servicio" ? "#f3e8ff" : "#eff6ff",
+                                color: (prod.tipo || "articulo") === "servicio" ? "#7c3aed" : "#2563eb",
+                              }}>
+                                {(prod.tipo || "articulo") === "servicio" ? "🔧" : "📦"}
+                              </span>
+                            </div>
                             <div className="item-card-subtitulo">
                               <span className="badge badge-gris">Compra: ${Number(prod.precio_compra || 0).toLocaleString("es-CO")}</span>
                               {" "}
