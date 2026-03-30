@@ -10,7 +10,7 @@ export default function Proveedores() {
   const [proveedores, setProveedores] = useState([]);
   const [productosProveedor, setProductosProveedor] = useState([]);
   const [formProv, setFormProv] = useState({ nombre: "", telefono: "", tipo_servicio: "" });
-  const [formProd, setFormProd] = useState({ proveedor_id: "", nombre: "", precio_compra: "", precio_venta: "" });
+  const [formProd, setFormProd] = useState({ proveedor_id: "", nombre: "", precio_compra: "", precio_venta: "", tipo: "articulo" });
 
   const [buscar, setBuscar] = useState("");
   const [editandoProveedor, setEditandoProveedor] = useState(null);
@@ -103,7 +103,7 @@ export default function Proveedores() {
       return Swal.fire("Valores inválidos", "Los precios deben ser positivos.", "error");
     }
 
-    const datos = { proveedor_id, nombre: nombre.trim(), precio_compra: Number(precio_compra), precio_venta: Number(precio_venta) };
+    const datos = { proveedor_id, nombre: nombre.trim(), precio_compra: Number(precio_compra), precio_venta: Number(precio_venta), tipo: formProd.tipo || "articulo" };
     const operacion = editandoProducto
       ? supabase.from("productos_proveedores").update(datos).eq("id", editandoProducto)
       : supabase.from("productos_proveedores").insert([datos]);
@@ -122,6 +122,7 @@ export default function Proveedores() {
       nombre: producto.nombre || "",
       precio_compra: producto.precio_compra,
       precio_venta: producto.precio_venta,
+      tipo: producto.tipo || "articulo",
     });
     setMostrarFormProd(true);
     setProveedorExpandido(producto.proveedor_id);
@@ -147,13 +148,13 @@ export default function Proveedores() {
   };
 
   const cerrarFormProd = () => {
-    setFormProd({ proveedor_id: formProd.proveedor_id, nombre: "", precio_compra: "", precio_venta: "" });
+    setFormProd({ proveedor_id: formProd.proveedor_id, nombre: "", precio_compra: "", precio_venta: "", tipo: "articulo" });
     setEditandoProducto(null);
     setMostrarFormProd(false);
   };
 
   const abrirFormProducto = (provId) => {
-    setFormProd({ proveedor_id: provId, nombre: "", precio_compra: "", precio_venta: "" });
+    setFormProd({ proveedor_id: provId, nombre: "", precio_compra: "", precio_venta: "", tipo: "articulo" });
     setEditandoProducto(null);
     setMostrarFormProd(true);
     setProveedorExpandido(provId);
@@ -204,9 +205,10 @@ export default function Proveedores() {
         "#": i + 1,
         "Proveedor": prov?.nombre || "",
         "Producto": pp.nombre || "",
-        "Precio compra": Number(pp.precio_compra || 0),
-        "Precio venta": Number(pp.precio_venta || 0),
-        "Margen": Number(pp.precio_venta || 0) - Number(pp.precio_compra || 0)
+        "Tipo": (pp.tipo || "articulo") === "servicio" ? "Servicio" : "Artículo",
+      "Precio compra": Number(pp.precio_compra || 0),
+      "Precio venta": Number(pp.precio_venta || 0),
+      "Margen": Number(pp.precio_venta || 0) - Number(pp.precio_compra || 0)
       };
     });
 
@@ -542,9 +544,32 @@ export default function Proveedores() {
                       {proveedores.map((prov) => <option key={prov.id} value={prov.id}>{prov.nombre}</option>)}
                     </select>
                   </div>
+                  {/* Selector tipo */}
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Nombre del producto *</label>
-                    <input type="text" placeholder="Nombre del producto" value={formProd.nombre}
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 6, display: "block" }}>Tipo</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[
+                        { id: "articulo", label: "📦 Artículo" },
+                        { id: "servicio", label: "🔧 Servicio" },
+                      ].map((t) => (
+                        <button key={t.id} type="button"
+                          onClick={() => setFormProd({ ...formProd, tipo: t.id })}
+                          style={{
+                            flex: 1, padding: "8px 12px", borderRadius: 8, cursor: "pointer",
+                            fontSize: 13, fontWeight: 600,
+                            border: formProd.tipo === t.id ? `2px solid ${t.id === "servicio" ? "#7c3aed" : "var(--sw-azul)"}` : "1px solid var(--sw-borde)",
+                            background: formProd.tipo === t.id ? (t.id === "servicio" ? "#f3e8ff" : "#eff6ff") : "white",
+                            color: formProd.tipo === t.id ? (t.id === "servicio" ? "#7c3aed" : "var(--sw-azul)") : "#6b7280",
+                          }}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>{formProd.tipo === "servicio" ? "Nombre del servicio *" : "Nombre del producto *"}</label>
+                    <input type="text" placeholder={formProd.tipo === "servicio" ? "Ej: Sonido, Transporte, Buffet..." : "Nombre del producto"} value={formProd.nombre}
                       onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })} style={inputStyle} />
                   </div>
                   <div>
@@ -712,7 +737,16 @@ export default function Proveedores() {
                                   gap: 8
                                 }}>
                                   <div>
-                                    <div style={{ fontWeight: 500, fontSize: 13, color: "var(--sw-texto)" }}>{prod.nombre}</div>
+                                    <div style={{ fontWeight: 500, fontSize: 13, color: "var(--sw-texto)", display: "flex", alignItems: "center", gap: 6 }}>
+                                      {prod.nombre}
+                                      <span style={{
+                                        fontSize: 9, padding: "1px 6px", borderRadius: 20, fontWeight: 600,
+                                        background: (prod.tipo || "articulo") === "servicio" ? "#f3e8ff" : "#eff6ff",
+                                        color: (prod.tipo || "articulo") === "servicio" ? "#7c3aed" : "#2563eb",
+                                      }}>
+                                        {(prod.tipo || "articulo") === "servicio" ? "🔧 Servicio" : "📦"}
+                                      </span>
+                                    </div>
                                     <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 2, display: "flex", gap: 12, flexWrap: "wrap" }}>
                                       <span>Compra: <strong style={{ color: "var(--sw-rojo)" }}>{money(prod.precio_compra)}</strong></span>
                                       <span>Venta: <strong style={{ color: "var(--sw-verde-oscuro)" }}>{money(prod.precio_venta)}</strong></span>

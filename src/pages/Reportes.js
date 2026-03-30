@@ -95,6 +95,8 @@ function flattenItems(items = []) {
           cantidad: isFinite(cant * factor) ? cant * factor : 0,
           recaudo: isFinite(sub * factor) ? sub * factor : 0,
           es_proveedor: !!it?.es_proveedor,
+          es_servicio: !!it?.es_servicio,
+          costo_interno: Number(it?.costo_interno || 0),
         });
       }
     }
@@ -332,23 +334,36 @@ export default function Reportes() {
       .slice(0, 10);
   }, [movsFiltrados, clientesMap]);
 
-  /* ─── Artículos ─── */
+ /* ─── Artículos ─── */
   const resumenArticulos = useMemo(() => {
     const usP = {}, usV = {}, rcP = {}, rcV = {};
+    const usS = {}, rcS = {}, costoS = {}; // servicios
     for (const o of ordenes || []) {
       for (const it of flattenItems(o.productos || [])) {
         const k = it.nombre; if (!k) continue;
-        const tgt = it.es_proveedor ? [usV, rcV] : [usP, rcP];
-        tgt[0][k] = (tgt[0][k] || 0) + Number(it.cantidad || 0);
-        tgt[1][k] = (tgt[1][k] || 0) + Number(it.recaudo || 0);
+        if (it.es_servicio) {
+          usS[k] = (usS[k] || 0) + Number(it.cantidad || 0);
+          rcS[k] = (rcS[k] || 0) + Number(it.recaudo || 0);
+          costoS[k] = (costoS[k] || 0) + Number(it.costo_interno || 0) * Number(it.cantidad || 0);
+        } else {
+          const tgt = it.es_proveedor ? [usV, rcV] : [usP, rcP];
+          tgt[0][k] = (tgt[0][k] || 0) + Number(it.cantidad || 0);
+          tgt[1][k] = (tgt[1][k] || 0) + Number(it.recaudo || 0);
+        }
       }
     }
     const toTop = (m, c) => Object.entries(m).map(([n, v]) => ({ nombre: n, [c]: v })).sort((a, b) => b[c] - a[c]).slice(0, 10);
     const toBottom = (m, c) => Object.entries(m).map(([n, v]) => ({ nombre: n, [c]: v })).sort((a, b) => a[c] - b[c]).slice(0, 10);
+    // Servicios con margen
+    const topServiciosRecaudo = Object.entries(rcS).map(([n, v]) => ({
+      nombre: n, valor: v, costo: costoS[n] || 0, margen: v > 0 ? Math.round(((v - (costoS[n] || 0)) / v) * 100) : 0,
+    })).sort((a, b) => b.valor - a.valor).slice(0, 10);
+    const topServiciosUso = toTop(usS, "cantidad");
     return {
       topUsoPropios: toTop(usP, "cantidad"), topUsoProveedor: toTop(usV, "cantidad"),
       topRecaudoPropios: toTop(rcP, "valor"), topRecaudoProv: toTop(rcV, "valor"),
       bottomUsoPropios: toBottom(usP, "cantidad"), bottomUsoProveedor: toBottom(usV, "cantidad"),
+      topServiciosRecaudo, topServiciosUso,
     };
   }, [ordenes]);
 
@@ -397,9 +412,9 @@ export default function Reportes() {
      RESÚMENES INTELIGENTES (Sesión 8)
      ═══════════════════════════════════════════════════════════════ */
   // artD y recD se definen aquí para que los resúmenes los puedan usar
-  const artD = subTabArt === "propios" ? resumenArticulos.topUsoPropios : resumenArticulos.topUsoProveedor;
-  const recD = subTabArt === "propios" ? resumenArticulos.topRecaudoPropios : resumenArticulos.topRecaudoProv;
-  const artBottom = subTabArt === "propios" ? resumenArticulos.bottomUsoPropios : resumenArticulos.bottomUsoProveedor;
+  const artD = subTabArt === "propios" ? resumenArticulos.topUsoPropios : subTabArt === "proveedor" ? resumenArticulos.topUsoProveedor : resumenArticulos.topServiciosUso;
+  const recD = subTabArt === "propios" ? resumenArticulos.topRecaudoPropios : subTabArt === "proveedor" ? resumenArticulos.topRecaudoProv : resumenArticulos.topServiciosRecaudo;
+  const artBottom = subTabArt === "propios" ? resumenArticulos.bottomUsoPropios : subTabArt === "proveedor" ? resumenArticulos.bottomUsoProveedor : [];
 
   /* ─── Top clientes por frecuencia ─── */
   const topClientesFrecuencia = useMemo(() => {
@@ -1229,6 +1244,7 @@ export default function Reportes() {
                   <div className="sw-subtabs">
                     <button className={`sw-subtab ${subTabArt === "propios" ? "activo" : ""}`} onClick={() => setSubTabArt("propios")}>🏠 Propios</button>
                     <button className={`sw-subtab ${subTabArt === "proveedor" ? "activo" : ""}`} onClick={() => setSubTabArt("proveedor")}>🏢 Proveedor</button>
+                    <button className={`sw-subtab ${subTabArt === "servicios" ? "activo" : ""}`} onClick={() => setSubTabArt("servicios")}>🔧 Servicios</button>
                   </div>
                   <div className="sw-charts-duo">
                     <div className="sw-chart-wrapper">
