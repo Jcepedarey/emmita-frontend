@@ -39,6 +39,7 @@ import PreguntasFrecuentes from "./pages/PreguntasFrecuentes";
 import ResetPassword from "./pages/ResetPassword"; // ✅ NUEVO IMPORT
 import RutaEntregas from "./pages/RutaEntregas";
 import PagosPendientes from "./pages/PagosPendientes";
+import SuperAdmin from "./pages/SuperAdmin"; // ✅ IMPORT SUPERADMIN
 
 // ✅ Componente interno que tiene acceso a useLocation
 function AppContent() {
@@ -169,6 +170,7 @@ function AppContent() {
             <Route path="/mi-empresa" element={<MiEmpresa />} />
             <Route path="/ruta-entregas" element={<RutaEntregas />} />
             <Route path="/pagos-pendientes" element={<PagosPendientes />} />
+            <Route path="/superadmin" element={<SuperAdmin />} /> {/* ✅ RUTA SUPERADMIN AÑADIDA */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Suspense>

@@ -14,7 +14,7 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
   const [tooltipTop, setTooltipTop] = useState(0);
 
   // ✅ CONEXIÓN AL TENANT (Para saber el nombre de la empresa)
-  const { tenant } = useTenant();
+  const { tenant, esSuperAdmin } = useTenant();
 
   // Detectar cambio de tamaño
   useEffect(() => {
@@ -40,6 +40,8 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
     { id: "usuarios", titulo: "Usuarios", icono: "👤", ruta: "/usuarios", color: "#64748b" },
     // ✅ NUEVO MÓDULO AL FINAL
     { id: "mi-empresa", titulo: "Mi Empresa", icono: "🏢", ruta: "/mi-empresa", color: "#0077B6" },
+    // 🛡️ Super Admin (solo visible para super_admin)
+    ...(esSuperAdmin ? [{ id: "superadmin", titulo: "Super Admin", icono: "🛡️", ruta: "/superadmin", color: "#dc2626" }] : []),
   ];
 
   const handleNavegar = (ruta) => {

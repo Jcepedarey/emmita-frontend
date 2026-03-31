@@ -105,6 +105,7 @@ app.use("/api/usuarios", limiterAuth, require("./routes/usuarios"));       // �
 app.use("/api/ia", limiterIA, require("./routes/ia"));                     // 🔒 rate limit IA
 app.use("/api/registro", limiterAuth, require("./routes/registro"));       // 🔒 rate limit estricto
 app.use("/api/empleados", limiterEmpleados, require("./routes/empleados")); // 🔒 rate limit empleados
+app.use("/api/superadmin", require("./routes/superadmin"));                // ✅ NUEVA RUTA SUPERADMIN
 
 // Ruta 404
 app.use((req, res) => {

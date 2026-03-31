@@ -54,13 +54,16 @@ const verificarToken = async (req, res, next) => {
       return res.status(403).json({ error: "Empresa no encontrada" });
     }
 
+    // ✅ Super admin NUNCA es bloqueado por estado de tenant
+    const esSuperAdmin = profile.rol === "super_admin";
+
     // Tenant suspendido manualmente
-    if (tenant.estado === "suspendido" || tenant.estado === "inactivo") {
+    if (!esSuperAdmin && (tenant.estado === "suspendido" || tenant.estado === "inactivo")) {
       return res.status(403).json({ error: "Cuenta suspendida. Contacta a SwAlquiler para reactivarla." });
     }
 
     // Trial vencido
-    if (tenant.plan === "trial" && tenant.fecha_registro) {
+    if (!esSuperAdmin && tenant.plan === "trial" && tenant.fecha_registro) {
       const inicio = new Date(tenant.fecha_registro);
       const ahora = new Date();
       const diffDias = Math.floor((ahora - inicio) / (1000 * 60 * 60 * 24));
@@ -70,7 +73,7 @@ const verificarToken = async (req, res, next) => {
     }
 
     // Plan pago vencido
-    if (tenant.plan !== "trial" && tenant.fecha_vencimiento) {
+    if (!esSuperAdmin && tenant.plan !== "trial" && tenant.fecha_vencimiento) {
       const vencimiento = new Date(tenant.fecha_vencimiento);
       if (new Date() > vencimiento) {
         return res.status(403).json({ error: "Tu plan ha vencido. Renueva tu suscripción para continuar." });
