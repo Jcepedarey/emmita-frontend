@@ -29,11 +29,6 @@ export default function SuperAdmin() {
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroPlan, setFiltroPlan] = useState("");
 
-  // Protección: si no es super_admin, redirigir
-  if (!cargando && !esSuperAdmin) {
-    return <Navigate to="/inicio" />;
-  }
-
   const cargarDatos = async () => {
     setLoading(true);
     try {
@@ -50,10 +45,12 @@ export default function SuperAdmin() {
     setLoading(false);
   };
 
+  // ✅ HOOK 1: Siempre se ejecuta
   useEffect(() => {
     if (esSuperAdmin) cargarDatos();
   }, [esSuperAdmin]); // eslint-disable-line
 
+  // ✅ HOOK 2: Siempre se ejecuta
   // ─── Filtros ───
   const tenantsFiltrados = useMemo(() => {
     let lista = tenants;
@@ -69,6 +66,12 @@ export default function SuperAdmin() {
     if (filtroPlan) lista = lista.filter((t) => t.plan === filtroPlan);
     return lista;
   }, [tenants, buscar, filtroEstado, filtroPlan]);
+
+  // 🚀 REGLA DE REACT CUMPLIDA: 
+  // La validación condicional (el return temprano) va AQUÍ, después de todos los hooks.
+  if (!cargando && !esSuperAdmin) {
+    return <Navigate to="/inicio" />;
+  }
 
   // ─── Acciones ───
   const cambiarPlan = async (tenant) => {
