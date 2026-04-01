@@ -20,8 +20,30 @@ const ESTADOS_INFO = {
   suspendido: { label: "Suspendido", color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
 };
 
+// 🔒 PIN de seguridad para acciones críticas
+const PIN_SUPERADMIN = "2669"; // Cambia esto por tu PIN secreto
+
+const pedirPIN = async (accion) => {
+  const { value: pin } = await Swal.fire({
+    title: "🔒 Confirmación de seguridad",
+    text: `Ingresa tu PIN para ${accion}:`,
+    input: "password",
+    inputPlaceholder: "PIN de 4 dígitos",
+    inputAttributes: { maxlength: 4, inputmode: "numeric" },
+    showCancelButton: true,
+    confirmButtonText: "Confirmar",
+    cancelButtonText: "Cancelar",
+    confirmButtonColor: "#dc2626",
+    inputValidator: (value) => {
+      if (!value) return "Debes ingresar el PIN";
+      if (value !== PIN_SUPERADMIN) return "PIN incorrecto";
+    },
+  });
+  return !!pin;
+};
+
 export default function SuperAdmin() {
-  const { esSuperAdmin, cargando } = useTenant();
+  const { esSuperAdmin, cargando, tenant: miTenant } = useTenant();
   const [tenants, setTenants] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -64,8 +86,14 @@ export default function SuperAdmin() {
     }
     if (filtroEstado) lista = lista.filter((t) => (t.estado || "activo") === filtroEstado);
     if (filtroPlan) lista = lista.filter((t) => t.plan === filtroPlan);
+    // Poner mi empresa al final y marcarla
+    lista.sort((a, b) => {
+      if (a.id === miTenant?.id) return 1;
+      if (b.id === miTenant?.id) return -1;
+      return 0;
+    });
     return lista;
-  }, [tenants, buscar, filtroEstado, filtroPlan]);
+  }, [tenants, buscar, filtroEstado, filtroPlan, miTenant]);
 
   // 🚀 REGLA DE REACT CUMPLIDA: 
   // La validación condicional (el return temprano) va AQUÍ, después de todos los hooks.
@@ -98,6 +126,10 @@ export default function SuperAdmin() {
 
     if (!plan) return;
 
+    // 🔒 Pedir PIN
+    const autorizado = await pedirPIN(`cambiar plan de ${tenant.nombre}`);
+    if (!autorizado) return;
+
     try {
       await fetchAPI(`${API_URL}/api/superadmin/tenants/${tenant.id}/plan`, {
         method: "PUT",
@@ -127,6 +159,10 @@ export default function SuperAdmin() {
     });
 
     if (!confirm.isConfirmed) return;
+
+    // 🔒 Pedir PIN
+    const autorizado = await pedirPIN(`${esActivo ? "suspender" : "reactivar"} a ${tenant.nombre}`);
+    if (!autorizado) return;
 
     try {
       await fetchAPI(`${API_URL}/api/superadmin/tenants/${tenant.id}/estado`, {
@@ -177,6 +213,10 @@ export default function SuperAdmin() {
           confirmButtonColor: "#0077B6",
         })
       : { isConfirmed: false };
+
+    // 🔒 Pedir PIN
+    const autorizado = await pedirPIN(`renovar ${tenant.nombre} por ${dias} días`);
+    if (!autorizado) return;
 
     try {
       const result = await fetchAPI(`${API_URL}/api/superadmin/tenants/${tenant.id}/renovar`, {
@@ -372,12 +412,19 @@ export default function SuperAdmin() {
 
                       {/* Acciones */}
                       <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                        {t.id === miTenant?.id && (
+                          <span style={{ fontSize: 11, color: "#6b7280", fontStyle: "italic", alignSelf: "center", padding: "0 8px" }}>
+                            🏠 Tu empresa
+                          </span>
+                        )}
                         <button
                           onClick={() => cambiarPlan(t)}
+                          disabled={t.id === miTenant?.id}
                           style={{
                             padding: "7px 12px", borderRadius: 8, border: "1px solid #ddd6fe",
                             background: "#faf5ff", color: "#7c3aed", fontSize: 12, fontWeight: 600,
-                            cursor: "pointer", whiteSpace: "nowrap",
+                            cursor: t.id === miTenant?.id ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                            opacity: t.id === miTenant?.id ? 0.4 : 1,
                           }}
                           title="Cambiar plan"
                         >
@@ -385,10 +432,12 @@ export default function SuperAdmin() {
                         </button>
                         <button
                           onClick={() => renovar(t)}
+                          disabled={t.id === miTenant?.id}
                           style={{
                             padding: "7px 12px", borderRadius: 8, border: "1px solid #bbf7d0",
                             background: "#f0fdf4", color: "#16a34a", fontSize: 12, fontWeight: 600,
-                            cursor: "pointer", whiteSpace: "nowrap",
+                            cursor: t.id === miTenant?.id ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                            opacity: t.id === miTenant?.id ? 0.4 : 1,
                           }}
                           title="Renovar suscripción"
                         >
@@ -396,12 +445,15 @@ export default function SuperAdmin() {
                         </button>
                         <button
                           onClick={() => toggleEstado(t)}
+                          disabled={t.id === miTenant?.id}
                           style={{
                             padding: "7px 12px", borderRadius: 8,
                             border: esActivo ? "1px solid #fecaca" : "1px solid #bbf7d0",
                             background: esActivo ? "#fef2f2" : "#f0fdf4",
                             color: esActivo ? "#dc2626" : "#16a34a",
-                            fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+                            fontSize: 12, fontWeight: 600,
+                            cursor: t.id === miTenant?.id ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                            opacity: t.id === miTenant?.id ? 0.4 : 1,
                           }}
                           title={esActivo ? "Suspender" : "Reactivar"}
                         >
