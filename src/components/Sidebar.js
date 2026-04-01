@@ -14,7 +14,7 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
   const [tooltipTop, setTooltipTop] = useState(0);
 
   // ✅ CONEXIÓN AL TENANT (Para saber el nombre de la empresa)
-  const { tenant, esSuperAdmin } = useTenant();
+  const { tenant, esAdmin, esSuperAdmin } = useTenant();
 
   // Detectar cambio de tamaño
   useEffect(() => {
@@ -23,8 +23,8 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Lista de módulos
-  const modulos = [
+  // Lista de módulos (soloAdmin = true → solo visible para admin/super_admin)
+  const todosModulos = [
     { id: "inicio", titulo: "Inicio", icono: "🏠", ruta: "/inicio", color: "#00B4D8" },
     { id: "crear", titulo: "Crear documento", icono: "📝", ruta: "/crear-documento", color: "#10b981" },
     { id: "clientes", titulo: "Clientes", icono: "👥", ruta: "/clientes", color: "#3b82f6" },
@@ -32,17 +32,19 @@ const Sidebar = ({ isOpen, isCollapsed, onClose, onToggleCollapse }) => {
     { id: "agenda", titulo: "Agenda", icono: "📅", ruta: "/agenda", color: "#ef4444" },
     { id: "proveedores", titulo: "Proveedores", icono: "🚚", ruta: "/proveedores", color: "#8b5cf6" },
     { id: "buscar-doc", titulo: "Buscar documento", icono: "🔍", ruta: "/buscar-documento", color: "#06b6d4" },
-    { id: "reportes", titulo: "Dashboard", icono: "📊", ruta: "/reportes", color: "#ec4899" },
+    { id: "reportes", titulo: "Dashboard", icono: "📊", ruta: "/reportes", color: "#ec4899", soloAdmin: true },
     { id: "trazabilidad", titulo: "Trazabilidad", icono: "📋", ruta: "/trazabilidad", color: "#14b8a6" },
-    { id: "contabilidad", titulo: "Contabilidad", icono: "💰", ruta: "/contabilidad", color: "#22c55e" },
+    { id: "contabilidad", titulo: "Contabilidad", icono: "💰", ruta: "/contabilidad", color: "#22c55e", soloAdmin: true },
     { id: "recepcion", titulo: "Recepción", icono: "📥", ruta: "/recepcion", color: "#6366f1" },
     { id: "buscar-recep", titulo: "Buscar recepción", icono: "🔎", ruta: "/buscar-recepcion", color: "#a855f7" },
-    { id: "usuarios", titulo: "Usuarios", icono: "👤", ruta: "/usuarios", color: "#64748b" },
-    // ✅ NUEVO MÓDULO AL FINAL
-    { id: "mi-empresa", titulo: "Mi Empresa", icono: "🏢", ruta: "/mi-empresa", color: "#0077B6" },
+    { id: "usuarios", titulo: "Usuarios", icono: "👤", ruta: "/usuarios", color: "#64748b", soloAdmin: true },
+    { id: "mi-empresa", titulo: "Mi Empresa", icono: "🏢", ruta: "/mi-empresa", color: "#0077B6", soloAdmin: true },
     // 🛡️ Super Admin (solo visible para super_admin)
     ...(esSuperAdmin ? [{ id: "superadmin", titulo: "Super Admin", icono: "🛡️", ruta: "/superadmin", color: "#dc2626" }] : []),
   ];
+
+  // Filtrar módulos según el rol del usuario
+  const modulos = todosModulos.filter((m) => !m.soloAdmin || esAdmin);
 
   const handleNavegar = (ruta) => {
     navigate(ruta);

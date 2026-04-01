@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTenant } from "../context/TenantContext";
 
-export default function Protegido({ children }) {
+export default function Protegido({ children, soloAdmin = false }) {
   const navigate = useNavigate();
-  const { tenant, perfil, cargando } = useTenant();
+  const { tenant, perfil, cargando, esAdmin } = useTenant();
   const [verificado, setVerificado] = useState(false);
 
   useEffect(() => {
@@ -129,6 +129,49 @@ export default function Protegido({ children }) {
               Empresa: {tenant.nombre} · Plan: {tenant.plan || "trial"}
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Bloqueo por rol (admin/empleado) ───
+  if (soloAdmin && !esAdmin) {
+    return (
+      <div style={{
+        minHeight: "80vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20
+      }}>
+        <div style={{
+          maxWidth: 420,
+          width: "100%",
+          background: "white",
+          borderRadius: 16,
+          boxShadow: "0 10px 40px rgba(0,0,0,0.08)",
+          padding: "40px 32px",
+          textAlign: "center"
+        }}>
+          <div style={{ fontSize: 56, marginBottom: 16 }}>🔒</div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>
+            Acceso restringido
+          </h1>
+          <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.6, margin: "0 0 20px" }}>
+            Este módulo está disponible solo para administradores.
+            Si necesitas acceso, contacta al administrador de tu empresa.
+          </p>
+          <button
+            onClick={() => navigate("/inicio")}
+            style={{
+              padding: "10px 24px", borderRadius: 10,
+              background: "linear-gradient(135deg, #0077B6, #00B4D8)",
+              color: "white", fontWeight: 600, fontSize: 14,
+              border: "none", cursor: "pointer"
+            }}
+          >
+            ← Volver al inicio
+          </button>
         </div>
       </div>
     );

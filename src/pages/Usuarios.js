@@ -337,7 +337,7 @@ export default function Usuarios() {
   };
 
   return (
-    <Protegido>
+    <Protegido soloAdmin>
       <div className="sw-pagina">
         <div className="sw-pagina-contenido" style={{ maxWidth: 700 }}>
           <div className="sw-header">

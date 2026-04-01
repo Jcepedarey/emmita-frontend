@@ -921,7 +921,7 @@ export default function Reportes() {
      RENDER
      ═══════════════════════════════════════════════════════════════ */
   return (
-    <Protegido>
+    <Protegido soloAdmin>
       <div className="sw-pagina">
         <div className="sw-pagina-contenido" style={{ maxWidth: 900 }}>
           <div className="sw-header">

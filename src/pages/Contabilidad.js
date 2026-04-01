@@ -492,7 +492,7 @@ const Contabilidad = () => {
      RENDER
      ═══════════════════════════════════════ */
   return (
-    <Protegido>
+    <Protegido soloAdmin>
       <div className="sw-pagina">
         <div className="sw-pagina-contenido" style={{ maxWidth: 1000 }}>
 
