@@ -29,6 +29,8 @@ export default function BuscarProductoModal({
     cantidad: 1,
     tipo: "articulo",
     costo: "",
+    valor_adquisicion: "",
+    fecha_adquisicion: "",
   });
   const [temporal, setTemporal] = useState(false);
 
@@ -155,7 +157,7 @@ export default function BuscarProductoModal({
       };
       onAgregarProducto?.(itemTemporal);
       if (persistOpen) {
-        setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", cantidad: 1, tipo: "articulo", costo: "" });
+        setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", cantidad: 1, tipo: "articulo", costo: "", valor_adquisicion: "", fecha_adquisicion: "" });
         setMostrarFormNuevo(false);
         inputRef.current?.focus();
       } else {
@@ -168,7 +170,7 @@ export default function BuscarProductoModal({
       const stockFinal = esServicio ? 999 : Number(stock);
       const { data, error } = await supabase
         .from("productos")
-        .insert([{ nombre, descripcion, precio: Number(precio), stock: stockFinal, categoria, tipo, costo: Number(costo || 0) }])
+        .insert([{ nombre, descripcion, precio: Number(precio), stock: stockFinal, categoria, tipo, costo: Number(costo || 0), valor_adquisicion: Number(form.valor_adquisicion || 0), fecha_adquisicion: form.fecha_adquisicion || null }])
         .select()
         .single();
 
@@ -192,7 +194,7 @@ export default function BuscarProductoModal({
       onAgregarProducto?.(nuevoProducto);
 
       if (persistOpen) {
-        setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", cantidad: 1, tipo: "articulo", costo: "" });
+        setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", cantidad: 1, tipo: "articulo", costo: "", valor_adquisicion: "", fecha_adquisicion: "" });
         setMostrarFormNuevo(false);
         inputRef.current?.focus();
       } else {
@@ -423,6 +425,28 @@ export default function BuscarProductoModal({
                     className="modal-input input-destacado"
                   />
                 </div>
+                {/* Valor de adquisición (solo artículos no temporales) */}
+                {form.tipo === "articulo" && (
+                  <div className="form-grid form-grid-2" style={{ marginTop: 4 }}>
+                    <input
+                      type="number"
+                      placeholder="💰 Valor adquisición (opcional)"
+                      value={form.valor_adquisicion}
+                      onChange={(e) => setForm({ ...form, valor_adquisicion: e.target.value })}
+                      className="modal-input"
+                      style={{ borderColor: "#fde68a" }}
+                    />
+                    <input
+                      type="date"
+                      placeholder="Fecha compra"
+                      value={form.fecha_adquisicion}
+                      onChange={(e) => setForm({ ...form, fecha_adquisicion: e.target.value })}
+                      className="modal-input"
+                      style={{ borderColor: "#fde68a" }}
+                      title="Fecha de compra del artículo"
+                    />
+                  </div>
+                )}
               </div>
 
               <div style={{ marginTop: 12, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
@@ -445,7 +469,7 @@ export default function BuscarProductoModal({
                 <button
                   onClick={() => {
                     setMostrarFormNuevo(false);
-                    setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", cantidad: 1, tipo: "articulo", costo: "" });
+                    setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", cantidad: 1, tipo: "articulo", costo: "", valor_adquisicion: "", fecha_adquisicion: "" });
                   }}
                   className="btn-modal btn-secundario"
                 >

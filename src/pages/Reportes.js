@@ -157,6 +157,21 @@ export default function Reportes() {
   const chartHeight = chartSize === "compacto" ? 200 : chartSize === "grande" ? 450 : 300;
   const toggleResumen = (key) => setResumenAbierto((p) => ({ ...p, [key]: !p[key] }));
 
+  // 📦 Inventario real (valor de adquisición)
+  const [inventarioReal, setInventarioReal] = useState({ valorReal: 0, valorAlquiler: 0, totalArticulos: 0 });
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("productos").select("precio, stock, valor_adquisicion, tipo");
+      if (!data) return;
+      const arts = data.filter((p) => (p.tipo || "articulo") === "articulo");
+      setInventarioReal({
+        valorReal: arts.reduce((s, p) => s + (Number(p.valor_adquisicion || 0) * Number(p.stock || 0)), 0),
+        valorAlquiler: arts.reduce((s, p) => s + (Number(p.precio || 0) * Number(p.stock || 0)), 0),
+        totalArticulos: arts.length,
+      });
+    })();
+  }, []);
+
   /* ─── Cargar datos ─── */
   const cargarDatos = useCallback(async () => {
     setLoading(true);
@@ -1246,6 +1261,30 @@ export default function Reportes() {
                     <button className={`sw-subtab ${subTabArt === "proveedor" ? "activo" : ""}`} onClick={() => setSubTabArt("proveedor")}>🏢 Proveedor</button>
                     <button className={`sw-subtab ${subTabArt === "servicios" ? "activo" : ""}`} onClick={() => setSubTabArt("servicios")}>🔧 Servicios</button>
                   </div>
+
+                  {/* KPIs de Inventario Real */}
+                  {subTabArt === "propios" && inventarioReal.valorReal > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+                      <div className="sw-card" style={{ padding: "14px", textAlign: "center", borderLeft: "4px solid #f59e0b" }}>
+                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>VALOR REAL INVENTARIO</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "#b45309", marginTop: 4 }}>${inventarioReal.valorReal.toLocaleString("es-CO")}</div>
+                        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{inventarioReal.totalArticulos} artículos</div>
+                      </div>
+                      <div className="sw-card" style={{ padding: "14px", textAlign: "center", borderLeft: "4px solid #3b82f6" }}>
+                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>VALOR EN ALQUILER</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "#2563eb", marginTop: 4 }}>${inventarioReal.valorAlquiler.toLocaleString("es-CO")}</div>
+                        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>precio × stock</div>
+                      </div>
+                      {inventarioReal.valorReal > 0 && (
+                        <div className="sw-card" style={{ padding: "14px", textAlign: "center", borderLeft: "4px solid #16a34a" }}>
+                          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>MULTIPLICADOR</div>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: "#16a34a", marginTop: 4 }}>{(inventarioReal.valorAlquiler / inventarioReal.valorReal).toFixed(1)}x</div>
+                          <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>alquiler / costo real</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="sw-charts-duo">
                     <div className="sw-chart-wrapper">
                       <h3 className="sw-chart-titulo">Más alquilados ({subTabArt})</h3>
