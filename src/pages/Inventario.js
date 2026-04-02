@@ -211,6 +211,8 @@ export default function Inventario() {
             categoria: mapCol(row, ["categoria", "Categoría", "Categoria", "CATEGORIA"]),
             tipo: esServicio ? "servicio" : "articulo",
             costo: parseFloat(mapCol(row, ["costo", "Costo", "COSTO", "costo_interno", "Costo interno"]) || "0"),
+            valor_adquisicion: parseFloat(mapCol(row, ["valor_adquisicion", "Valor adquisicion", "Valor Adquisición", "V. Adquisición", "valor_compra", "Valor compra", "costo_compra", "Costo compra"]) || "0"),
+            fecha_adquisicion: mapCol(row, ["fecha_adquisicion", "Fecha adquisicion", "Fecha Adquisición", "Fecha compra", "fecha_compra"]) || null,
           };
         })
         .filter((p) => p.nombre && !isNaN(p.precio) && p.precio >= 0 && !isNaN(p.stock) && p.stock >= 0);
@@ -280,12 +282,25 @@ export default function Inventario() {
               <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
               <td style="border:1px solid #e5e7eb;padding:6px;">Mobiliario</td>
             </tr>
+            <tr style="background:#fefce8;">
+              <td style="border:1px solid #e5e7eb;padding:6px;">valor_adquisicion</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">85000</td>
+            </tr>
+            <tr style="background:#fefce8;">
+              <td style="border:1px solid #e5e7eb;padding:6px;">fecha_adquisicion</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;">2026-01-15</td>
+            </tr>
           </table>
           <p style="margin-top:10px;">💡 <strong>Tips:</strong></p>
           <ul style="margin:4px 0 0 16px;padding:0;">
             <li>El sistema acepta variantes como "Nombre", "NOMBRE", "Producto", "cantidad", "Valor", etc.</li>
             <li>Si la columna <strong>tipo</strong> dice "servicio", el stock se ignora (se pone ilimitado).</li>
             <li>La columna <strong>costo</strong> registra el costo interno de producción/prestación.</li>
+            <li><strong>valor_adquisicion</strong> = lo que pagaste por comprar el artículo (valor real del inventario).</li>
+            <li><strong>fecha_adquisicion</strong> = fecha de compra en formato AAAA-MM-DD (ej: 2026-01-15).</li>
+            <li>⚠️ La importación desde Excel <strong>NO registra gastos</strong> en contabilidad. Si necesitas registrar el gasto, edita cada artículo y activa el checkbox.</li>
             <li>Precio y stock deben ser números positivos.</li>
             <li>Las filas sin nombre o precio serán ignoradas.</li>
             <li>Formatos aceptados: <strong>.xlsx</strong> y <strong>.xls</strong></li>
