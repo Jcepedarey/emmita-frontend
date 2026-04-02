@@ -14,7 +14,8 @@ export default function Inventario() {
 
   const [productos, setProductos] = useState([]);
   const [form, setForm] = useState(estadoGuardado?.form || {
-    nombre: "", descripcion: "", precio: "", stock: "", categoria: "", tipo: "articulo", costo: ""
+    nombre: "", descripcion: "", precio: "", stock: "", categoria: "", tipo: "articulo", costo: "",
+    valor_adquisicion: "", fecha_adquisicion: "", registrar_gasto_compra: false
   });
   const [buscar, setBuscar] = useState(estadoGuardado?.buscar || "");
   const [categoriaFiltro, setCategoriaFiltro] = useState(estadoGuardado?.categoriaFiltro || "");
@@ -53,12 +54,35 @@ export default function Inventario() {
     if (precio < 0 || stockFinal < 0) {
       return Swal.fire("Valores inválidos", "Precio y stock deben ser positivos.", "error");
     }
-    const datos = { nombre, descripcion, precio: Number(precio), stock: stockFinal, categoria, tipo, costo: Number(costo || 0) };
+    const valorAdq = Number(form.valor_adquisicion || 0);
+    const fechaAdq = form.fecha_adquisicion || null;
+    const registrarGasto = !!form.registrar_gasto_compra;
+    const datos = {
+      nombre, descripcion, precio: Number(precio), stock: stockFinal, categoria, tipo, costo: Number(costo || 0),
+      valor_adquisicion: valorAdq, fecha_adquisicion: fechaAdq,
+      registrar_gasto_compra: registrarGasto,
+    };
     const operacion = editandoId
       ? supabase.from("productos").update(datos).eq("id", editandoId)
       : supabase.from("productos").insert([datos]);
     const { error } = await operacion;
     if (!error) {
+      // 📊 Registrar gasto en contabilidad si el checkbox está activo y es creación nueva
+      if (!editandoId && registrarGasto && valorAdq > 0) {
+        const totalGasto = valorAdq * stockFinal;
+        try {
+          await supabase.from("movimientos_contables").insert([{
+            fecha: fechaAdq || new Date().toISOString().slice(0, 10),
+            tipo: "gasto",
+            monto: totalGasto,
+            descripcion: `Compra de inventario: ${nombre} (${stockFinal} und × ${money(valorAdq)})`,
+            categoria: "Compra de inventario",
+            estado: "activo",
+          }]);
+        } catch (err) {
+          console.error("Error registrando gasto de compra:", err);
+        }
+      }
       Swal.fire({ icon: "success", title: editandoId ? "Actualizado" : "Guardado", timer: 1500, showConfirmButton: false });
       limpiarFormulario();
       obtenerProductos();
@@ -93,13 +117,16 @@ export default function Inventario() {
       categoria: producto.categoria || "",
       tipo: producto.tipo || "articulo",
       costo: producto.costo || "",
+      valor_adquisicion: producto.valor_adquisicion || "",
+      fecha_adquisicion: producto.fecha_adquisicion || "",
+      registrar_gasto_compra: false, // Al editar nunca re-registrar el gasto
     });
     setMostrarFormulario(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const limpiarFormulario = () => {
-    setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", tipo: "articulo", costo: "" });
+    setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", tipo: "articulo", costo: "", valor_adquisicion: "", fecha_adquisicion: "", registrar_gasto_compra: false });
     setEditandoId(null);
     setMostrarFormulario(false);
   };
@@ -135,6 +162,8 @@ export default function Inventario() {
       "Descripción": p.descripcion || "",
       "Precio": Number(p.precio || 0),
       "Costo": Number(p.costo || 0),
+      "V. Adquisición": Number(p.valor_adquisicion || 0),
+      "Fecha Adq.": p.fecha_adquisicion || "",
       "Stock": (p.tipo || "articulo") === "servicio" ? "∞" : Number(p.stock || 0),
       "Categoría": p.categoria || ""
     }));
@@ -297,7 +326,8 @@ export default function Inventario() {
   /* ─── KPIs ─── */
   const articulos = productos.filter((p) => (p.tipo || "articulo") === "articulo");
   const servicios = productos.filter((p) => p.tipo === "servicio");
-  const valorTotal = articulos.reduce((s, p) => s + (Number(p.precio || 0) * Number(p.stock || 0)), 0);
+  const valorAlquiler = articulos.reduce((s, p) => s + (Number(p.precio || 0) * Number(p.stock || 0)), 0);
+  const valorReal = articulos.reduce((s, p) => s + (Number(p.valor_adquisicion || 0) * Number(p.stock || 0)), 0);
   const stockTotal = articulos.reduce((s, p) => s + Number(p.stock || 0), 0);
   const sinStock = articulos.filter((p) => Number(p.stock || 0) === 0).length;
 
@@ -332,8 +362,11 @@ export default function Inventario() {
               <div style={{ fontSize: 24, fontWeight: 700, color: "var(--sw-verde)", marginTop: 4 }}>{stockTotal.toLocaleString("es-CO")}</div>
             </div>
             <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Valor inventario</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--sw-morado)", marginTop: 4 }}>{money(valorTotal)}</div>
+              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Valor real inventario</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--sw-morado)", marginTop: 4 }}>{money(valorReal)}</div>
+              {valorAlquiler > 0 && (
+                <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>Alquiler: {money(valorAlquiler)}</div>
+              )}
             </div>
             <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Sin stock</div>
@@ -464,6 +497,62 @@ export default function Inventario() {
                     </datalist>
                   </div>
                 </div>
+
+                {/* ═══ VALOR DE ADQUISICIÓN (solo artículos) ═══ */}
+                {form.tipo === "articulo" && (
+                  <div style={{
+                    marginTop: 12, padding: "14px", borderRadius: 10,
+                    background: "linear-gradient(135deg, #fefce8, #fef9c3)",
+                    border: "1px solid #fde68a",
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 10 }}>
+                      💰 Valor de adquisición
+                    </div>
+                    <div style={{ fontSize: 11, color: "#a16207", marginBottom: 10 }}>
+                      Registra cuánto pagaste por este artículo. Esto permite calcular el valor real de tu inventario.
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: "#92400e", marginBottom: 4, display: "block" }}>
+                          Valor por unidad ($)
+                        </label>
+                        <input type="number" placeholder="0" value={form.valor_adquisicion}
+                          onChange={(e) => setForm({ ...form, valor_adquisicion: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1px solid #fde68a", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "white" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: "#92400e", marginBottom: 4, display: "block" }}>
+                          Fecha de compra
+                        </label>
+                        <input type="date" value={form.fecha_adquisicion}
+                          onChange={(e) => setForm({ ...form, fecha_adquisicion: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1px solid #fde68a", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "white" }}
+                        />
+                      </div>
+                    </div>
+                    {/* Checkbox registrar gasto */}
+                    {!editandoId && (
+                      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          id="registrar-gasto-check"
+                          checked={form.registrar_gasto_compra}
+                          onChange={(e) => setForm({ ...form, registrar_gasto_compra: e.target.checked })}
+                          style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#f59e0b" }}
+                        />
+                        <label htmlFor="registrar-gasto-check" style={{ fontSize: 12, color: "#92400e", cursor: "pointer" }}>
+                          Registrar como gasto en contabilidad (artículo nuevo, no existía antes)
+                        </label>
+                      </div>
+                    )}
+                    {form.registrar_gasto_compra && Number(form.valor_adquisicion || 0) > 0 && Number(form.stock || 0) > 0 && (
+                      <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 6, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 12, color: "#991b1b" }}>
+                        Se registrará un gasto de <strong>{money(Number(form.valor_adquisicion) * Number(form.stock))}</strong> en contabilidad al guardar
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Margen calculado */}
                 {Number(form.precio || 0) > 0 && Number(form.costo || 0) > 0 && (
@@ -631,6 +720,7 @@ export default function Inventario() {
                         <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 3, display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>
                           <span style={{ fontWeight: 600, color: "var(--sw-verde-oscuro)" }}>{money(p.precio)}</span>
                           {!esServicio && <span>Stock: <strong>{Number(p.stock || 0)}</strong></span>}
+                          {Number(p.valor_adquisicion || 0) > 0 && <span style={{ color: "#b45309" }}>Adq: {money(p.valor_adquisicion)}</span>}
                           {Number(p.costo || 0) > 0 && <span style={{ color: "#dc2626" }}>Costo: {money(p.costo)}</span>}
                           {Number(p.costo || 0) > 0 && Number(p.precio || 0) > 0 && (
                             <span style={{ color: "var(--sw-verde)", fontWeight: 500 }}>
