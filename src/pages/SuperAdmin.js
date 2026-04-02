@@ -122,6 +122,7 @@ export default function SuperAdmin() {
       confirmButtonText: "Cambiar plan",
       cancelButtonText: "Cancelar",
       confirmButtonColor: "#0077B6",
+      width: 500,
     });
 
     if (!plan) return;
