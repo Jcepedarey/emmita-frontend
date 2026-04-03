@@ -3,17 +3,18 @@ const express = require("express");
 const router = express.Router();
 const verificarToken = require("../middleware/verificarToken");
 
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
+// ✅ Usamos la nueva llave de Groq
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// 🔒 Modelos permitidos (evitar que el frontend elija modelos caros)
-const MODELOS_PERMITIDOS = ["gpt-4o", "gpt-4o-mini"];
-const MODELO_DEFAULT = "gpt-4o";
+// 🔒 Modelos permitidos (Cambiamos GPT-4o por Llama 3.3)
+const MODELOS_PERMITIDOS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+const MODELO_DEFAULT = "llama-3.3-70b-versatile";
 
 // 🔒 Límites de entrada
-const MAX_MESSAGES = 20;        // máximo mensajes en conversación
-const MAX_CONTENT_LENGTH = 3000; // máximo caracteres por mensaje
+const MAX_MESSAGES = 20;        
+const MAX_CONTENT_LENGTH = 3000; 
 
-// POST /api/ia/chat — Proxy seguro para OpenAI
+// POST /api/ia/chat — Proxy seguro para Groq (Compatible con OpenAI)
 router.post("/chat", verificarToken, async (req, res) => {
   try {
     const { messages } = req.body;
@@ -27,7 +28,6 @@ router.post("/chat", verificarToken, async (req, res) => {
       return res.status(400).json({ error: `Máximo ${MAX_MESSAGES} mensajes por consulta` });
     }
 
-    // Validar cada mensaje
     for (const msg of messages) {
       if (!msg.role || !msg.content) {
         return res.status(400).json({ error: "Cada mensaje debe tener role y content" });
@@ -43,14 +43,14 @@ router.post("/chat", verificarToken, async (req, res) => {
       }
     }
 
-    // 🔒 Forzar modelo seguro (ignorar lo que envíe el frontend)
     const modelo = MODELO_DEFAULT;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    // ✅ Apuntamos a la API de Groq en lugar de OpenAI
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_KEY}`
+        "Authorization": `Bearer ${GROQ_API_KEY}`
       },
       body: JSON.stringify({
         model: modelo,
@@ -62,8 +62,7 @@ router.post("/chat", verificarToken, async (req, res) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("Error OpenAI:", response.status);
-      // 🔒 No filtrar detalles del error de OpenAI al frontend
+      console.error("Error Groq:", response.status, errorData);
       return res.status(502).json({ error: "El asistente no pudo procesar tu consulta. Intenta de nuevo." });
     }
 

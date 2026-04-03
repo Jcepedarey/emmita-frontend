@@ -138,7 +138,7 @@ export async function consultarIA(mensajeOriginal) {
             content: mensajeOriginal,
           },
         ],
-        model: "gpt-4o",
+        model: "llama-3.3-70b-versatile",
       }),
     });
 
