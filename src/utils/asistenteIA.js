@@ -1,8 +1,8 @@
 // src/utils/asistenteIA.js
 // Asistente IA con Tool Calling — Groq + Llama 3.3 70B
 import { fetchAPI } from "./api";
-import { aiTools } from "./aiSchema";
-import { ejecutarFuncionAI } from "./aiParser";
+import { aiTools } from "../ia/aiSchema";
+import { ejecutarFuncionAI } from "../ia/aiParser";
 
 const API_URL = process.env.REACT_APP_API_URL || "https://backend-emmita.onrender.com";
 const MAX_TOOL_ROUNDS = 3; // máximo de rondas de tool calling (evitar loops)
