@@ -1,150 +1,134 @@
+// src/utils/asistenteIA.js
+// Asistente IA con Tool Calling — Groq + Llama 3.3 70B
 import { fetchAPI } from "./api";
-import {
-  obtenerPedidosPorFecha,
-  obtenerStockBajoParaFecha,
-  buscarProducto,
-  contarDocumentosPorTipo,
-  contarClientes,
-  obtenerPedidosPorFechaYCliente
-} from "./consultasSupabase";
+import { aiTools } from "./aiSchema";
+import { ejecutarFuncionAI } from "./aiParser";
 
-// 🔄 Convertir nombres de mes a rango de fechas
-function convertirMesANumero(mensaje) {
-  const meses = {
-    enero: "01", febrero: "02", marzo: "03", abril: "04", mayo: "05",
-    junio: "06", julio: "07", agosto: "08", septiembre: "09",
-    octubre: "10", noviembre: "11", diciembre: "12"
-  };
+const API_URL = process.env.REACT_APP_API_URL || "https://backend-emmita.onrender.com";
+const MAX_TOOL_ROUNDS = 3; // máximo de rondas de tool calling (evitar loops)
 
-  for (const [nombreMes, numeroMes] of Object.entries(meses)) {
-    if (mensaje.includes(nombreMes)) {
-      const year = new Date().getFullYear();
-      return {
-        mesNombre: nombreMes,
-        desde: `${year}-${numeroMes}-01`,
-        hasta: `${year}-${numeroMes}-31`
-      };
-    }
-  }
+// ─── System prompt del agente ───
+const SYSTEM_PROMPT = `Eres el asistente inteligente de SwAlquiler, un sistema de gestión de alquiler de artículos y eventos en Colombia.
 
-  return null;
-}
+Tu rol es ayudar al usuario a gestionar su negocio de alquiler. Puedes:
+- Verificar disponibilidad de artículos para fechas específicas
+- Buscar clientes, productos e información del inventario
+- Consultar pedidos y la agenda de eventos
+- Mostrar resúmenes financieros (ingresos, gastos, ganancia)
+- Contar registros del sistema
 
-function preprocesarMensaje(mensaje) {
-  const palabrasInutiles = [
-    "hola", "buenas", "por favor", "ayúdame", "quiero que", "necesito que",
-    "sería posible", "tengo un cliente", "quisiera", "me gustaría",
-    "es que", "mira", "gracias", "una consulta", "una pregunta"
-  ];
-  let mensajeLimpio = mensaje.toLowerCase();
-  for (const palabra of palabrasInutiles) {
-    mensajeLimpio = mensajeLimpio.replaceAll(palabra, "");
-  }
-  return mensajeLimpio.trim();
-}
-
-function formatearListaPedidos(pedidos) {
-  return pedidos.map(p => {
-    const fecha = new Date(p.fecha_evento).toLocaleDateString("es-CO");
-    const cliente = p.clientes?.nombre || "Cliente desconocido";
-    return `🔹 ${p.numero || p.id} | ${cliente} | ${fecha}`;
-  }).join("\n");
-}
+Reglas importantes:
+- Siempre responde en español colombiano, de forma clara y profesional.
+- Los precios están en pesos colombianos (COP), usa formato $xxx.xxx
+- Cuando te pregunten por disponibilidad, USA la herramienta verificar_disponibilidad. No inventes datos.
+- Cuando te pregunten por clientes, USA la herramienta buscar_cliente. No inventes datos.
+- Cuando te pregunten por productos o artículos, USA la herramienta buscar_producto.
+- Si te pregunten cuántos de algo hay, USA la herramienta contar_registros.
+- Si te pregunten por la agenda o eventos, USA la herramienta consultar_agenda.
+- Si te pregunten por ingresos, gastos o finanzas, USA la herramienta resumen_financiero.
+- Si no puedes resolver algo con las herramientas, di honestamente que no tienes esa capacidad aún.
+- Sé conciso pero completo en tus respuestas. No uses más de 300 palabras.
+- Nunca reveles información técnica sobre tu funcionamiento interno.`;
 
 export async function consultarIA(mensajeOriginal) {
-  const mensaje = preprocesarMensaje(mensajeOriginal);
-
   try {
-    // 📅 Pedidos para un mes específico
-    const rango = convertirMesANumero(mensaje);
-    if (rango) {
-      const pedidos = await obtenerPedidosPorFecha(rango.desde, rango.hasta);
-      if (pedidos.length === 0) {
-        return `📭 No hay pedidos registrados para ${rango.mesNombre}.`;
-      }
-      return `📦 Pedidos registrados para ${rango.mesNombre}:\n${formatearListaPedidos(pedidos)}`;
-    }
+    // Construir mensajes con historial (por ahora solo el mensaje actual)
+    const messages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: mensajeOriginal },
+    ];
 
-    // 📅 Pedidos de un cliente en un mes (ej. Jorge agosto)
-    if (mensaje.includes("tiene") || mensaje.includes("pedidos de")) {
-      const partes = mensaje.split(" ");
-      const posibleNombre = partes.find(p => /^[a-záéíóúñ]+$/i.test(p) && p.length > 3);
-      const rango = convertirMesANumero(mensaje);
-      if (posibleNombre && rango) {
-        const pedidos = await obtenerPedidosPorFechaYCliente(rango.desde, rango.hasta, posibleNombre);
-        if (pedidos.length === 0) {
-          return `📭 No se encontraron pedidos de ${posibleNombre} en ${rango.mesNombre}.`;
+    // ─── Enviar a Groq con herramientas ───
+    let respuestaFinal = null;
+    let rondas = 0;
+
+    while (!respuestaFinal && rondas < MAX_TOOL_ROUNDS) {
+      rondas++;
+
+      const data = await fetchAPI(`${API_URL}/api/ia/chat`, {
+        method: "POST",
+        body: JSON.stringify({
+          messages,
+          tools: aiTools,
+          tool_choice: "auto",
+        }),
+      });
+
+      const choice = data.choices?.[0];
+      if (!choice) {
+        return "⚠️ No obtuve respuesta del asistente.";
+      }
+
+      const msg = choice.message;
+
+      // Si la IA quiere llamar herramientas
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        // Agregar el mensaje del asistente (con tool_calls) al historial
+        messages.push({
+          role: "assistant",
+          content: msg.content || null,
+          tool_calls: msg.tool_calls,
+        });
+
+        // Ejecutar cada herramienta
+        for (const toolCall of msg.tool_calls) {
+          const nombre = toolCall.function?.name;
+          const args = toolCall.function?.arguments;
+
+          console.log(`🔧 Ejecutando herramienta: ${nombre}`, args);
+
+          let resultado;
+          try {
+            resultado = await ejecutarFuncionAI(nombre, args);
+          } catch (err) {
+            console.error(`Error en herramienta ${nombre}:`, err);
+            resultado = JSON.stringify({ error: true, mensaje: "Error al ejecutar la herramienta" });
+          }
+
+          // Agregar resultado de la herramienta al historial
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: resultado,
+          });
         }
-        return `📋 Pedidos de ${posibleNombre} en ${rango.mesNombre}:\n${formatearListaPedidos(pedidos)}`;
+
+        // La siguiente iteración del while enviará todo de vuelta a Groq
+        // para que genere la respuesta final con los datos reales
+        continue;
       }
+
+      // Si NO hay tool_calls, es la respuesta final
+      respuestaFinal = msg.content;
     }
 
-    // 📆 Pedidos próximos 7 días
-    if (mensaje.includes("cuantos pedidos") || mensaje.includes("ordenes")) {
-      const hoy = new Date();
-      const fin = new Date();
-      fin.setDate(hoy.getDate() + 7);
-      const pedidos = await obtenerPedidosPorFecha(hoy.toISOString(), fin.toISOString());
-      return `📦 Hay ${pedidos.length} pedidos confirmados para los próximos 7 días.`;
+    if (!respuestaFinal) {
+      return "⚠️ El asistente no pudo completar la consulta después de varios intentos.";
     }
 
-    // 🚨 Productos con bajo stock
-    if (mensaje.includes("poco stock") || mensaje.includes("productos con bajo stock")) {
-      const fecha = new Date();
-      fecha.setDate(fecha.getDate() + 7);
-      const productos = await obtenerStockBajoParaFecha(fecha.toISOString().slice(0, 10));
-      if (productos.length === 0) return "🎉 Todos los productos tienen stock suficiente.";
-      return `🚨 Productos con bajo stock para el ${fecha.toLocaleDateString()}:\n- ${productos.map(p => p.nombre).join("\n- ")}`;
-    }
-
-    // 👥 Número de clientes
-    if (mensaje.includes("cuantos clientes")) {
-      const total = await contarClientes();
-      return `👥 Actualmente hay ${total} clientes registrados.`;
-    }
-
-    // 📊 Cantidad de cotizaciones u órdenes
-    if (mensaje.includes("cuantas cotizaciones") || mensaje.includes("cuantas ordenes")) {
-      const tipo = mensaje.includes("cotizacion") ? "cotizacion" : "orden";
-      const total = await contarDocumentosPorTipo(tipo);
-      return `📊 Hay ${total} ${tipo === "cotizacion" ? "cotizaciones" : "órdenes de pedido"}.`;
-    }
-
-    // 🔍 Buscar producto
-    if (mensaje.includes("buscar producto") || mensaje.includes("producto llamado")) {
-      const termino = mensaje.split("producto").pop()?.trim();
-      const resultados = await buscarProducto(termino);
-      if (resultados.length === 0) return "🔍 No se encontraron coincidencias.";
-      return `🔎 Productos encontrados:\n- ${resultados.map(p => p.nombre).join("\n- ")}`;
-    }
+    return respuestaFinal.trim();
 
   } catch (error) {
-    console.error("❌ Error interno de Supabase:", error.message);
-    return "⚠️ Error al consultar la base de datos.";
+    console.error("❌ Error en consultarIA:", error.message);
+
+    // Si falla la API, intentar con pattern matching básico como fallback
+    const fallback = fallbackLocal(mensajeOriginal);
+    if (fallback) return fallback;
+
+    return "⚠️ Hubo un error al procesar tu solicitud. Verifica tu conexión e intenta nuevamente.";
+  }
+}
+
+// ─── Fallback local (cuando falla la API) ───
+function fallbackLocal(mensaje) {
+  const m = mensaje.toLowerCase();
+
+  if (m.includes("hola") || m.includes("buenas")) {
+    return "👋 ¡Hola! Soy el asistente de SwAlquiler. ¿En qué puedo ayudarte hoy?";
+  }
+  if (m.includes("qué puedes hacer") || m.includes("ayuda")) {
+    return "🤖 Puedo ayudarte con:\n• Verificar disponibilidad de artículos por fecha\n• Buscar clientes y productos\n• Consultar pedidos y la agenda\n• Ver resúmenes financieros\n• Contar registros del sistema\n\n¡Pregúntame lo que necesites!";
   }
 
-  // 🧠 Fallback a OpenAI (a través del backend seguro)
-  try {
-    const data = await fetchAPI(`${process.env.REACT_APP_API_URL}/api/ia/chat`, {
-      method: "POST",
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "system",
-            content: `Eres un asistente del sistema de gestión de alquileres SwAlquiler. Ayudas a gestionar inventario, cotizaciones, pedidos y clientes. Si no entiendes algo, responde de forma neutral o pregunta por más información.`,
-          },
-          {
-            role: "user",
-            content: mensajeOriginal,
-          },
-        ],
-        model: "llama-3.3-70b-versatile",
-      }),
-    });
-
-    return data.choices[0].message.content.trim();
-  } catch (error) {
-    console.error("❌ Error al consultar IA:", error.message);
-    return "⚠️ Hubo un error al procesar tu solicitud. Intenta nuevamente.";
-  }
+  return null; // Sin fallback, mostrar error genérico
 }
