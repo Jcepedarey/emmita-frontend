@@ -65,7 +65,25 @@ function AsistenteModal({ visible, onClose }) {
         {respuesta && (
           <div className="respuesta-modal">
             <strong>✅ Respuesta:</strong>
-            <p>{respuesta}</p>
+            <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.7 }}>
+              {respuesta.split("\n").map((linea, i) => {
+                if (!linea.trim()) return <br key={i} />;
+                // Detectar líneas de lista (- o • o 🔹 etc)
+                const esLista = /^[\-•🔹🔸📦📋✅❌🔍💰👥📊📅🔧]/.test(linea.trim());
+                return (
+                  <div key={i} style={{
+                    padding: esLista ? "4px 0 4px 8px" : "2px 0",
+                    borderLeft: esLista ? "3px solid #0077B6" : "none",
+                    marginBottom: esLista ? 4 : 0,
+                    background: esLista ? "#f0f9ff" : "transparent",
+                    borderRadius: esLista ? 4 : 0,
+                    paddingLeft: esLista ? 10 : 0,
+                  }}>
+                    {linea}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

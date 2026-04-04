@@ -8,7 +8,11 @@ const API_URL = process.env.REACT_APP_API_URL || "https://backend-emmita.onrende
 const MAX_TOOL_ROUNDS = 3; // máximo de rondas de tool calling (evitar loops)
 
 // ─── System prompt del agente ───
+const FECHA_HOY = new Date().toLocaleDateString("es-CO", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
 const SYSTEM_PROMPT = `Eres el asistente inteligente de SwAlquiler, un sistema de gestión de alquiler de artículos y eventos en Colombia.
+
+FECHA ACTUAL: ${FECHA_HOY}. Año actual: ${new Date().getFullYear()}. SIEMPRE usa el año ${new Date().getFullYear()} para cualquier consulta de fechas a menos que el usuario especifique otro año.
 
 Tu rol es ayudar al usuario a gestionar su negocio de alquiler. Puedes:
 - Verificar disponibilidad de artículos para fechas específicas
