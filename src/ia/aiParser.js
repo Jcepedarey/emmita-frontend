@@ -13,6 +13,7 @@ const FUNCIONES_DISPONIBLES = {
   contar_registros: funciones.contar_registros,
   consultar_cotizaciones: funciones.consultar_cotizaciones,
   trazabilidad_precio: funciones.trazabilidad_precio,
+  ultimo_cliente_articulo: funciones.ultimo_cliente_articulo,
 };
 
 export async function ejecutarFuncionAI(nombre, argumentos) {

@@ -4,6 +4,7 @@ import supabase from "../supabaseClient";
 
 // ─── Helpers ───
 const money = (n) => `$${Number(n || 0).toLocaleString("es-CO")}`;
+const sinTildes = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const hoyISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -68,10 +69,12 @@ export async function verificar_disponibilidad({ articulo, fecha }) {
 // 2. BUSCAR CLIENTE
 // ═══════════════════════════════════════════════════════════
 export async function buscar_cliente({ texto }) {
+  // Buscar con y sin tildes
+  const textoNormal = sinTildes(texto);
   const { data, error } = await supabase
     .from("clientes")
     .select("id, nombre, telefono, email, identificacion, direccion")
-    .or(`nombre.ilike.%${texto}%,telefono.ilike.%${texto}%,email.ilike.%${texto}%,identificacion.ilike.%${texto}%`)
+    .or(`nombre.ilike.%${texto}%,nombre.ilike.%${textoNormal}%,telefono.ilike.%${texto}%,email.ilike.%${texto}%,identificacion.ilike.%${texto}%`)
     .limit(5);
 
   if (error || !data || data.length === 0) {
@@ -363,4 +366,59 @@ export async function trazabilidad_precio({ articulo, cliente }) {
       cantidad: c.cantidad,
     })),
   });
+}
+// ═══════════════════════════════════════════════════════════
+// 10. ÚLTIMO CLIENTE QUE ALQUILÓ UN ARTÍCULO
+// ═══════════════════════════════════════════════════════════
+export async function ultimo_cliente_articulo({ articulo }) {
+  const nombreBuscado = sinTildes(articulo.toLowerCase());
+
+  // Buscar en pedidos recientes
+  const { data: pedidos } = await supabase
+    .from("ordenes_pedido")
+    .select("numero, fecha_evento, productos, cliente_id, clientes(nombre)")
+    .order("fecha_evento", { ascending: false })
+    .limit(100);
+
+  if (!pedidos || pedidos.length === 0) return "No hay pedidos registrados.";
+
+  // Recorrer pedidos buscando el artículo
+  for (const ped of pedidos) {
+    const items = ped.productos || [];
+    const walk = (list, factor = 1) => {
+      for (const it of list) {
+        if (it.es_grupo && Array.isArray(it.productos)) {
+          const found = walk(it.productos, factor * (Number(it.cantidad) || 1));
+          if (found) return found;
+        } else {
+          const nomItem = sinTildes((it.nombre || "").toLowerCase());
+          if (nomItem.includes(nombreBuscado)) {
+            return {
+              cliente: ped.clientes?.nombre || "Desconocido",
+              fecha: ped.fecha_evento,
+              documento: ped.numero,
+              articulo: it.nombre,
+              precio: Number(it.precio || 0),
+              cantidad: (Number(it.cantidad) || 0) * factor,
+            };
+          }
+        }
+      }
+      return null;
+    };
+    const encontrado = walk(items);
+    if (encontrado) {
+      return JSON.stringify({
+        mensaje: `El último cliente fue ${encontrado.cliente}`,
+        cliente: encontrado.cliente,
+        fecha: encontrado.fecha,
+        articulo: encontrado.articulo,
+        precio_unitario: money(encontrado.precio),
+        cantidad: encontrado.cantidad,
+        documento: encontrado.documento,
+      });
+    }
+  }
+
+  return `No se encontró "${articulo}" en ningún pedido reciente.`;
 }

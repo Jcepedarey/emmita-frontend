@@ -141,4 +141,18 @@ export const aiTools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "ultimo_cliente_articulo",
+      description: "Busca cuál fue el último cliente al que se le alquiló un artículo específico, sin necesidad de saber el nombre del cliente. Muestra fecha, precio y cliente.",
+      parameters: {
+        type: "object",
+        properties: {
+          articulo: { type: "string", description: "Nombre del artículo" },
+        },
+        required: ["articulo"],
+      },
+    },
+  },
 ];

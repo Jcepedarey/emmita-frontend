@@ -28,12 +28,22 @@ function incrementarConsulta() {
 // ─── Voz de respuesta ───
 function limpiarParaVoz(texto) {
   return texto
-    .replace(/\*\*/g, "")           // quitar negritas markdown
-    .replace(/[🔹🔸📦📋✅❌🔍💰👥📊📅🔧🤖👋🎉⚠️📞📧🆔📍🏢💎⭐🆓🛡️🔊🔇🚀🗑️]/g, "") // quitar emojis
-    .replace(/[\-•|]/g, ", ")       // guiones y pipes por comas
-    .replace(/\d+\.\s/g, "")        // quitar numeración (1. 2. 3.)
-    .replace(/\s{2,}/g, " ")        // espacios múltiples
-    .replace(/,\s*,/g, ",")         // comas dobles
+    .replace(/\*\*/g, "")
+    .replace(/<[^>]*>/g, "")                          // quitar HTML
+    .replace(/<function=[^>]*>[^<]*<\/function>/g, "") // quitar tool calls visibles
+    .replace(/\{[^}]*\}/g, "")                        // quitar JSON
+    .replace(/[🔹🔸📦📋✅❌🔍💰👥📊📅🔧🤖👋🎉⚠️📞📧🆔📍🏢💎⭐🆓🛡️🔊🔇🚀🗑️🔎🎙️⏹🆕⏰]/g, "")
+    .replace(/[\-•|]/g, ", ")
+    .replace(/\d+\.\s/g, "")
+    .replace(/[A-Z]{2,3}-\d{8}-\d+/g, "")            // quitar números de pedido (OP-20260309-1)
+    .replace(/COT-\d+-\d+/g, "")                      // quitar números de cotización
+    .replace(/\$[\d.,]+/g, (match) => {               // convertir $ a "pesos"
+      const num = match.replace(/[$.]/g, "").replace(/,/g, "");
+      return `${Number(num).toLocaleString("es-CO")} pesos`;
+    })
+    .replace(/USD|dolares|dólares/gi, "pesos")
+    .replace(/\s{2,}/g, " ")
+    .replace(/,\s*,/g, ",")
     .trim();
 }
 
@@ -243,7 +253,11 @@ function AsistenteModal({ visible, onClose }) {
                 }}>
                   {msg.tipo === "ia" ? (
                     <div>
-                      {msg.texto.split("\n").map((linea, j) => {
+                      {msg.texto
+                        .replace(/<function=[^>]*>[^<]*<\/function>/g, "")
+                        .replace(/<function=[^>]*>/g, "")
+                        .replace(/<\/function>/g, "")
+                        .split("\n").map((linea, j) => {
                         if (!linea.trim()) return <br key={j} />;
                         const esLista = /^[\-•🔹🔸📦📋✅❌🔍💰👥📊📅🔧\d]+[\.\)]/.test(linea.trim());
                         return (
