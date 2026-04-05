@@ -11,6 +11,8 @@ const FUNCIONES_DISPONIBLES = {
   consultar_agenda: funciones.consultar_agenda,
   resumen_financiero: funciones.resumen_financiero,
   contar_registros: funciones.contar_registros,
+  consultar_cotizaciones: funciones.consultar_cotizaciones,
+  trazabilidad_precio: funciones.trazabilidad_precio,
 };
 
 export async function ejecutarFuncionAI(nombre, argumentos) {

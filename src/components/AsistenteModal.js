@@ -26,10 +26,21 @@ function incrementarConsulta() {
 }
 
 // ─── Voz de respuesta ───
+function limpiarParaVoz(texto) {
+  return texto
+    .replace(/\*\*/g, "")           // quitar negritas markdown
+    .replace(/[🔹🔸📦📋✅❌🔍💰👥📊📅🔧🤖👋🎉⚠️📞📧🆔📍🏢💎⭐🆓🛡️🔊🔇🚀🗑️]/g, "") // quitar emojis
+    .replace(/[\-•|]/g, ", ")       // guiones y pipes por comas
+    .replace(/\d+\.\s/g, "")        // quitar numeración (1. 2. 3.)
+    .replace(/\s{2,}/g, " ")        // espacios múltiples
+    .replace(/,\s*,/g, ",")         // comas dobles
+    .trim();
+}
+
 function leerEnVozAlta(texto) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(texto);
+  const utterance = new SpeechSynthesisUtterance(limpiarParaVoz(texto));
   utterance.lang = "es-CO";
   utterance.rate = 1.05;
   utterance.pitch = 1;

@@ -261,3 +261,106 @@ export async function contar_registros({ tipo }) {
 
   return JSON.stringify({ tipo, total: count });
 }
+// ═══════════════════════════════════════════════════════════
+// 8. CONSULTAR COTIZACIONES
+// ═══════════════════════════════════════════════════════════
+export async function consultar_cotizaciones({ fecha_desde, fecha_hasta, cliente }) {
+  let query = supabase
+    .from("cotizaciones")
+    .select("numero, fecha_evento, total_neto, clientes(nombre)")
+    .order("fecha_evento", { ascending: false })
+    .limit(15);
+
+  if (fecha_desde && fecha_hasta) {
+    query = query.gte("fecha_evento", fecha_desde).lte("fecha_evento", fecha_hasta);
+  }
+
+  const { data, error } = await query;
+  if (error || !data || data.length === 0) return "No se encontraron cotizaciones.";
+
+  let resultado = data;
+  if (cliente) {
+    resultado = resultado.filter((c) =>
+      (c.clientes?.nombre || "").toLowerCase().includes(cliente.toLowerCase())
+    );
+  }
+  if (resultado.length === 0) return `No se encontraron cotizaciones del cliente "${cliente}".`;
+
+  return JSON.stringify(resultado.map((c) => ({
+    numero: c.numero || "—",
+    cliente: c.clientes?.nombre || "—",
+    fecha_evento: c.fecha_evento,
+    total: money(c.total_neto),
+  })));
+}
+
+// ═══════════════════════════════════════════════════════════
+// 9. TRAZABILIDAD DE PRECIO (último precio a un cliente)
+// ═══════════════════════════════════════════════════════════
+export async function trazabilidad_precio({ articulo, cliente }) {
+  // 1. Buscar cliente
+  const { data: clientes } = await supabase
+    .from("clientes")
+    .select("id, nombre")
+    .ilike("nombre", `%${cliente}%`)
+    .limit(3);
+
+  if (!clientes || clientes.length === 0) return `No se encontró el cliente "${cliente}".`;
+
+  const clienteEncontrado = clientes[0];
+
+  // 2. Buscar pedidos y cotizaciones del cliente
+  const [{ data: pedidos }, { data: cotizaciones }] = await Promise.all([
+    supabase.from("ordenes_pedido").select("numero, fecha_evento, productos").eq("cliente_id", clienteEncontrado.id).order("fecha_evento", { ascending: false }).limit(50),
+    supabase.from("cotizaciones").select("numero, fecha_evento, productos").eq("cliente_id", clienteEncontrado.id).order("fecha_evento", { ascending: false }).limit(50),
+  ]);
+
+  const todos = [...(pedidos || []), ...(cotizaciones || [])].sort((a, b) =>
+    new Date(b.fecha_evento || 0) - new Date(a.fecha_evento || 0)
+  );
+
+  // 3. Buscar el artículo en los productos de cada documento
+  const nombreBuscado = articulo.toLowerCase();
+  const coincidencias = [];
+
+  for (const doc of todos) {
+    const items = doc.productos || [];
+    const walk = (list, factor = 1) => {
+      for (const it of list) {
+        if (it.es_grupo && Array.isArray(it.productos)) {
+          walk(it.productos, factor * (Number(it.cantidad) || 1));
+        } else if ((it.nombre || "").toLowerCase().includes(nombreBuscado)) {
+          coincidencias.push({
+            documento: doc.numero || "—",
+            fecha: doc.fecha_evento,
+            articulo: it.nombre,
+            precio_unitario: Number(it.precio || 0),
+            cantidad: (Number(it.cantidad) || 0) * factor,
+          });
+        }
+      }
+    };
+    walk(items);
+  }
+
+  if (coincidencias.length === 0) {
+    return `No se encontró "${articulo}" en los documentos de ${clienteEncontrado.nombre}.`;
+  }
+
+  const ultimo = coincidencias[0];
+  return JSON.stringify({
+    cliente: clienteEncontrado.nombre,
+    articulo_buscado: articulo,
+    ultimo_precio: money(ultimo.precio_unitario),
+    ultimo_documento: ultimo.documento,
+    ultima_fecha: ultimo.fecha,
+    ultima_cantidad: ultimo.cantidad,
+    total_veces_alquilado: coincidencias.length,
+    historial: coincidencias.slice(0, 5).map((c) => ({
+      documento: c.documento,
+      fecha: c.fecha,
+      precio: money(c.precio_unitario),
+      cantidad: c.cantidad,
+    })),
+  });
+}

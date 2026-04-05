@@ -111,4 +111,34 @@ export const aiTools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_cotizaciones",
+      description: "Consulta las cotizaciones registradas para una fecha, rango de fechas o por nombre de cliente",
+      parameters: {
+        type: "object",
+        properties: {
+          fecha_desde: { type: "string", description: "Inicio del rango en formato YYYY-MM-DD" },
+          fecha_hasta: { type: "string", description: "Fin del rango en formato YYYY-MM-DD" },
+          cliente: { type: "string", description: "Nombre del cliente para filtrar" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "trazabilidad_precio",
+      description: "Busca el último precio al que se le alquiló un artículo o producto a un cliente específico. Útil para saber precios preferenciales o históricos de un cliente. También muestra cuántas veces se le ha alquilado ese artículo.",
+      parameters: {
+        type: "object",
+        properties: {
+          articulo: { type: "string", description: "Nombre del artículo o producto" },
+          cliente: { type: "string", description: "Nombre del cliente" },
+        },
+        required: ["articulo", "cliente"],
+      },
+    },
+  },
 ];

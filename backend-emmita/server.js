@@ -107,6 +107,11 @@ app.use("/api/registro", limiterAuth, require("./routes/registro"));       // �
 app.use("/api/empleados", limiterEmpleados, require("./routes/empleados")); // 🔒 rate limit empleados
 app.use("/api/superadmin", require("./routes/superadmin"));                // ✅ NUEVA RUTA SUPERADMIN
 
+// ✅ NUEVO: Ruta raíz básica para que UptimeRobot sepa que el servidor está vivo
+app.get("/", (req, res) => {
+  res.status(200).send("Backend SwAlquiler activo y funcionando 🚀");
+});
+
 // Ruta 404
 app.use((req, res) => {
   res.status(404).json({ error: "Ruta no encontrada" });
