@@ -1,13 +1,17 @@
 // src/components/AsistenteModal.js
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import "./AsistenteModal.css";
-import { consultarIA } from "../utils/asistenteIA";
+import { consultarIA, NOMBRE_ASISTENTE } from "../utils/asistenteIA";
+import { generarPDF } from "../utils/generarPDF";
+import { generarRemision } from "../utils/generarRemision";
+import supabase from "../supabaseClient";
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
 
-// ─── Contador de consultas diarias (localStorage) ───
-const LIMITE_CONSULTAS_DIARIAS = 30; // por tenant
+// ─── Contador de consultas diarias (localStorage por ahora) ───
+const LIMITE_CONSULTAS_DIARIAS = 30;
 
 function getConsultasHoy() {
   try {
@@ -29,15 +33,15 @@ function incrementarConsulta() {
 function limpiarParaVoz(texto) {
   return texto
     .replace(/\*\*/g, "")
-    .replace(/<[^>]*>/g, "")                          // quitar HTML
-    .replace(/<function=[^>]*>[^<]*<\/function>/g, "") // quitar tool calls visibles
-    .replace(/\{[^}]*\}/g, "")                        // quitar JSON
-    .replace(/[🔹🔸📦📋✅❌🔍💰👥📊📅🔧🤖👋🎉⚠️📞📧🆔📍🏢💎⭐🆓🛡️🔊🔇🚀🗑️🔎🎙️⏹🆕⏰]/g, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/<function=[^>]*>[^<]*<\/function>/g, "")
+    .replace(/\{[^}]*\}/g, "")
+    .replace(/[🔹🔸📦📋✅❌🔍💰👥📊📅🔧🤖👋🎉⚠️📞📧🆔📍🏢💎⭐🆓🛡️🔊🔇🚀🗑️🔎🎙️⏹🆕⏰✏️📄📤]/g, "")
     .replace(/[\-•|]/g, ", ")
     .replace(/\d+\.\s/g, "")
-    .replace(/[A-Z]{2,3}-\d{8}-\d+/g, "")            // quitar números de pedido (OP-20260309-1)
-    .replace(/COT-\d+-\d+/g, "")                      // quitar números de cotización
-    .replace(/\$[\d.,]+/g, (match) => {               // convertir $ a "pesos"
+    .replace(/[A-Z]{2,3}-\d{8}-\d+/g, "")
+    .replace(/COT-\d+-\d+/g, "")
+    .replace(/\$[\d.,]+/g, (match) => {
       const num = match.replace(/[$.]/g, "").replace(/,/g, "");
       return `${Number(num).toLocaleString("es-CO")} pesos`;
     })
@@ -54,7 +58,6 @@ function leerEnVozAlta(texto) {
   utterance.lang = "es-CO";
   utterance.rate = 1.05;
   utterance.pitch = 1;
-  // Buscar voz en español
   const voces = window.speechSynthesis.getVoices();
   const vozES = voces.find((v) => v.lang.startsWith("es")) || null;
   if (vozES) utterance.voice = vozES;
@@ -65,13 +68,84 @@ function detenerVozRespuesta() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
+// ─── Helper: formatear fecha para display ───
+const soloFecha = (f) => (f ? String(f).slice(0, 10) : "");
+
+// ═══════════════════════════════════════════════════════════
+// Componente de botones de acción para un pedido/cotización
+// ═══════════════════════════════════════════════════════════
+function BotonesAccion({ acciones, onEditar, onPDF, onRemision, cargando }) {
+  if (!acciones || acciones.length === 0) return null;
+
+  // Mostrar máximo 3 documentos con botones
+  const mostrar = acciones.slice(0, 3);
+
+  return (
+    <div style={{ marginTop: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+      {mostrar.map((acc, i) => (
+        <div key={i} style={{
+          display: "flex", alignItems: "center", gap: 6, marginBottom: 6,
+          flexWrap: "wrap",
+        }}>
+          <span style={{ fontSize: 11, color: "#6b7280", minWidth: 80 }}>
+            {acc.tipo === "pedido" ? "📦" : "📋"} {acc.numero}
+          </span>
+          <button
+            onClick={() => onEditar(acc.id, acc.tipo)}
+            disabled={cargando}
+            style={btnStyle("#2563eb", "#dbeafe")}
+            title="Editar documento"
+          >
+            ✏️ Editar
+          </button>
+          <button
+            onClick={() => onPDF(acc.id, acc.tipo)}
+            disabled={cargando}
+            style={btnStyle("#059669", "#d1fae5")}
+            title="Generar PDF"
+          >
+            📄 PDF
+          </button>
+          {acc.tipo === "pedido" && (
+            <button
+              onClick={() => onRemision(acc.id)}
+              disabled={cargando}
+              style={btnStyle("#7c3aed", "#ede9fe")}
+              title="Generar remisión"
+            >
+              📤 Remisión
+            </button>
+          )}
+        </div>
+      ))}
+      {acciones.length > 3 && (
+        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>
+          +{acciones.length - 3} documentos más...
+        </div>
+      )}
+    </div>
+  );
+}
+
+const btnStyle = (color, bg) => ({
+  fontSize: 11, padding: "3px 8px", borderRadius: 6,
+  border: `1px solid ${color}30`, background: bg,
+  color, cursor: "pointer", fontWeight: 500,
+  transition: "all 0.15s",
+});
+
+// ═══════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════
 function AsistenteModal({ visible, onClose }) {
+  const navigate = useNavigate();
   const [mensaje, setMensaje] = useState("");
-  const [historial, setHistorial] = useState([]); // [{tipo: "user"|"ia", texto}]
+  const [historial, setHistorial] = useState([]); // [{tipo: "user"|"ia", texto, acciones?}]
   const [enviando, setEnviando] = useState(false);
   const [consultasHoy, setConsultasHoy] = useState(getConsultasHoy().total);
-  const [vozActiva, setVozActiva] = useState(false); // si lee las respuestas en voz alta
-  const [hablando, setHablando] = useState(false); // si speechSynthesis está hablando
+  const [vozActiva, setVozActiva] = useState(false);
+  const [hablando, setHablando] = useState(false);
+  const [cargandoAccion, setCargandoAccion] = useState(false);
   const historialRef = useRef(null);
 
   const {
@@ -81,19 +155,16 @@ function AsistenteModal({ visible, onClose }) {
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
 
-  // Actualizar mensaje con transcript de voz
   useEffect(() => {
     if (transcript) setMensaje(transcript);
   }, [transcript]);
 
-  // Scroll al final del historial
   useEffect(() => {
     if (historialRef.current) {
       historialRef.current.scrollTop = historialRef.current.scrollHeight;
     }
   }, [historial]);
 
-  // Monitorear si speechSynthesis está hablando
   useEffect(() => {
     const interval = setInterval(() => {
       setHablando(window.speechSynthesis?.speaking || false);
@@ -101,25 +172,145 @@ function AsistenteModal({ visible, onClose }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Detener voz al cerrar
   useEffect(() => {
     if (!visible) detenerVozRespuesta();
   }, [visible]);
 
+  // ─── Cargar documento completo desde Supabase ───
+  const cargarDocumentoCompleto = useCallback(async (id, tipo) => {
+    const tabla = tipo === "cotizacion" ? "cotizaciones" : "ordenes_pedido";
+    const { data, error } = await supabase
+      .from(tabla)
+      .select("*, clientes(*)")
+      .eq("id", id)
+      .single();
+
+    if (error || !data) {
+      console.error("Error cargando documento:", error);
+      return null;
+    }
+    return data;
+  }, []);
+
+  // ─── Acción: Editar ───
+  const handleEditar = useCallback(async (id, tipo) => {
+    setCargandoAccion(true);
+    try {
+      const doc = await cargarDocumentoCompleto(id, tipo);
+      if (!doc) {
+        alert("No se pudo cargar el documento.");
+        return;
+      }
+
+      const cliente = doc.clientes || {};
+      const documentoCompleto = {
+        ...doc,
+        nombre_cliente: cliente.nombre || "",
+        identificacion: cliente.identificacion || "",
+        telefono: cliente.telefono || "",
+        direccion: cliente.direccion || "",
+        email: cliente.email || "",
+        fecha_creacion: doc.fecha_creacion || doc.fecha || null,
+        abonos: doc.abonos || [],
+        garantia: doc.garantia || "",
+        fechaGarantia: doc.fechaGarantia || "",
+        garantiaRecibida: doc.garantiaRecibida || false,
+        estado: doc.estado || "",
+        numero: doc.numero || "",
+        esEdicion: true,
+        idOriginal: doc.id,
+      };
+
+      detenerVozRespuesta();
+      onClose();
+      navigate("/crear-documento", {
+        state: {
+          documento: documentoCompleto,
+          tipo: tipo === "cotizacion" ? "cotizacion" : "orden",
+        },
+      });
+    } catch (err) {
+      console.error("Error al editar:", err);
+      alert("Error al cargar el documento.");
+    } finally {
+      setCargandoAccion(false);
+    }
+  }, [cargarDocumentoCompleto, navigate, onClose]);
+
+  // ─── Acción: PDF ───
+  const handlePDF = useCallback(async (id, tipo) => {
+    setCargandoAccion(true);
+    try {
+      const doc = await cargarDocumentoCompleto(id, tipo);
+      if (!doc) {
+        alert("No se pudo cargar el documento.");
+        return;
+      }
+
+      const docPDF = {
+        ...doc,
+        nombre_cliente: doc.clientes?.nombre || "N/A",
+        identificacion: doc.clientes?.identificacion || "N/A",
+        telefono: doc.clientes?.telefono || "N/A",
+        direccion: doc.clientes?.direccion || "N/A",
+        email: doc.clientes?.email || "N/A",
+        fecha_creacion: soloFecha(doc.fecha_creacion || doc.fecha),
+        fecha_evento: soloFecha(doc.fecha_evento),
+      };
+
+      await generarPDF(docPDF, tipo === "cotizacion" ? "cotizacion" : "orden");
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+      alert("Error al generar el PDF.");
+    } finally {
+      setCargandoAccion(false);
+    }
+  }, [cargarDocumentoCompleto]);
+
+  // ─── Acción: Remisión ───
+  const handleRemision = useCallback(async (id) => {
+    setCargandoAccion(true);
+    try {
+      const doc = await cargarDocumentoCompleto(id, "pedido");
+      if (!doc) {
+        alert("No se pudo cargar el documento.");
+        return;
+      }
+
+      const docRemision = {
+        ...doc,
+        nombre_cliente: doc.clientes?.nombre || "N/A",
+        identificacion: doc.clientes?.identificacion || "N/A",
+        telefono: doc.clientes?.telefono || "N/A",
+        direccion: doc.clientes?.direccion || "N/A",
+        email: doc.clientes?.email || "N/A",
+        fecha_creacion: soloFecha(doc.fecha_creacion || doc.fecha),
+        fecha_evento: soloFecha(doc.fecha_evento),
+      };
+
+      await generarRemision(docRemision);
+    } catch (err) {
+      console.error("Error generando remisión:", err);
+      alert("Error al generar la remisión.");
+    } finally {
+      setCargandoAccion(false);
+    }
+  }, [cargarDocumentoCompleto]);
+
+  // ─── Enviar consulta ───
   const enviarConsulta = async () => {
     const texto = mensaje.trim();
     if (!texto) return;
 
-    // Verificar límite diario
     if (consultasHoy >= LIMITE_CONSULTAS_DIARIAS) {
       setHistorial((prev) => [...prev, {
         tipo: "ia",
         texto: `⚠️ Has alcanzado el límite de ${LIMITE_CONSULTAS_DIARIAS} consultas para hoy. El contador se reinicia a medianoche.`,
+        acciones: [],
       }]);
       return;
     }
 
-    // Agregar mensaje del usuario al historial
     setHistorial((prev) => [...prev, { tipo: "user", texto }]);
     setMensaje("");
     resetTranscript();
@@ -129,12 +320,16 @@ function AsistenteModal({ visible, onClose }) {
       const resultado = await consultarIA(texto);
       const nuevoTotal = incrementarConsulta();
       setConsultasHoy(nuevoTotal);
-      setHistorial((prev) => [...prev, { tipo: "ia", texto: resultado }]);
 
-      // Leer respuesta en voz alta si está activado
-      if (vozActiva) leerEnVozAlta(resultado);
+      // resultado ahora es { texto, acciones }
+      const textoIA = resultado.texto || resultado;
+      const acciones = resultado.acciones || [];
+
+      setHistorial((prev) => [...prev, { tipo: "ia", texto: textoIA, acciones }]);
+
+      if (vozActiva) leerEnVozAlta(textoIA);
     } catch (err) {
-      setHistorial((prev) => [...prev, { tipo: "ia", texto: "⚠️ Error al procesar la consulta." }]);
+      setHistorial((prev) => [...prev, { tipo: "ia", texto: "⚠️ Error al procesar la consulta.", acciones: [] }]);
     }
 
     setEnviando(false);
@@ -176,7 +371,6 @@ function AsistenteModal({ visible, onClose }) {
             <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Groq + Llama 3.3 • Tool Calling</div>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {/* Toggle voz de respuesta */}
             <button
               onClick={() => { setVozActiva(!vozActiva); if (vozActiva) detenerVozRespuesta(); }}
               title={vozActiva ? "Desactivar respuesta por voz" : "Activar respuesta por voz"}
@@ -219,8 +413,11 @@ function AsistenteModal({ visible, onClose }) {
           {historial.length === 0 ? (
             <div style={{ textAlign: "center", padding: "30px 10px", color: "#9ca3af" }}>
               <div style={{ fontSize: 36, marginBottom: 8 }}>🤖</div>
-              <div style={{ fontSize: 14, fontWeight: 500 }}>¿En qué puedo ayudarte?</div>
-              <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>
+                ¡Hola! Soy <span style={{ color: "#2563eb", fontWeight: 700 }}>{NOMBRE_ASISTENTE}</span>, tu asistente inteligente.
+              </div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>¿En qué puedo ayudarte hoy?</div>
+              <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.6, color: "#b0b0b0" }}>
                 Consulta disponibilidad, busca clientes, revisa pedidos, finanzas y más.
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginTop: 12 }}>
@@ -253,7 +450,8 @@ function AsistenteModal({ visible, onClose }) {
                 }}>
                   {msg.tipo === "ia" ? (
                     <div>
-                      {msg.texto
+                      {/* Renderizar texto limpio */}
+                      {(msg.texto || "")
                         .replace(/<function=[^>]*>[^<]*<\/function>/g, "")
                         .replace(/<function=[^>]*>/g, "")
                         .replace(/<\/function>/g, "")
@@ -273,6 +471,15 @@ function AsistenteModal({ visible, onClose }) {
                           </div>
                         );
                       })}
+
+                      {/* Botones de acción */}
+                      <BotonesAccion
+                        acciones={msg.acciones}
+                        onEditar={handleEditar}
+                        onPDF={handlePDF}
+                        onRemision={handleRemision}
+                        cargando={cargandoAccion}
+                      />
                     </div>
                   ) : (
                     msg.texto
@@ -292,11 +499,21 @@ function AsistenteModal({ visible, onClose }) {
               </div>
             </div>
           )}
+          {cargandoAccion && (
+            <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 12 }}>
+              <div style={{
+                padding: "8px 14px", borderRadius: "14px 14px 14px 4px",
+                background: "#eff6ff", border: "1px solid #bfdbfe",
+                fontSize: 12, color: "#2563eb",
+              }}>
+                ⏳ Cargando documento...
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input + acciones */}
         <div style={{ padding: "12px 16px", borderTop: "1px solid #e5e7eb", flexShrink: 0 }}>
-          {/* Indicador de voz */}
           {listening && (
             <div style={{
               padding: "6px 12px", marginBottom: 8, borderRadius: 8,

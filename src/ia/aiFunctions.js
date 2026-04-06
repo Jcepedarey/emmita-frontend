@@ -15,12 +15,13 @@ const hoyISO = () => {
 // ═══════════════════════════════════════════════════════════
 export async function verificar_disponibilidad({ articulo, fecha }) {
   const fechaBuscar = fecha || hoyISO();
+  const articuloNormal = sinTildes(articulo);
 
-  // Buscar el producto
+  // Buscar el producto (con y sin tildes)
   const { data: productos } = await supabase
     .from("productos")
     .select("id, nombre, stock, precio, tipo")
-    .ilike("nombre", `%${articulo}%`)
+    .or(`nombre.ilike.%${articulo}%,nombre.ilike.%${articuloNormal}%`)
     .limit(5);
 
   if (!productos || productos.length === 0) {
@@ -69,7 +70,6 @@ export async function verificar_disponibilidad({ articulo, fecha }) {
 // 2. BUSCAR CLIENTE
 // ═══════════════════════════════════════════════════════════
 export async function buscar_cliente({ texto }) {
-  // Buscar con y sin tildes
   const textoNormal = sinTildes(texto);
   const { data, error } = await supabase
     .from("clientes")
@@ -82,6 +82,7 @@ export async function buscar_cliente({ texto }) {
   }
 
   return JSON.stringify(data.map((c) => ({
+    id: c.id,
     nombre: c.nombre,
     telefono: c.telefono || "—",
     email: c.email || "—",
@@ -94,10 +95,11 @@ export async function buscar_cliente({ texto }) {
 // 3. BUSCAR PRODUCTO
 // ═══════════════════════════════════════════════════════════
 export async function buscar_producto({ nombre }) {
+  const nombreNormal = sinTildes(nombre);
   const { data, error } = await supabase
     .from("productos")
     .select("nombre, precio, stock, tipo, costo, categoria, valor_adquisicion")
-    .ilike("nombre", `%${nombre}%`)
+    .or(`nombre.ilike.%${nombre}%,nombre.ilike.%${nombreNormal}%`)
     .order("nombre")
     .limit(10);
 
@@ -117,12 +119,12 @@ export async function buscar_producto({ nombre }) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 4. CONSULTAR PEDIDOS
+// 4. CONSULTAR PEDIDOS — ahora retorna ID para botones
 // ═══════════════════════════════════════════════════════════
 export async function consultar_pedidos({ fecha, fecha_desde, fecha_hasta, cliente }) {
   let query = supabase
     .from("ordenes_pedido")
-    .select("numero, fecha_evento, total_neto, estado, clientes(nombre)")
+    .select("id, numero, fecha_evento, total_neto, estado, clientes(nombre)")
     .order("fecha_evento", { ascending: false })
     .limit(15);
 
@@ -140,9 +142,11 @@ export async function consultar_pedidos({ fecha, fecha_desde, fecha_hasta, clien
 
   let resultado = data;
   if (cliente) {
-    resultado = resultado.filter((p) =>
-      (p.clientes?.nombre || "").toLowerCase().includes(cliente.toLowerCase())
-    );
+    const clienteNormal = sinTildes(cliente.toLowerCase());
+    resultado = resultado.filter((p) => {
+      const nom = (p.clientes?.nombre || "").toLowerCase();
+      return nom.includes(cliente.toLowerCase()) || sinTildes(nom).includes(clienteNormal);
+    });
   }
 
   if (resultado.length === 0) {
@@ -150,6 +154,8 @@ export async function consultar_pedidos({ fecha, fecha_desde, fecha_hasta, clien
   }
 
   return JSON.stringify(resultado.map((p) => ({
+    _id: p.id,
+    _tipo: "pedido",
     numero: p.numero || "—",
     cliente: p.clientes?.nombre || "—",
     fecha_evento: p.fecha_evento,
@@ -159,7 +165,7 @@ export async function consultar_pedidos({ fecha, fecha_desde, fecha_hasta, clien
 }
 
 // ═══════════════════════════════════════════════════════════
-// 5. CONSULTAR AGENDA
+// 5. CONSULTAR AGENDA — ahora retorna ID para botones
 // ═══════════════════════════════════════════════════════════
 export async function consultar_agenda({ periodo }) {
   const hoy = new Date();
@@ -179,7 +185,7 @@ export async function consultar_agenda({ periodo }) {
 
   const { data, error } = await supabase
     .from("ordenes_pedido")
-    .select("numero, fecha_evento, fecha_entrega, total_neto, clientes(nombre)")
+    .select("id, numero, fecha_evento, fecha_entrega, total_neto, clientes(nombre)")
     .gte("fecha_evento", desde)
     .lte("fecha_evento", hasta)
     .order("fecha_evento", { ascending: true })
@@ -190,6 +196,8 @@ export async function consultar_agenda({ periodo }) {
   }
 
   return JSON.stringify(data.map((p) => ({
+    _id: p.id,
+    _tipo: "pedido",
     numero: p.numero || "—",
     cliente: p.clientes?.nombre || "—",
     fecha_evento: p.fecha_evento,
@@ -221,7 +229,6 @@ export async function resumen_financiero({ mes, anio }) {
   const gastos = data.filter((m) => m.tipo === "gasto").reduce((s, m) => s + Number(m.monto || 0), 0);
   const ganancia = ingresos - gastos;
 
-  // Top categorías de gasto
   const catGastos = {};
   data.filter((m) => m.tipo === "gasto").forEach((m) => {
     const cat = m.categoria || "Sin categoría";
@@ -264,13 +271,14 @@ export async function contar_registros({ tipo }) {
 
   return JSON.stringify({ tipo, total: count });
 }
+
 // ═══════════════════════════════════════════════════════════
-// 8. CONSULTAR COTIZACIONES
+// 8. CONSULTAR COTIZACIONES — ahora retorna ID para botones
 // ═══════════════════════════════════════════════════════════
 export async function consultar_cotizaciones({ fecha_desde, fecha_hasta, cliente }) {
   let query = supabase
     .from("cotizaciones")
-    .select("numero, fecha_evento, total_neto, clientes(nombre)")
+    .select("id, numero, fecha_evento, total_neto, clientes(nombre)")
     .order("fecha_evento", { ascending: false })
     .limit(15);
 
@@ -283,13 +291,17 @@ export async function consultar_cotizaciones({ fecha_desde, fecha_hasta, cliente
 
   let resultado = data;
   if (cliente) {
-    resultado = resultado.filter((c) =>
-      (c.clientes?.nombre || "").toLowerCase().includes(cliente.toLowerCase())
-    );
+    const clienteNormal = sinTildes(cliente.toLowerCase());
+    resultado = resultado.filter((c) => {
+      const nom = (c.clientes?.nombre || "").toLowerCase();
+      return nom.includes(cliente.toLowerCase()) || sinTildes(nom).includes(clienteNormal);
+    });
   }
   if (resultado.length === 0) return `No se encontraron cotizaciones del cliente "${cliente}".`;
 
   return JSON.stringify(resultado.map((c) => ({
+    _id: c.id,
+    _tipo: "cotizacion",
     numero: c.numero || "—",
     cliente: c.clientes?.nombre || "—",
     fecha_evento: c.fecha_evento,
@@ -301,11 +313,12 @@ export async function consultar_cotizaciones({ fecha_desde, fecha_hasta, cliente
 // 9. TRAZABILIDAD DE PRECIO (último precio a un cliente)
 // ═══════════════════════════════════════════════════════════
 export async function trazabilidad_precio({ articulo, cliente }) {
-  // 1. Buscar cliente
+  const clienteNormal = sinTildes(cliente);
+  // 1. Buscar cliente (con y sin tildes)
   const { data: clientes } = await supabase
     .from("clientes")
     .select("id, nombre")
-    .ilike("nombre", `%${cliente}%`)
+    .or(`nombre.ilike.%${cliente}%,nombre.ilike.%${clienteNormal}%`)
     .limit(3);
 
   if (!clientes || clientes.length === 0) return `No se encontró el cliente "${cliente}".`;
@@ -314,8 +327,8 @@ export async function trazabilidad_precio({ articulo, cliente }) {
 
   // 2. Buscar pedidos y cotizaciones del cliente
   const [{ data: pedidos }, { data: cotizaciones }] = await Promise.all([
-    supabase.from("ordenes_pedido").select("numero, fecha_evento, productos").eq("cliente_id", clienteEncontrado.id).order("fecha_evento", { ascending: false }).limit(50),
-    supabase.from("cotizaciones").select("numero, fecha_evento, productos").eq("cliente_id", clienteEncontrado.id).order("fecha_evento", { ascending: false }).limit(50),
+    supabase.from("ordenes_pedido").select("id, numero, fecha_evento, productos").eq("cliente_id", clienteEncontrado.id).order("fecha_evento", { ascending: false }).limit(50),
+    supabase.from("cotizaciones").select("id, numero, fecha_evento, productos").eq("cliente_id", clienteEncontrado.id).order("fecha_evento", { ascending: false }).limit(50),
   ]);
 
   const todos = [...(pedidos || []), ...(cotizaciones || [])].sort((a, b) =>
@@ -323,23 +336,29 @@ export async function trazabilidad_precio({ articulo, cliente }) {
   );
 
   // 3. Buscar el artículo en los productos de cada documento
-  const nombreBuscado = articulo.toLowerCase();
+  const nombreBuscado = sinTildes(articulo.toLowerCase());
   const coincidencias = [];
 
   for (const doc of todos) {
     const items = doc.productos || [];
+    const esPedido = (pedidos || []).some((p) => p.id === doc.id);
     const walk = (list, factor = 1) => {
       for (const it of list) {
         if (it.es_grupo && Array.isArray(it.productos)) {
           walk(it.productos, factor * (Number(it.cantidad) || 1));
-        } else if ((it.nombre || "").toLowerCase().includes(nombreBuscado)) {
-          coincidencias.push({
-            documento: doc.numero || "—",
-            fecha: doc.fecha_evento,
-            articulo: it.nombre,
-            precio_unitario: Number(it.precio || 0),
-            cantidad: (Number(it.cantidad) || 0) * factor,
-          });
+        } else {
+          const nomItem = sinTildes((it.nombre || "").toLowerCase());
+          if (nomItem.includes(nombreBuscado)) {
+            coincidencias.push({
+              _id: doc.id,
+              _tipo: esPedido ? "pedido" : "cotizacion",
+              documento: doc.numero || "—",
+              fecha: doc.fecha_evento,
+              articulo: it.nombre,
+              precio_unitario: Number(it.precio || 0),
+              cantidad: (Number(it.cantidad) || 0) * factor,
+            });
+          }
         }
       }
     };
@@ -359,6 +378,7 @@ export async function trazabilidad_precio({ articulo, cliente }) {
     ultima_fecha: ultimo.fecha,
     ultima_cantidad: ultimo.cantidad,
     total_veces_alquilado: coincidencias.length,
+    _acciones: coincidencias.slice(0, 3).map((c) => ({ _id: c._id, _tipo: c._tipo, numero: c.documento })),
     historial: coincidencias.slice(0, 5).map((c) => ({
       documento: c.documento,
       fecha: c.fecha,
@@ -367,6 +387,7 @@ export async function trazabilidad_precio({ articulo, cliente }) {
     })),
   });
 }
+
 // ═══════════════════════════════════════════════════════════
 // 10. ÚLTIMO CLIENTE QUE ALQUILÓ UN ARTÍCULO
 // ═══════════════════════════════════════════════════════════
@@ -376,7 +397,7 @@ export async function ultimo_cliente_articulo({ articulo }) {
   // Buscar en pedidos recientes
   const { data: pedidos } = await supabase
     .from("ordenes_pedido")
-    .select("numero, fecha_evento, productos, cliente_id, clientes(nombre)")
+    .select("id, numero, fecha_evento, productos, cliente_id, clientes(nombre)")
     .order("fecha_evento", { ascending: false })
     .limit(100);
 
@@ -400,6 +421,7 @@ export async function ultimo_cliente_articulo({ articulo }) {
               articulo: it.nombre,
               precio: Number(it.precio || 0),
               cantidad: (Number(it.cantidad) || 0) * factor,
+              _id: ped.id,
             };
           }
         }
@@ -416,6 +438,7 @@ export async function ultimo_cliente_articulo({ articulo }) {
         precio_unitario: money(encontrado.precio),
         cantidad: encontrado.cantidad,
         documento: encontrado.documento,
+        _acciones: [{ _id: encontrado._id, _tipo: "pedido", numero: encontrado.documento }],
       });
     }
   }

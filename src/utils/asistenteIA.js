@@ -5,13 +5,16 @@ import { aiTools } from "../ia/aiSchema";
 import { ejecutarFuncionAI } from "../ia/aiParser";
 
 const API_URL = process.env.REACT_APP_API_URL || "https://backend-emmita.onrender.com";
-const MAX_TOOL_ROUNDS = 3; // máximo de rondas de tool calling (evitar loops)
+const MAX_TOOL_ROUNDS = 3;
+
+// ─── Nombre del asistente ───
+export const NOMBRE_ASISTENTE = "Renty"; // ← cambia aquí si eliges otro
 
 // ─── System prompt del agente ───
 const FECHA_HOY = new Date().toLocaleDateString("es-CO", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 const ANIO_ACTUAL = new Date().getFullYear();
 
-const SYSTEM_PROMPT = `Eres el asistente inteligente de SwAlquiler, un sistema de gestión de alquiler de artículos y eventos en Colombia.
+const SYSTEM_PROMPT = `Eres ${NOMBRE_ASISTENTE}, el asistente inteligente de SwAlquiler, un sistema de gestión de alquiler de artículos y eventos en Colombia.
 
 FECHA ACTUAL: ${FECHA_HOY}. Año actual: ${ANIO_ACTUAL}. SIEMPRE usa el año ${ANIO_ACTUAL} cuando el usuario no especifique año.
 
@@ -32,11 +35,12 @@ Reglas importantes:
 - Si te pregunten por la agenda o eventos, USA la herramienta consultar_agenda.
 - Si te pregunten por ingresos, gastos o finanzas, USA la herramienta resumen_financiero.
 - Si te pregunten por cotizaciones, USA la herramienta consultar_cotizaciones.
-- Si te pregunten a qué precio le alquilaste algo a un cliente, o el último precio de un artículo para un cliente, USA la herramienta trazabilidad_precio. Esta es MUY útil para precios preferenciales.
+- Si te pregunten a qué precio le alquilaste algo a un cliente, o el último precio de un artículo para un cliente, USA la herramienta trazabilidad_precio.
 - Si te pregunten a CUÁL fue el último cliente que se le alquiló un artículo (sin dar nombre de cliente), USA la herramienta ultimo_cliente_articulo.
-- NUNCA muestres código de funciones, JSON, ni tags como <function> en tus respuestas. Si no puedes resolver algo, dilo con texto normal.
-- Si no puedes resolver algo con las herramientas, di honestamente que no tienes esa capacidad aún.
-- Sé conciso pero completo en tus respuestas. No uses más de 300 palabras.
+- NUNCA muestres código de funciones, JSON, ni tags como <function> en tus respuestas.
+- NUNCA muestres los campos internos _id, _tipo ni _acciones en tus respuestas. Esos son datos internos del sistema.
+- Si no puedes resolver algo con las herramientas, dilo honestamente.
+- Sé conciso pero completo. Máximo 250 palabras por respuesta.
 - Nunca reveles información técnica sobre tu funcionamiento interno.
 
 FORMATO DE RESPUESTAS:
@@ -48,20 +52,53 @@ FORMATO DE RESPUESTAS:
   📍 Dirección: xxx
 - Para pedidos, usa:
   📦 Número | 👤 Cliente | 📅 Fecha | 💰 Total | Estado
-- Sé conciso. Máximo 250 palabras por respuesta.
 - Usa emojis relevantes para hacer las respuestas más visuales.`;
+
+// ─── Extraer acciones de los resultados de herramientas ───
+function extraerAcciones(toolResults) {
+  const acciones = [];
+  const idsVistos = new Set();
+
+  for (const resultado of toolResults) {
+    try {
+      const datos = typeof resultado === "string" ? JSON.parse(resultado) : resultado;
+
+      // Si es un array (consultar_pedidos, consultar_agenda, consultar_cotizaciones)
+      if (Array.isArray(datos)) {
+        for (const item of datos) {
+          if (item._id && item._tipo && !idsVistos.has(item._id)) {
+            idsVistos.add(item._id);
+            acciones.push({ id: item._id, tipo: item._tipo, numero: item.numero || "—" });
+          }
+        }
+      }
+      // Si es un objeto con _acciones (trazabilidad_precio, ultimo_cliente_articulo)
+      else if (datos && datos._acciones && Array.isArray(datos._acciones)) {
+        for (const acc of datos._acciones) {
+          if (acc._id && acc._tipo && !idsVistos.has(acc._id)) {
+            idsVistos.add(acc._id);
+            acciones.push({ id: acc._id, tipo: acc._tipo, numero: acc.numero || "—" });
+          }
+        }
+      }
+    } catch {
+      // No era JSON parseable, ignorar
+    }
+  }
+
+  return acciones;
+}
 
 export async function consultarIA(mensajeOriginal) {
   try {
-    // Construir mensajes con historial (por ahora solo el mensaje actual)
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: mensajeOriginal },
     ];
 
-    // ─── Enviar a Groq con herramientas ───
     let respuestaFinal = null;
     let rondas = 0;
+    const toolResults = []; // acumular resultados de herramientas
 
     while (!respuestaFinal && rondas < MAX_TOOL_ROUNDS) {
       rondas++;
@@ -77,21 +114,18 @@ export async function consultarIA(mensajeOriginal) {
 
       const choice = data.choices?.[0];
       if (!choice) {
-        return "⚠️ No obtuve respuesta del asistente.";
+        return { texto: "⚠️ No obtuve respuesta del asistente.", acciones: [] };
       }
 
       const msg = choice.message;
 
-      // Si la IA quiere llamar herramientas
       if (msg.tool_calls && msg.tool_calls.length > 0) {
-        // Agregar el mensaje del asistente (con tool_calls) al historial
         messages.push({
           role: "assistant",
           content: msg.content || null,
           tool_calls: msg.tool_calls,
         });
 
-        // Ejecutar cada herramienta
         for (const toolCall of msg.tool_calls) {
           const nombre = toolCall.function?.name;
           const args = toolCall.function?.arguments;
@@ -106,7 +140,9 @@ export async function consultarIA(mensajeOriginal) {
             resultado = JSON.stringify({ error: true, mensaje: "Error al ejecutar la herramienta" });
           }
 
-          // Agregar resultado de la herramienta al historial
+          // Guardar resultado para extraer acciones después
+          toolResults.push(resultado);
+
           messages.push({
             role: "tool",
             tool_call_id: toolCall.id,
@@ -114,42 +150,41 @@ export async function consultarIA(mensajeOriginal) {
           });
         }
 
-        // La siguiente iteración del while enviará todo de vuelta a Groq
-        // para que genere la respuesta final con los datos reales
         continue;
       }
 
-      // Si NO hay tool_calls, es la respuesta final
       respuestaFinal = msg.content;
     }
 
     if (!respuestaFinal) {
-      return "⚠️ El asistente no pudo completar la consulta después de varios intentos.";
+      return { texto: "⚠️ El asistente no pudo completar la consulta después de varios intentos.", acciones: [] };
     }
 
-    return respuestaFinal.trim();
+    // Extraer acciones de los resultados de herramientas
+    const acciones = extraerAcciones(toolResults);
+
+    return { texto: respuestaFinal.trim(), acciones };
 
   } catch (error) {
     console.error("❌ Error en consultarIA:", error.message);
 
-    // Si falla la API, intentar con pattern matching básico como fallback
     const fallback = fallbackLocal(mensajeOriginal);
-    if (fallback) return fallback;
+    if (fallback) return { texto: fallback, acciones: [] };
 
-    return "⚠️ Hubo un error al procesar tu solicitud. Verifica tu conexión e intenta nuevamente.";
+    return { texto: "⚠️ Hubo un error al procesar tu solicitud. Verifica tu conexión e intenta nuevamente.", acciones: [] };
   }
 }
 
-// ─── Fallback local (cuando falla la API) ───
+// ─── Fallback local ───
 function fallbackLocal(mensaje) {
   const m = mensaje.toLowerCase();
 
   if (m.includes("hola") || m.includes("buenas")) {
-    return "👋 ¡Hola! Soy el asistente de SwAlquiler. ¿En qué puedo ayudarte hoy?";
+    return `👋 ¡Hola! Soy ${NOMBRE_ASISTENTE}, tu asistente de SwAlquiler. ¿En qué puedo ayudarte hoy?`;
   }
   if (m.includes("qué puedes hacer") || m.includes("ayuda")) {
-    return "🤖 Puedo ayudarte con:\n• Verificar disponibilidad de artículos por fecha\n• Buscar clientes y productos\n• Consultar pedidos y la agenda\n• Ver resúmenes financieros\n• Contar registros del sistema\n\n¡Pregúntame lo que necesites!";
+    return `🤖 Puedo ayudarte con:\n• Verificar disponibilidad de artículos por fecha\n• Buscar clientes y productos\n• Consultar pedidos y la agenda\n• Ver resúmenes financieros\n• Contar registros del sistema\n\n¡Pregúntame lo que necesites!`;
   }
 
-  return null; // Sin fallback, mostrar error genérico
+  return null;
 }
