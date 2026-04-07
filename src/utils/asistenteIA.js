@@ -137,14 +137,25 @@ export async function consultarIA(mensajeOriginal, historial = []) {
     while (!respuestaFinal && rondas < MAX_TOOL_ROUNDS) {
       rondas++;
 
-      const data = await fetchAPI(`${API_URL}/api/ia/chat`, {
-        method: "POST",
-        body: JSON.stringify({
-          messages,
-          tools: aiTools,
-          tool_choice: "auto",
-        }),
-      });
+      // ── Retry: si Render devuelve 502, intentar una vez más ──
+      let data;
+      try {
+        data = await fetchAPI(`${API_URL}/api/ia/chat`, {
+          method: "POST",
+          body: JSON.stringify({ messages, tools: aiTools, tool_choice: "auto" }),
+        });
+      } catch (err) {
+        if (err.message?.includes("502") || err.message?.includes("503")) {
+          console.log("🔄 Reintentando tras 502...");
+          await new Promise((r) => setTimeout(r, 2000));
+          data = await fetchAPI(`${API_URL}/api/ia/chat`, {
+            method: "POST",
+            body: JSON.stringify({ messages, tools: aiTools, tool_choice: "auto" }),
+          });
+        } else {
+          throw err;
+        }
+      }
 
       const choice = data.choices?.[0];
       if (!choice) {
