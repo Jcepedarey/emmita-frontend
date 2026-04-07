@@ -1,14 +1,16 @@
 // src/utils/asistenteIA.js
 // Asistente IA con Tool Calling — Groq + Llama 3.3 70B
+// ✅ Multi-turn: recibe historial para mantener contexto conversacional
 import { fetchAPI } from "./api";
 import { aiTools } from "../ia/aiSchema";
 import { ejecutarFuncionAI } from "../ia/aiParser";
 
 const API_URL = process.env.REACT_APP_API_URL || "https://backend-emmita.onrender.com";
 const MAX_TOOL_ROUNDS = 3;
+const MAX_HISTORIAL = 10; // máximo de mensajes previos a enviar (evitar tokens excesivos)
 
 // ─── Nombre del asistente ───
-export const NOMBRE_ASISTENTE = "Renty"; // ← cambia aquí si eliges otro
+export const NOMBRE_ASISTENTE = "Renty";
 
 // ─── System prompt del agente ───
 const FECHA_HOY = new Date().toLocaleDateString("es-CO", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -21,38 +23,39 @@ FECHA ACTUAL: ${FECHA_HOY}. Año actual: ${ANIO_ACTUAL}. SIEMPRE usa el año ${A
 Tu rol es ayudar al usuario a gestionar su negocio de alquiler. Puedes:
 - Verificar disponibilidad de artículos para fechas específicas
 - Buscar clientes, productos e información del inventario
-- Consultar pedidos y la agenda de eventos
+- Consultar pedidos, cotizaciones y la agenda de eventos
 - Mostrar resúmenes financieros (ingresos, gastos, ganancia)
 - Contar registros del sistema
+- Consultar la agenda completa de un día (pedidos + cotizaciones + notas)
+- Crear notas en el calendario
+- Ver pagos pendientes y quién debe
+- Crear clientes nuevos
+- Actualizar precios de productos
+- Mostrar rankings de artículos más alquilados y mejores clientes
 
-Reglas importantes:
+REGLAS IMPORTANTES:
 - Siempre responde en español colombiano, de forma clara y profesional.
 - Los precios están en pesos colombianos (COP), usa formato $xxx.xxx
-- Cuando te pregunten por disponibilidad, USA la herramienta verificar_disponibilidad. No inventes datos.
-- Cuando te pregunten por clientes, USA la herramienta buscar_cliente. No inventes datos.
-- Cuando te pregunten por productos o artículos, USA la herramienta buscar_producto.
-- Si te pregunten cuántos de algo hay, USA la herramienta contar_registros.
-- Si te pregunten por la agenda o eventos, USA la herramienta consultar_agenda.
-- Si te pregunten por ingresos, gastos o finanzas, USA la herramienta resumen_financiero.
-- Si te pregunten por cotizaciones, USA la herramienta consultar_cotizaciones.
-- Si te pregunten a qué precio le alquilaste algo a un cliente, o el último precio de un artículo para un cliente, USA la herramienta trazabilidad_precio.
-- Si te pregunten a CUÁL fue el último cliente que se le alquiló un artículo (sin dar nombre de cliente), USA la herramienta ultimo_cliente_articulo.
-- NUNCA muestres código de funciones, JSON, ni tags como <function> en tus respuestas.
-- NUNCA muestres los campos internos _id, _tipo ni _acciones en tus respuestas. Esos son datos internos del sistema.
-- Si no puedes resolver algo con las herramientas, dilo honestamente.
+- USA las herramientas para responder. NUNCA inventes datos.
+- Cuando te pregunten por la agenda de una FECHA ESPECÍFICA (ej: "18 de abril", "20/04"), USA consultar_agenda_fecha.
+- Cuando te pregunten de forma general ("esta semana", "hoy", "mañana"), USA consultar_agenda.
+- Si te piden crear una nota o recordatorio, USA crear_nota con la fecha correcta.
+- Si te pregunten por pagos pendientes o quién debe, USA pagos_pendientes.
+- Si te piden crear un cliente, USA crear_cliente.
+- Si te piden cambiar un precio, USA actualizar_precio_producto.
+- Si preguntan cuál es el producto estrella o qué se alquila más, USA articulos_mas_alquilados.
+- Si preguntan quiénes son los mejores clientes, USA clientes_mas_frecuentes.
+- NUNCA muestres los campos internos _id, _tipo, _acciones en tus respuestas.
+- NUNCA muestres código de funciones, JSON, ni tags como <function>.
 - Sé conciso pero completo. Máximo 250 palabras por respuesta.
-- Nunca reveles información técnica sobre tu funcionamiento interno.
+- Eres conversacional: puedes responder varias preguntas, continuar temas previos y recordar lo que se habló en esta conversación.
 
 FORMATO DE RESPUESTAS:
-- Cuando muestres listas de pedidos, clientes o productos, usa numeración (1. 2. 3.) con saltos de línea.
-- Para datos de un cliente, usa formato con iconos:
-  📞 Teléfono: xxx
-  📧 Email: xxx
-  🆔 Identificación: xxx
-  📍 Dirección: xxx
-- Para pedidos, usa:
-  📦 Número | 👤 Cliente | 📅 Fecha | 💰 Total | Estado
-- Usa emojis relevantes para hacer las respuestas más visuales.`;
+- Listas: usa numeración (1. 2. 3.) con saltos de línea.
+- Clientes: 📞 Teléfono | 📧 Email | 🆔 Cédula | 📍 Dirección
+- Pedidos: 📦 Número | 👤 Cliente | 📅 Fecha | 💰 Total | Estado
+- Usa emojis relevantes para hacer las respuestas más visuales.
+- Cuando crees algo (nota, cliente) confirma con ✅.`;
 
 // ─── Extraer acciones de los resultados de herramientas ───
 function extraerAcciones(toolResults) {
@@ -63,7 +66,6 @@ function extraerAcciones(toolResults) {
     try {
       const datos = typeof resultado === "string" ? JSON.parse(resultado) : resultado;
 
-      // Si es un array (consultar_pedidos, consultar_agenda, consultar_cotizaciones)
       if (Array.isArray(datos)) {
         for (const item of datos) {
           if (item._id && item._tipo && !idsVistos.has(item._id)) {
@@ -71,13 +73,28 @@ function extraerAcciones(toolResults) {
             acciones.push({ id: item._id, tipo: item._tipo, numero: item.numero || "—" });
           }
         }
-      }
-      // Si es un objeto con _acciones (trazabilidad_precio, ultimo_cliente_articulo)
-      else if (datos && datos._acciones && Array.isArray(datos._acciones)) {
+      } else if (datos && datos._acciones && Array.isArray(datos._acciones)) {
         for (const acc of datos._acciones) {
           if (acc._id && acc._tipo && !idsVistos.has(acc._id)) {
             idsVistos.add(acc._id);
             acciones.push({ id: acc._id, tipo: acc._tipo, numero: acc.numero || "—" });
+          }
+        }
+      } else if (datos && datos.pedidos && Array.isArray(datos.pedidos)) {
+        // Para pagos_pendientes y consultar_agenda_fecha
+        for (const item of datos.pedidos) {
+          if (item._id && item._tipo && !idsVistos.has(item._id)) {
+            idsVistos.add(item._id);
+            acciones.push({ id: item._id, tipo: item._tipo, numero: item.numero || "—" });
+          }
+        }
+        // También cotizaciones de consultar_agenda_fecha
+        if (datos.cotizaciones) {
+          for (const item of datos.cotizaciones) {
+            if (item._id && item._tipo && !idsVistos.has(item._id)) {
+              idsVistos.add(item._id);
+              acciones.push({ id: item._id, tipo: item._tipo, numero: item.numero || "—" });
+            }
           }
         }
       }
@@ -89,16 +106,33 @@ function extraerAcciones(toolResults) {
   return acciones;
 }
 
-export async function consultarIA(mensajeOriginal) {
+/**
+ * Consultar IA con soporte multi-turno
+ * @param {string} mensajeOriginal - Mensaje actual del usuario
+ * @param {Array} historial - Array de mensajes previos [{tipo: "user"|"ia", texto}]
+ */
+export async function consultarIA(mensajeOriginal, historial = []) {
   try {
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: mensajeOriginal },
-    ];
+    // Construir mensajes con historial conversacional
+    const messages = [{ role: "system", content: SYSTEM_PROMPT }];
+
+    // Incluir historial previo (últimos N mensajes para contexto)
+    const historialReciente = historial.slice(-MAX_HISTORIAL);
+    for (const msg of historialReciente) {
+      if (msg.tipo === "user") {
+        messages.push({ role: "user", content: msg.texto });
+      } else if (msg.tipo === "ia" && msg.texto) {
+        // Solo enviar texto, no acciones
+        messages.push({ role: "assistant", content: msg.texto });
+      }
+    }
+
+    // Mensaje actual
+    messages.push({ role: "user", content: mensajeOriginal });
 
     let respuestaFinal = null;
     let rondas = 0;
-    const toolResults = []; // acumular resultados de herramientas
+    const toolResults = [];
 
     while (!respuestaFinal && rondas < MAX_TOOL_ROUNDS) {
       rondas++;
@@ -130,26 +164,19 @@ export async function consultarIA(mensajeOriginal) {
           const nombre = toolCall.function?.name;
           const args = toolCall.function?.arguments;
 
-          console.log(`🔧 Ejecutando herramienta: ${nombre}`, args);
+          console.log(`🔧 Ejecutando: ${nombre}`, args);
 
           let resultado;
           try {
             resultado = await ejecutarFuncionAI(nombre, args);
           } catch (err) {
-            console.error(`Error en herramienta ${nombre}:`, err);
+            console.error(`Error en ${nombre}:`, err);
             resultado = JSON.stringify({ error: true, mensaje: "Error al ejecutar la herramienta" });
           }
 
-          // Guardar resultado para extraer acciones después
           toolResults.push(resultado);
-
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: resultado,
-          });
+          messages.push({ role: "tool", tool_call_id: toolCall.id, content: resultado });
         }
-
         continue;
       }
 
@@ -160,9 +187,7 @@ export async function consultarIA(mensajeOriginal) {
       return { texto: "⚠️ El asistente no pudo completar la consulta después de varios intentos.", acciones: [] };
     }
 
-    // Extraer acciones de los resultados de herramientas
     const acciones = extraerAcciones(toolResults);
-
     return { texto: respuestaFinal.trim(), acciones };
 
   } catch (error) {
@@ -178,13 +203,11 @@ export async function consultarIA(mensajeOriginal) {
 // ─── Fallback local ───
 function fallbackLocal(mensaje) {
   const m = mensaje.toLowerCase();
-
   if (m.includes("hola") || m.includes("buenas")) {
     return `👋 ¡Hola! Soy ${NOMBRE_ASISTENTE}, tu asistente de SwAlquiler. ¿En qué puedo ayudarte hoy?`;
   }
   if (m.includes("qué puedes hacer") || m.includes("ayuda")) {
-    return `🤖 Puedo ayudarte con:\n• Verificar disponibilidad de artículos por fecha\n• Buscar clientes y productos\n• Consultar pedidos y la agenda\n• Ver resúmenes financieros\n• Contar registros del sistema\n\n¡Pregúntame lo que necesites!`;
+    return `🤖 Puedo ayudarte con:\n• Verificar disponibilidad de artículos\n• Buscar clientes y productos\n• Consultar pedidos, cotizaciones y agenda\n• Ver resúmenes financieros\n• Crear notas en el calendario\n• Ver pagos pendientes\n• Crear clientes\n• Cambiar precios de productos\n• Ver rankings de artículos y clientes\n\n¡Pregúntame lo que necesites!`;
   }
-
   return null;
 }

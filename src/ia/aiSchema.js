@@ -65,7 +65,7 @@ export const aiTools = [
     type: "function",
     function: {
       name: "consultar_agenda",
-      description: "Consulta los eventos y pedidos programados para hoy, mañana, esta semana o los próximos días",
+      description: "Consulta los eventos y pedidos programados para hoy, mañana, esta semana o los próximos días. Usa esto para preguntas genéricas como '¿qué tengo esta semana?'",
       parameters: {
         type: "object",
         properties: {
@@ -76,6 +76,20 @@ export const aiTools = [
           },
         },
         required: ["periodo"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_agenda_fecha",
+      description: "Consulta TODA la agenda de una fecha específica: pedidos, cotizaciones Y notas del calendario. Usa esta herramienta cuando el usuario pregunte por una fecha exacta como '¿qué tengo el 18 de abril?' o 'mi agenda del 20/04'.",
+      parameters: {
+        type: "object",
+        properties: {
+          fecha: { type: "string", description: "Fecha en formato YYYY-MM-DD" },
+        },
+        required: ["fecha"],
       },
     },
   },
@@ -130,7 +144,7 @@ export const aiTools = [
     type: "function",
     function: {
       name: "trazabilidad_precio",
-      description: "Busca el último precio al que se le alquiló un artículo o producto a un cliente específico. Útil para saber precios preferenciales o históricos de un cliente. También muestra cuántas veces se le ha alquilado ese artículo.",
+      description: "Busca el último precio al que se le alquiló un artículo a un cliente específico. Útil para precios preferenciales o históricos.",
       parameters: {
         type: "object",
         properties: {
@@ -145,13 +159,101 @@ export const aiTools = [
     type: "function",
     function: {
       name: "ultimo_cliente_articulo",
-      description: "Busca cuál fue el último cliente al que se le alquiló un artículo específico, sin necesidad de saber el nombre del cliente. Muestra fecha, precio y cliente.",
+      description: "Busca cuál fue el último cliente al que se le alquiló un artículo específico, sin necesidad de saber el nombre del cliente.",
       parameters: {
         type: "object",
         properties: {
           articulo: { type: "string", description: "Nombre del artículo" },
         },
         required: ["articulo"],
+      },
+    },
+  },
+  // ─── NUEVAS HERRAMIENTAS DE ACCIÓN ───
+  {
+    type: "function",
+    function: {
+      name: "crear_nota",
+      description: "Crea una nota en el calendario/agenda para una fecha específica. Úsala cuando el usuario diga cosas como 'créame una nota para el 7 de junio de comprar madera' o 'recuérdame el 15 de mayo llamar al proveedor'.",
+      parameters: {
+        type: "object",
+        properties: {
+          fecha: { type: "string", description: "Fecha de la nota en formato YYYY-MM-DD" },
+          descripcion: { type: "string", description: "Texto/contenido de la nota" },
+        },
+        required: ["fecha", "descripcion"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "pagos_pendientes",
+      description: "Muestra los pedidos que tienen saldo pendiente (total - abonos > 0). Puede filtrar por cliente. Úsala cuando pregunten '¿quién me debe?', '¿qué pagos tengo pendientes?', o 'saldo de María'.",
+      parameters: {
+        type: "object",
+        properties: {
+          cliente: { type: "string", description: "Nombre del cliente para filtrar (opcional)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "crear_cliente",
+      description: "Crea un nuevo cliente en el sistema. Verifica primero si ya existe uno similar. Úsala cuando digan 'crea el cliente Juan Pérez con teléfono 310...'.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre: { type: "string", description: "Nombre completo del cliente" },
+          telefono: { type: "string", description: "Número de teléfono" },
+          identificacion: { type: "string", description: "Cédula o NIT" },
+          email: { type: "string", description: "Correo electrónico" },
+          direccion: { type: "string", description: "Dirección" },
+        },
+        required: ["nombre"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "actualizar_precio_producto",
+      description: "Actualiza el precio de alquiler de un producto. Úsala cuando digan 'sube el precio de la silla tiffany a 8000' o 'cambia el precio de X a Y'.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre: { type: "string", description: "Nombre del producto a actualizar" },
+          nuevo_precio: { type: "number", description: "Nuevo precio en pesos colombianos (solo el número, sin $ ni puntos)" },
+        },
+        required: ["nombre", "nuevo_precio"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "articulos_mas_alquilados",
+      description: "Muestra un ranking de los artículos más alquilados basado en el historial de pedidos. Úsala para '¿cuál es mi producto estrella?' o '¿qué se alquila más?'.",
+      parameters: {
+        type: "object",
+        properties: {
+          limite: { type: "integer", description: "Cantidad de artículos a mostrar (default: 10)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "clientes_mas_frecuentes",
+      description: "Muestra un ranking de los clientes con más pedidos y mayor facturación. Úsala para '¿quién me alquila más?' o 'mis mejores clientes'.",
+      parameters: {
+        type: "object",
+        properties: {
+          limite: { type: "integer", description: "Cantidad de clientes a mostrar (default: 10)" },
+        },
       },
     },
   },

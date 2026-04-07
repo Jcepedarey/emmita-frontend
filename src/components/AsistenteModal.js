@@ -317,7 +317,7 @@ function AsistenteModal({ visible, onClose }) {
     setEnviando(true);
 
     try {
-      const resultado = await consultarIA(texto);
+      const resultado = await consultarIA(texto, historial);
       const nuevoTotal = incrementarConsulta();
       setConsultasHoy(nuevoTotal);
 
