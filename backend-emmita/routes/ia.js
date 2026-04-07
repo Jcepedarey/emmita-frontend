@@ -14,7 +14,7 @@ const MAX_CONTENT_LENGTH = 3000;
 // Supabase admin para actualizar contadores (service_role bypasa RLS)
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
 
 // ─── Límites de consultas por plan ───

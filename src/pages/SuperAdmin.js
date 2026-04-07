@@ -408,6 +408,7 @@ export default function SuperAdmin() {
                           {t.fecha_vencimiento && <span>⏳ Vence: {new Date(t.fecha_vencimiento).toLocaleDateString("es-CO")}</span>}
                           <span>👥 {t.usuarios} usuario{t.usuarios !== 1 ? "s" : ""}</span>
                           <span>📦 {t.productos} producto{t.productos !== 1 ? "s" : ""}</span>
+                          <span>🤖 IA hoy: {t.consultas_ia_mes ?? 0}</span>
                         </div>
                       </div>
 
