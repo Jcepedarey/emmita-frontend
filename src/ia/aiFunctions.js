@@ -86,8 +86,8 @@ export async function consultar_agenda({ periodo }) {
 export async function consultar_agenda_fecha({ fecha }) {
   const fechaBuscar = fecha || hoyISO();
   const [{ data: pedidos }, { data: cotizaciones }, { data: notas }] = await Promise.all([
-    supabase.from("ordenes_pedido").select("id, numero, fecha_evento, fecha_entrega, total_neto, estado, clientes(nombre)").eq("fecha_evento", fechaBuscar).order("created_at", { ascending: true }),
-    supabase.from("cotizaciones").select("id, numero, fecha_evento, total_neto, clientes(nombre)").eq("fecha_evento", fechaBuscar).order("created_at", { ascending: true }),
+    supabase.from("ordenes_pedido").select("id, numero, fecha_evento, fecha_entrega, total_neto, estado, clientes(nombre)").eq("fecha_evento", fechaBuscar),
+    supabase.from("cotizaciones").select("id, numero, fecha_evento, total_neto, clientes(nombre)").eq("fecha_evento", fechaBuscar),
     supabase.from("agenda").select("id, titulo, descripcion, fecha").eq("fecha", fechaBuscar).order("created_at", { ascending: true }),
   ]);
   const resultado = {
