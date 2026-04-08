@@ -1,6 +1,7 @@
 // src/components/AsistenteModal.js
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTenant } from "../context/TenantContext";
 import "./AsistenteModal.css";
 import { consultarIA, NOMBRE_ASISTENTE } from "../utils/asistenteIA";
 import { generarPDF } from "../utils/generarPDF";
@@ -10,23 +11,53 @@ import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
 
-// ─── Contador de consultas diarias (localStorage por ahora) ───
-const LIMITE_CONSULTAS_DIARIAS = 30;
+// ─── Límites de consultas IA por plan (por día) ───
+const LIMITES_POR_PLAN = {
+  trial: 5,
+  basico: 0,
+  profesional: 15,
+  enterprise: 50,
+};
 
-function getConsultasHoy() {
+// Obtener consultas de hoy desde Supabase
+async function getConsultasSupabase(tenantId) {
   try {
-    const data = JSON.parse(localStorage.getItem("sw_ia_consultas") || "{}");
+    const { data } = await supabase
+      .from("tenants")
+      .select("consultas_ia_mes, consultas_ia_ultimo_reset")
+      .eq("id", tenantId)
+      .single();
+    if (!data) return 0;
     const hoy = new Date().toISOString().slice(0, 10);
-    if (data.fecha !== hoy) return { fecha: hoy, total: 0 };
-    return data;
-  } catch { return { fecha: new Date().toISOString().slice(0, 10), total: 0 }; }
+    const reset = data.consultas_ia_ultimo_reset
+      ? new Date(data.consultas_ia_ultimo_reset).toISOString().slice(0, 10)
+      : null;
+    if (reset !== hoy) {
+      // Nuevo día → resetear
+      await supabase.from("tenants").update({ consultas_ia_mes: 0, consultas_ia_ultimo_reset: hoy }).eq("id", tenantId);
+      return 0;
+    }
+    return Number(data.consultas_ia_mes || 0);
+  } catch { return 0; }
 }
 
-function incrementarConsulta() {
-  const data = getConsultasHoy();
-  data.total += 1;
-  localStorage.setItem("sw_ia_consultas", JSON.stringify(data));
-  return data.total;
+async function incrementarConsultaSupabase(tenantId) {
+  try {
+    const hoy = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("tenants")
+      .select("consultas_ia_mes, consultas_ia_ultimo_reset")
+      .eq("id", tenantId)
+      .single();
+    let actual = Number(data?.consultas_ia_mes || 0);
+    const reset = data?.consultas_ia_ultimo_reset
+      ? new Date(data.consultas_ia_ultimo_reset).toISOString().slice(0, 10)
+      : null;
+    if (reset !== hoy) actual = 0;
+    const nuevo = actual + 1;
+    await supabase.from("tenants").update({ consultas_ia_mes: nuevo, consultas_ia_ultimo_reset: hoy }).eq("id", tenantId);
+    return nuevo;
+  } catch { return 0; }
 }
 
 // ─── Voz de respuesta ───
@@ -139,10 +170,14 @@ const btnStyle = (color, bg) => ({
 // ═══════════════════════════════════════════════════════════
 function AsistenteModal({ visible, onClose }) {
   const navigate = useNavigate();
+  const { tenant, esSuperAdmin } = useTenant();
+  const tenantId = tenant?.id;
+  const plan = tenant?.plan || "trial";
+  const LIMITE = esSuperAdmin ? 999 : (LIMITES_POR_PLAN[plan] ?? 0);
   const [mensaje, setMensaje] = useState("");
   const [historial, setHistorial] = useState([]); // [{tipo: "user"|"ia", texto, acciones?}]
   const [enviando, setEnviando] = useState(false);
-  const [consultasHoy, setConsultasHoy] = useState(getConsultasHoy().total);
+  const [consultasHoy, setConsultasHoy] = useState(0);
   const [vozActiva, setVozActiva] = useState(false);
   const [hablando, setHablando] = useState(false);
   const [cargandoAccion, setCargandoAccion] = useState(false);
@@ -297,15 +332,26 @@ function AsistenteModal({ visible, onClose }) {
     }
   }, [cargarDocumentoCompleto]);
 
+  // ─── Cargar contador real desde Supabase al abrir ───
+  useEffect(() => {
+    if (visible && tenantId) {
+      getConsultasSupabase(tenantId).then(setConsultasHoy);
+    }
+  }, [visible, tenantId]);
+
   // ─── Enviar consulta ───
   const enviarConsulta = async () => {
     const texto = mensaje.trim();
     if (!texto) return;
 
-    if (consultasHoy >= LIMITE_CONSULTAS_DIARIAS) {
+    if (LIMITE === 0) {
+      setHistorial((prev) => [...prev, { tipo: "ia", texto: "⚠️ Tu plan actual no incluye el asistente de IA.", acciones: [] }]);
+      return;
+    }
+    if (consultasHoy >= LIMITE) {
       setHistorial((prev) => [...prev, {
         tipo: "ia",
-        texto: `⚠️ Has alcanzado el límite de ${LIMITE_CONSULTAS_DIARIAS} consultas para hoy. El contador se reinicia a medianoche.`,
+        texto: `⚠️ Has alcanzado el límite de ${LIMITE} consultas de IA para hoy. Se reinicia a medianoche.`,
         acciones: [],
       }]);
       return;
@@ -318,7 +364,7 @@ function AsistenteModal({ visible, onClose }) {
 
     try {
       const resultado = await consultarIA(texto, historial);
-      const nuevoTotal = incrementarConsulta();
+      const nuevoTotal = await incrementarConsultaSupabase(tenantId);
       setConsultasHoy(nuevoTotal);
 
       // resultado ahora es { texto, acciones }
@@ -358,7 +404,7 @@ function AsistenteModal({ visible, onClose }) {
 
   if (!visible) return null;
 
-  const porcentajeUso = Math.min(100, Math.round((consultasHoy / LIMITE_CONSULTAS_DIARIAS) * 100));
+  const porcentajeUso = Math.min(100, Math.round((consultasHoy / (LIMITE || 1)) * 100));
 
   return (
     <div className="modal-fondo">
@@ -390,10 +436,10 @@ function AsistenteModal({ visible, onClose }) {
         <div style={{ padding: "8px 16px", background: "#f8fafc", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <span style={{ fontSize: 11, color: "#6b7280" }}>
-              Consultas hoy: <strong>{consultasHoy}</strong> / {LIMITE_CONSULTAS_DIARIAS}
+              Consultas hoy: <strong>{consultasHoy}</strong> / {LIMITE}
             </span>
             <span style={{ fontSize: 11, color: porcentajeUso >= 80 ? "#dc2626" : "#6b7280" }}>
-              {LIMITE_CONSULTAS_DIARIAS - consultasHoy} restantes
+              {LIMITE - consultasHoy} restantes
             </span>
           </div>
           <div style={{ height: 4, background: "#e5e7eb", borderRadius: 4, overflow: "hidden" }}>

@@ -27,7 +27,7 @@ router.get("/tenants", verificarToken, verificarSuperAdmin, async (req, res) => 
     // Obtener todos los tenants
     const { data: tenants, error: e1 } = await supabase
       .from("tenants")
-      .select("id, nombre, plan, estado, max_usuarios, max_productos, fecha_registro, fecha_vencimiento, email, telefono, direccion, logo_url")
+      .select("id, nombre, plan, estado, max_usuarios, max_productos, fecha_registro, fecha_vencimiento, email, telefono, direccion, logo_url, consultas_ia_mes, consultas_ia_ultimo_reset")
       .order("fecha_registro", { ascending: false });
 
     if (e1) throw e1;
@@ -61,11 +61,16 @@ router.get("/tenants", verificarToken, verificarSuperAdmin, async (req, res) => 
     // Contar productos por tenant
     const { data: prodCounts } = await supabase
       .from("productos")
-      .select("tenant_id");
+      .select("tenant_id, tipo");
 
     const conteoProductos = {};
+    const conteoServicios = {};
     (prodCounts || []).forEach((p) => {
-      conteoProductos[p.tenant_id] = (conteoProductos[p.tenant_id] || 0) + 1;
+      if (p.tipo === "servicio") {
+        conteoServicios[p.tenant_id] = (conteoServicios[p.tenant_id] || 0) + 1;
+      } else {
+        conteoProductos[p.tenant_id] = (conteoProductos[p.tenant_id] || 0) + 1;
+      }
     });
 
     // Combinar datos
@@ -99,7 +104,10 @@ router.get("/tenants", verificarToken, verificarSuperAdmin, async (req, res) => 
         admin_email: admin?.email || "—",
         admin_rol: admin?.rol || "—",
         usuarios: conteoUsuarios[t.id] || 0,
-        productos: conteoProductos[t.id] || 0,
+        articulos: conteoProductos[t.id] || 0,
+        servicios: conteoServicios[t.id] || 0,
+        consultas_ia_hoy: t.consultas_ia_mes || 0,
+        consultas_ia_reset: t.consultas_ia_ultimo_reset,
         dias_restantes: diasRestantes,
       };
     });

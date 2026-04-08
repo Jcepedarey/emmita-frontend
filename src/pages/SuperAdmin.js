@@ -407,8 +407,9 @@ export default function SuperAdmin() {
                           <span>📅 Registro: {t.fecha_registro ? new Date(t.fecha_registro).toLocaleDateString("es-CO") : "—"}</span>
                           {t.fecha_vencimiento && <span>⏳ Vence: {new Date(t.fecha_vencimiento).toLocaleDateString("es-CO")}</span>}
                           <span>👥 {t.usuarios} usuario{t.usuarios !== 1 ? "s" : ""}</span>
-                          <span>📦 {t.productos} producto{t.productos !== 1 ? "s" : ""}</span>
-                          <span>🤖 IA hoy: {t.consultas_ia_mes ?? 0}</span>
+                          <span>📦 {t.articulos} artículo{t.articulos !== 1 ? "s" : ""}</span>
+<span>🛠️ {t.servicios} servicio{t.servicios !== 1 ? "s" : ""}</span>
+                          <span>🤖 IA hoy: {t.consultas_ia_hoy ?? 0}</span>
                         </div>
                       </div>
 
