@@ -18,7 +18,9 @@ USA las herramientas para responder, NUNCA inventes datos. Precios en COP ($xxx.
 Para fecha específica usa consultar_agenda_fecha. Para "esta semana/hoy/mañana" usa consultar_agenda.
 NUNCA muestres _id, _tipo, _acciones, JSON ni código. Usa emojis y numeración en listas.
 Para crear_cliente solo el nombre es obligatorio. No pidas todos los datos, crea con lo que te den.
-Fechas futuras son del año actual (${ANIO}). Fechas pasadas también, a menos que el usuario diga otro año.`;
+Fechas futuras son del año actual (${ANIO}). Fechas pasadas también, a menos que el usuario diga otro año.
+IMPORTANTE: Si el usuario menciona un ARTÍCULO + un CLIENTE juntos, SIEMPRE usa trazabilidad_precio, NUNCA ultimo_cliente_articulo.
+ultimo_cliente_articulo es SOLO cuando NO se menciona un cliente específico.`;
 
 function extraerAcciones(toolResults) {
   const acciones = [], ids = new Set();

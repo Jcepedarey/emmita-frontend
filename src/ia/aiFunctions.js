@@ -211,7 +211,7 @@ export async function trazabilidad_precio({ articulo, cliente }) {
 // ═══════════════════════════════════════════════════════════
 export async function ultimo_cliente_articulo({ articulo }) {
   const nombreBuscado = sinTildes(articulo.toLowerCase());
-  const { data: pedidos } = await supabase.from("ordenes_pedido").select("id, numero, fecha_evento, productos, cliente_id, clientes(nombre)").order("fecha_evento", { ascending: false }).limit(100);
+  const { data: pedidos } = await supabase.from("ordenes_pedido").select("id, numero, fecha_evento, productos, cliente_id, clientes(nombre)").order("fecha_evento", { ascending: false }).limit(300);
   if (!pedidos || pedidos.length === 0) return "No hay pedidos registrados.";
   for (const ped of pedidos) {
     const walk = (list, factor = 1) => { for (const it of list) { if (it.es_grupo && Array.isArray(it.productos)) { const f = walk(it.productos, factor * (Number(it.cantidad) || 1)); if (f) return f; } else { const nomItem = sinTildes((it.nombre || "").toLowerCase()); if (nomItem.includes(nombreBuscado)) return { cliente: ped.clientes?.nombre || "Desconocido", fecha: ped.fecha_evento, documento: ped.numero, articulo: it.nombre, precio: Number(it.precio || 0), cantidad: (Number(it.cantidad) || 0) * factor, _id: ped.id }; } } return null; };
@@ -236,7 +236,7 @@ export async function crear_nota({ fecha, descripcion }) {
 // 12. PAGOS PENDIENTES
 // ═══════════════════════════════════════════════════════════
 export async function pagos_pendientes({ cliente }) {
-  const { data: ordenes, error } = await supabase.from("ordenes_pedido").select("id, numero, fecha_evento, total_neto, abonos, clientes(nombre)").order("fecha_evento", { ascending: false }).limit(100);
+  const { data: ordenes, error } = await supabase.from("ordenes_pedido").select("id, numero, fecha_evento, total_neto, abonos, clientes(nombre)").order("fecha_evento", { ascending: false }).limit(300);
   if (error || !ordenes) return "Error al consultar pagos pendientes.";
   let pendientes = ordenes.map((o) => { const total = Number(o.total_neto || 0); const abonado = (o.abonos || []).reduce((s, a) => s + Number(a.valor || a || 0), 0); return { ...o, abonado, saldo: Math.max(0, total - abonado) }; }).filter((o) => o.saldo > 0);
   if (cliente) { const cn = sinTildes(cliente.toLowerCase()); pendientes = pendientes.filter((o) => { const nom = (o.clientes?.nombre || "").toLowerCase(); return nom.includes(cliente.toLowerCase()) || sinTildes(nom).includes(cn); }); }
