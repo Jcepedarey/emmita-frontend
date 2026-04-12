@@ -10,13 +10,31 @@ const hoyISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// Buscar por palabras individuales (fuzzy)
+function buildFuzzyFilter(campo, texto) {
+  const palabras = sinTildes(texto).toLowerCase().split(/\s+/).filter(p => p.length > 2);
+  if (palabras.length === 0) return `${campo}.ilike.%${texto}%`;
+  // Buscar con todas las palabras (AND implícito con ilike encadenados)
+  return palabras.map(p => `${campo}.ilike.%${p}%`).join(",");
+}
+
 // ═══════════════════════════════════════════════════════════
 // 1. VERIFICAR DISPONIBILIDAD
 // ═══════════════════════════════════════════════════════════
 export async function verificar_disponibilidad({ articulo, fecha }) {
   const fechaBuscar = fecha || hoyISO();
   const articuloNormal = sinTildes(articulo);
-  const { data: productos } = await supabase.from("productos").select("id, nombre, stock, precio, tipo").or(`nombre.ilike.%${articulo}%,nombre.ilike.%${articuloNormal}%`).limit(5);
+  let { data: productos } = await supabase.from("productos").select("id, nombre, stock, precio, tipo").or(`nombre.ilike.%${articulo}%,nombre.ilike.%${articuloNormal}%`).limit(5);
+  // Fallback: buscar por palabras individuales
+  if ((!productos || productos.length === 0) && articulo.includes(" ")) {
+    const palabras = sinTildes(articulo).toLowerCase().split(/\s+/).filter(p => p.length > 2);
+    if (palabras.length > 0) {
+      let query = supabase.from("productos").select("id, nombre, stock, precio, tipo");
+      for (const p of palabras) { query = query.ilike("nombre", `%${p}%`); }
+      const res = await query.limit(5);
+      productos = res.data;
+    }
+  }
   if (!productos || productos.length === 0) return `No encontré artículos que coincidan con "${articulo}".`;
   const resultados = [];
   for (const prod of productos) {
@@ -37,7 +55,17 @@ export async function verificar_disponibilidad({ articulo, fecha }) {
 // ═══════════════════════════════════════════════════════════
 export async function buscar_cliente({ texto }) {
   const textoNormal = sinTildes(texto);
-  const { data, error } = await supabase.from("clientes").select("id, nombre, telefono, email, identificacion, direccion").or(`nombre.ilike.%${texto}%,nombre.ilike.%${textoNormal}%,telefono.ilike.%${texto}%,email.ilike.%${texto}%,identificacion.ilike.%${texto}%`).limit(5);
+  let { data, error } = await supabase.from("clientes").select("id, nombre, telefono, email, identificacion, direccion").or(`nombre.ilike.%${texto}%,nombre.ilike.%${textoNormal}%,telefono.ilike.%${texto}%,email.ilike.%${texto}%,identificacion.ilike.%${texto}%`).limit(5);
+  // Fallback: buscar por palabras individuales del nombre
+  if ((!data || data.length === 0) && texto.includes(" ")) {
+    const palabras = sinTildes(texto).toLowerCase().split(/\s+/).filter(p => p.length > 2);
+    if (palabras.length > 0) {
+      let query = supabase.from("clientes").select("id, nombre, telefono, email, identificacion, direccion");
+      for (const p of palabras) { query = query.ilike("nombre", `%${p}%`); }
+      const res = await query.limit(5);
+      data = res.data; error = res.error;
+    }
+  }
   if (error || !data || data.length === 0) return `No se encontraron clientes que coincidan con "${texto}".`;
   return JSON.stringify(data.map((c) => ({ id: c.id, nombre: c.nombre, telefono: c.telefono || "—", email: c.email || "—", identificacion: c.identificacion || "—", direccion: c.direccion || "—" })));
 }
@@ -47,7 +75,18 @@ export async function buscar_cliente({ texto }) {
 // ═══════════════════════════════════════════════════════════
 export async function buscar_producto({ nombre }) {
   const nombreNormal = sinTildes(nombre);
-  const { data, error } = await supabase.from("productos").select("nombre, precio, stock, tipo, costo, categoria, valor_adquisicion").or(`nombre.ilike.%${nombre}%,nombre.ilike.%${nombreNormal}%`).order("nombre").limit(10);
+  // Intento 1: búsqueda exacta
+  let { data, error } = await supabase.from("productos").select("nombre, precio, stock, tipo, costo, categoria, valor_adquisicion").or(`nombre.ilike.%${nombre}%,nombre.ilike.%${nombreNormal}%`).order("nombre").limit(10);
+  // Intento 2: búsqueda por palabras individuales si no hay resultados
+  if ((!data || data.length === 0) && nombre.includes(" ")) {
+    const palabras = sinTildes(nombre).toLowerCase().split(/\s+/).filter(p => p.length > 2);
+    if (palabras.length > 0) {
+      let query = supabase.from("productos").select("nombre, precio, stock, tipo, costo, categoria, valor_adquisicion");
+      for (const p of palabras) { query = query.ilike("nombre", `%${p}%`); }
+      const res = await query.order("nombre").limit(10);
+      data = res.data; error = res.error;
+    }
+  }
   if (error || !data || data.length === 0) return `No se encontraron productos que coincidan con "${nombre}".`;
   return JSON.stringify(data.map((p) => ({ nombre: p.nombre, tipo: p.tipo || "articulo", precio_alquiler: money(p.precio), stock: p.tipo === "servicio" ? "Ilimitado" : Number(p.stock || 0), costo_interno: Number(p.costo || 0) > 0 ? money(p.costo) : "—", valor_adquisicion: Number(p.valor_adquisicion || 0) > 0 ? money(p.valor_adquisicion) : "—", categoria: p.categoria || "—" })));
 }

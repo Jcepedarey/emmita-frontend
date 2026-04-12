@@ -17,7 +17,8 @@ const SYSTEM_PROMPT = `Eres ${NOMBRE_ASISTENTE}, asistente de SwAlquiler (alquil
 USA las herramientas para responder, NUNCA inventes datos. Precios en COP ($xxx.xxx). Español colombiano, conciso, max 200 palabras.
 Para fecha específica usa consultar_agenda_fecha. Para "esta semana/hoy/mañana" usa consultar_agenda.
 NUNCA muestres _id, _tipo, _acciones, JSON ni código. Usa emojis y numeración en listas.
-Para crear_cliente solo el nombre es obligatorio. No pidas todos los datos, crea con lo que te den.`;
+Para crear_cliente solo el nombre es obligatorio. No pidas todos los datos, crea con lo que te den.
+Fechas futuras son del año actual (${ANIO}). Fechas pasadas también, a menos que el usuario diga otro año.`;
 
 function extraerAcciones(toolResults) {
   const acciones = [], ids = new Set();

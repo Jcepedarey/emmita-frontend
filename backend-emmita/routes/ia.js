@@ -4,7 +4,7 @@ const router = express.Router();
 const verificarToken = require("../middleware/verificarToken");
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const MODELO_DEFAULT = "meta-llama/llama-4-scout-17b-16e-instruct";
+const MODELO_DEFAULT = "llama-3.3-70b-versatile";
 
 const MAX_MESSAGES = 20;
 const MAX_CONTENT_LENGTH = 3000;
