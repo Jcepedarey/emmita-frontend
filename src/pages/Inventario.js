@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import Protegido from "../components/Protegido";
 import { useNavigationState } from "../context/NavigationContext";
 import useLimites from "../hooks/useLimites";
+import EditarPaqueteModal from "../components/EditarPaqueteModal";
 
 const money = (n) => `$${Number(n || 0).toLocaleString("es-CO")}`;
 
@@ -14,23 +15,28 @@ export default function Inventario() {
 
   const [productos, setProductos] = useState([]);
   const [form, setForm] = useState(estadoGuardado?.form || {
-    nombre: "", descripcion: "", precio: "", stock: "", categoria: "", tipo: "articulo", costo: "",
-    valor_adquisicion: "", fecha_adquisicion: "", registrar_gasto_compra: false
+    nombre: "", descripcion: "", precio: "", stock: "", categoria: ""
   });
   const [buscar, setBuscar] = useState(estadoGuardado?.buscar || "");
   const [categoriaFiltro, setCategoriaFiltro] = useState(estadoGuardado?.categoriaFiltro || "");
-  const [tipoFiltro, setTipoFiltro] = useState(estadoGuardado?.tipoFiltro || "");
   const [editandoId, setEditandoId] = useState(estadoGuardado?.editandoId || null);
   const [mostrarFormulario, setMostrarFormulario] = useState(estadoGuardado?.mostrarFormulario || false);
   const [loading, setLoading] = useState(true);
   const { puedeCrearProducto, mensajeBloqueo } = useLimites();
 
+  // ── Paquetes de eventos ──
+  const [tabActivo, setTabActivo] = useState(estadoGuardado?.tabActivo || "todos");
+  const [paquetes, setPaquetes] = useState([]);
+  const [loadingPaquetes, setLoadingPaquetes] = useState(false);
+  const [modalPaquete, setModalPaquete] = useState(false);
+  const [paqueteEditar, setPaqueteEditar] = useState(null);
+
   // Guardar estado
   useEffect(() => {
-    saveModuleState("/inventario", { form, buscar, categoriaFiltro, tipoFiltro, editandoId, mostrarFormulario });
-  }, [JSON.stringify(form), buscar, categoriaFiltro, tipoFiltro, editandoId, mostrarFormulario, saveModuleState]);
+    saveModuleState("/inventario", { form, buscar, categoriaFiltro, editandoId, mostrarFormulario, tabActivo });
+  }, [JSON.stringify(form), buscar, categoriaFiltro, editandoId, mostrarFormulario, tabActivo, saveModuleState]);
 
-  useEffect(() => { obtenerProductos(); }, []);
+  useEffect(() => { obtenerProductos(); obtenerPaquetes(); }, []);
 
   const obtenerProductos = async () => {
     setLoading(true);
@@ -40,49 +46,62 @@ export default function Inventario() {
     setLoading(false);
   };
 
+  // ── Paquetes CRUD ──
+  const obtenerPaquetes = async () => {
+    setLoadingPaquetes(true);
+    const { data, error } = await supabase.from("paquetes_eventos").select("*").order("nombre");
+    if (error) console.error("Error al obtener paquetes:", error);
+    else setPaquetes(data || []);
+    setLoadingPaquetes(false);
+  };
+
+  const eliminarPaquete = async (id, nombre) => {
+    const { isConfirmed } = await Swal.fire({
+      title: `¿Eliminar "${nombre}"?`,
+      text: "El paquete se eliminará permanentemente. Los pedidos que ya usaron su contenido NO se afectan.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      confirmButtonColor: "#ef4444",
+      cancelButtonText: "Cancelar",
+    });
+    if (!isConfirmed) return;
+    const { error } = await supabase.from("paquetes_eventos").delete().eq("id", id);
+    if (!error) {
+      Swal.fire({ icon: "success", title: "Paquete eliminado", timer: 1500, showConfirmButton: false });
+      obtenerPaquetes();
+    } else {
+      Swal.fire("Error", "No se pudo eliminar el paquete.", "error");
+    }
+  };
+
+  const abrirEditarPaquete = (paquete) => {
+    setPaqueteEditar(paquete);
+    setModalPaquete(true);
+  };
+
+  const abrirNuevoPaquete = () => {
+    setPaqueteEditar(null);
+    setModalPaquete(true);
+  };
+
   const guardarProducto = async () => {
     if (!editandoId && !puedeCrearProducto()) {
       const msg = mensajeBloqueo("producto");
       return Swal.fire(msg.titulo, msg.mensaje, msg.icono);
     }
-    const { nombre, descripcion, precio, stock, categoria, tipo, costo } = form;
-    const esServicio = tipo === "servicio";
-    const stockFinal = esServicio ? 999 : Number(stock);
-    if (!nombre || !precio || (!esServicio && !stock)) {
-      return Swal.fire("Campos requeridos", esServicio ? "Nombre y precio son obligatorios." : "Nombre, precio y stock son obligatorios.", "warning");
+    const { nombre, descripcion, precio, stock, categoria } = form;
+    if (!nombre || !precio || !stock) {
+      return Swal.fire("Campos requeridos", "Nombre, precio y stock son obligatorios.", "warning");
     }
-    if (precio < 0 || stockFinal < 0) {
+    if (precio < 0 || stock < 0) {
       return Swal.fire("Valores inválidos", "Precio y stock deben ser positivos.", "error");
     }
-    const valorAdq = Number(form.valor_adquisicion || 0);
-    const fechaAdq = form.fecha_adquisicion || null;
-    const registrarGasto = !!form.registrar_gasto_compra;
-    const datos = {
-      nombre, descripcion, precio: Number(precio), stock: stockFinal, categoria, tipo, costo: Number(costo || 0),
-      valor_adquisicion: valorAdq, fecha_adquisicion: fechaAdq,
-      registrar_gasto_compra: registrarGasto,
-    };
     const operacion = editandoId
-      ? supabase.from("productos").update(datos).eq("id", editandoId)
-      : supabase.from("productos").insert([datos]);
+      ? supabase.from("productos").update({ nombre, descripcion, precio: Number(precio), stock: Number(stock), categoria }).eq("id", editandoId)
+      : supabase.from("productos").insert([{ nombre, descripcion, precio: Number(precio), stock: Number(stock), categoria }]);
     const { error } = await operacion;
     if (!error) {
-      // 📊 Registrar gasto en contabilidad si el checkbox está activo y es creación nueva
-      if (!editandoId && registrarGasto && valorAdq > 0) {
-        const totalGasto = valorAdq * stockFinal;
-        try {
-          await supabase.from("movimientos_contables").insert([{
-            fecha: fechaAdq || new Date().toISOString().slice(0, 10),
-            tipo: "gasto",
-            monto: totalGasto,
-            descripcion: `Compra de inventario: ${nombre} (${stockFinal} und × ${money(valorAdq)})`,
-            categoria: "Compra de inventario",
-            estado: "activo",
-          }]);
-        } catch (err) {
-          console.error("Error registrando gasto de compra:", err);
-        }
-      }
       Swal.fire({ icon: "success", title: editandoId ? "Actualizado" : "Guardado", timer: 1500, showConfirmButton: false });
       limpiarFormulario();
       obtenerProductos();
@@ -113,20 +132,15 @@ export default function Inventario() {
       nombre: producto.nombre || "",
       descripcion: producto.descripcion || "",
       precio: producto.precio,
-      stock: producto.tipo === "servicio" ? 999 : producto.stock,
+      stock: producto.stock,
       categoria: producto.categoria || "",
-      tipo: producto.tipo || "articulo",
-      costo: producto.costo || "",
-      valor_adquisicion: producto.valor_adquisicion || "",
-      fecha_adquisicion: producto.fecha_adquisicion || "",
-      registrar_gasto_compra: false, // Al editar nunca re-registrar el gasto
     });
     setMostrarFormulario(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const limpiarFormulario = () => {
-    setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "", tipo: "articulo", costo: "", valor_adquisicion: "", fecha_adquisicion: "", registrar_gasto_compra: false });
+    setForm({ nombre: "", descripcion: "", precio: "", stock: "", categoria: "" });
     setEditandoId(null);
     setMostrarFormulario(false);
   };
@@ -157,20 +171,16 @@ export default function Inventario() {
 
     const datosLimpios = productos.map((p, i) => ({
       "#": i + 1,
-      "Tipo": (p.tipo || "articulo") === "servicio" ? "Servicio" : "Artículo",
       "Nombre": p.nombre || "",
       "Descripción": p.descripcion || "",
       "Precio": Number(p.precio || 0),
-      "Costo": Number(p.costo || 0),
-      "V. Adquisición": Number(p.valor_adquisicion || 0),
-      "Fecha Adq.": p.fecha_adquisicion || "",
-      "Stock": (p.tipo || "articulo") === "servicio" ? "∞" : Number(p.stock || 0),
+      "Stock": Number(p.stock || 0),
       "Categoría": p.categoria || ""
     }));
 
     const ws = XLSX.utils.json_to_sheet(datosLimpios);
     ws["!cols"] = [
-      { wch: 5 }, { wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 20 }
+      { wch: 5 }, { wch: 30 }, { wch: 30 }, { wch: 14 }, { wch: 8 }, { wch: 20 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario");
@@ -200,21 +210,13 @@ export default function Inventario() {
       };
 
       const productosValidos = json
-        .map((row) => {
-          const tipoRaw = mapCol(row, ["tipo", "Tipo", "TIPO"]).toLowerCase();
-          const esServicio = tipoRaw === "servicio" || tipoRaw === "service";
-          return {
-            nombre: mapCol(row, ["nombre", "Nombre", "NOMBRE", "producto", "Producto", "PRODUCTO"]),
-            descripcion: mapCol(row, ["descripcion", "Descripción", "Descripcion", "DESCRIPCION"]),
-            precio: parseFloat(mapCol(row, ["precio", "Precio", "PRECIO", "price", "valor", "Valor"]) || "0"),
-            stock: esServicio ? 999 : parseInt(mapCol(row, ["stock", "Stock", "STOCK", "cantidad", "Cantidad", "CANTIDAD", "unidades"]) || "0", 10),
-            categoria: mapCol(row, ["categoria", "Categoría", "Categoria", "CATEGORIA"]),
-            tipo: esServicio ? "servicio" : "articulo",
-            costo: parseFloat(mapCol(row, ["costo", "Costo", "COSTO", "costo_interno", "Costo interno"]) || "0"),
-            valor_adquisicion: parseFloat(mapCol(row, ["valor_adquisicion", "Valor adquisicion", "Valor Adquisición", "V. Adquisición", "valor_compra", "Valor compra", "costo_compra", "Costo compra"]) || "0"),
-            fecha_adquisicion: mapCol(row, ["fecha_adquisicion", "Fecha adquisicion", "Fecha Adquisición", "Fecha compra", "fecha_compra"]) || null,
-          };
-        })
+        .map((row) => ({
+          nombre: mapCol(row, ["nombre", "Nombre", "NOMBRE", "producto", "Producto", "PRODUCTO"]),
+          descripcion: mapCol(row, ["descripcion", "Descripción", "Descripcion", "DESCRIPCION"]),
+          precio: parseFloat(mapCol(row, ["precio", "Precio", "PRECIO", "price", "valor", "Valor"]) || "0"),
+          stock: parseInt(mapCol(row, ["stock", "Stock", "STOCK", "cantidad", "Cantidad", "CANTIDAD", "unidades"]) || "0", 10),
+          categoria: mapCol(row, ["categoria", "Categoría", "Categoria", "CATEGORIA", "tipo", "Tipo"])
+        }))
         .filter((p) => p.nombre && !isNaN(p.precio) && p.precio >= 0 && !isNaN(p.stock) && p.stock >= 0);
 
       if (productosValidos.length === 0) {
@@ -259,18 +261,8 @@ export default function Inventario() {
             </tr>
             <tr>
               <td style="border:1px solid #e5e7eb;padding:6px;font-weight:600;">stock</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;color:#ef4444;">✅ Sí (artículos)</td>
+              <td style="border:1px solid #e5e7eb;padding:6px;color:#ef4444;">✅ Sí</td>
               <td style="border:1px solid #e5e7eb;padding:6px;">50</td>
-            </tr>
-            <tr>
-              <td style="border:1px solid #e5e7eb;padding:6px;">tipo</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;">articulo / servicio</td>
-            </tr>
-            <tr>
-              <td style="border:1px solid #e5e7eb;padding:6px;">costo</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;">80000</td>
             </tr>
             <tr>
               <td style="border:1px solid #e5e7eb;padding:6px;">descripcion</td>
@@ -282,27 +274,12 @@ export default function Inventario() {
               <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
               <td style="border:1px solid #e5e7eb;padding:6px;">Mobiliario</td>
             </tr>
-            <tr style="background:#fefce8;">
-              <td style="border:1px solid #e5e7eb;padding:6px;">valor_adquisicion</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;">85000</td>
-            </tr>
-            <tr style="background:#fefce8;">
-              <td style="border:1px solid #e5e7eb;padding:6px;">fecha_adquisicion</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;color:#9ca3af;">Opcional</td>
-              <td style="border:1px solid #e5e7eb;padding:6px;">2026-01-15</td>
-            </tr>
           </table>
           <p style="margin-top:10px;">💡 <strong>Tips:</strong></p>
           <ul style="margin:4px 0 0 16px;padding:0;">
             <li>El sistema acepta variantes como "Nombre", "NOMBRE", "Producto", "cantidad", "Valor", etc.</li>
-            <li>Si la columna <strong>tipo</strong> dice "servicio", el stock se ignora (se pone ilimitado).</li>
-            <li>La columna <strong>costo</strong> registra el costo interno de producción/prestación.</li>
-            <li><strong>valor_adquisicion</strong> = lo que pagaste por comprar el artículo (valor real del inventario).</li>
-            <li><strong>fecha_adquisicion</strong> = fecha de compra en formato AAAA-MM-DD (ej: 2026-01-15).</li>
-            <li>⚠️ La importación desde Excel <strong>NO registra gastos</strong> en contabilidad. Si necesitas registrar el gasto, edita cada artículo y activa el checkbox.</li>
             <li>Precio y stock deben ser números positivos.</li>
-            <li>Las filas sin nombre o precio serán ignoradas.</li>
+            <li>Las filas sin nombre, precio o stock serán ignoradas.</li>
             <li>Formatos aceptados: <strong>.xlsx</strong> y <strong>.xls</strong></li>
           </ul>
         </div>
@@ -321,6 +298,12 @@ export default function Inventario() {
 
   const productosFiltrados = useMemo(() => {
     let lista = productos;
+    // Filtrar por tipo según tab activo
+    if (tabActivo === "articulo") {
+      lista = lista.filter((p) => (p.tipo || "articulo") === "articulo");
+    } else if (tabActivo === "servicio") {
+      lista = lista.filter((p) => p.tipo === "servicio");
+    }
     if (buscar.trim()) {
       const q = buscar.toLowerCase();
       lista = lista.filter((p) =>
@@ -332,19 +315,13 @@ export default function Inventario() {
     if (categoriaFiltro) {
       lista = lista.filter((p) => (p.categoria || "").toLowerCase() === categoriaFiltro.toLowerCase());
     }
-    if (tipoFiltro) {
-      lista = lista.filter((p) => (p.tipo || "articulo") === tipoFiltro);
-    }
     return lista;
-  }, [productos, buscar, categoriaFiltro, tipoFiltro]);
+  }, [productos, buscar, categoriaFiltro, tabActivo]);
 
   /* ─── KPIs ─── */
-  const articulos = productos.filter((p) => (p.tipo || "articulo") === "articulo");
-  const servicios = productos.filter((p) => p.tipo === "servicio");
-  const valorAlquiler = articulos.reduce((s, p) => s + (Number(p.precio || 0) * Number(p.stock || 0)), 0);
-  const valorReal = articulos.reduce((s, p) => s + (Number(p.valor_adquisicion || 0) * Number(p.stock || 0)), 0);
-  const stockTotal = articulos.reduce((s, p) => s + Number(p.stock || 0), 0);
-  const sinStock = articulos.filter((p) => Number(p.stock || 0) === 0).length;
+  const valorTotal = productos.reduce((s, p) => s + (Number(p.precio || 0) * Number(p.stock || 0)), 0);
+  const stockTotal = productos.reduce((s, p) => s + Number(p.stock || 0), 0);
+  const sinStock = productos.filter((p) => Number(p.stock || 0) === 0).length;
 
   /* ═══ RENDER ═══ */
   return (
@@ -357,31 +334,175 @@ export default function Inventario() {
             <h1 className="sw-header-titulo">📦 Gestión de Inventario</h1>
           </div>
 
-          {/* ═══ KPI CARDS ═══ */}
+          {/* ═══ TABS ═══ */}
+          <div style={{
+            display: "flex", gap: 0, marginBottom: 16, borderRadius: 10,
+            border: "1px solid var(--sw-borde)", overflow: "hidden", background: "white",
+          }}>
+            {[
+              { id: "todos", label: "📋 Todos", count: productos.length },
+              { id: "articulo", label: "📦 Artículos", count: productos.filter((p) => (p.tipo || "articulo") === "articulo").length },
+              { id: "servicio", label: "🔧 Servicios", count: productos.filter((p) => p.tipo === "servicio").length },
+              { id: "paquete", label: "🎁 Paquetes", count: paquetes.length },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setTabActivo(tab.id)}
+                style={{
+                  flex: 1, padding: "10px 8px", border: "none", cursor: "pointer",
+                  fontSize: 12, fontWeight: 600, transition: "all 0.15s",
+                  background: tabActivo === tab.id
+                    ? (tab.id === "paquete" ? "linear-gradient(135deg, #0891b2, #0e7490)" : "var(--sw-gradiente-primario)")
+                    : "transparent",
+                  color: tabActivo === tab.id ? "white" : "var(--sw-texto-secundario)",
+                  borderRight: "1px solid var(--sw-borde)",
+                }}
+              >
+                {tab.label} <span style={{ opacity: 0.8 }}>({tab.count})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* ═══ VISTA PAQUETES ═══ */}
+          {tabActivo === "paquete" ? (
+            <>
+              {/* KPIs Paquetes */}
+              <div style={{
+                display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 12, marginBottom: 20,
+              }}>
+                <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Paquetes</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: "#0891b2", marginTop: 4 }}>{paquetes.length}</div>
+                </div>
+                <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Precio promedio</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#0e7490", marginTop: 4 }}>
+                    {money(paquetes.length > 0 ? paquetes.reduce((s, p) => s + Number(p.precio_total || 0), 0) / paquetes.length : 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Acciones Paquetes */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                <button
+                  onClick={abrirNuevoPaquete}
+                  style={{
+                    padding: "10px 18px", borderRadius: 8, border: "none", cursor: "pointer",
+                    fontWeight: 600, fontSize: 13, color: "white", display: "inline-flex",
+                    alignItems: "center", gap: 6,
+                    background: "linear-gradient(135deg, #0891b2, #0e7490)",
+                    boxShadow: "0 2px 6px rgba(8,145,178,0.25)",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  ＋ Nuevo paquete
+                </button>
+              </div>
+
+              {/* Lista Paquetes */}
+              <div className="sw-card">
+                <div className="sw-card-header">
+                  <h3 className="sw-card-titulo" style={{ color: "#0e7490" }}>
+                    🎁 Paquetes de Eventos ({paquetes.length})
+                  </h3>
+                </div>
+                <div className="sw-card-body" style={{ padding: 0 }}>
+                  {loadingPaquetes ? (
+                    <div style={{ padding: 40, textAlign: "center", color: "var(--sw-texto-terciario)" }}>
+                      Cargando paquetes...
+                    </div>
+                  ) : paquetes.length === 0 ? (
+                    <div style={{ padding: 40, textAlign: "center" }}>
+                      <div style={{ fontSize: 40, marginBottom: 8 }}>🎁</div>
+                      <div style={{ fontSize: 14, color: "var(--sw-texto-terciario)" }}>
+                        No hay paquetes creados
+                      </div>
+                      <p style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 6 }}>
+                        Crea tu primer paquete con los productos que más uses juntos
+                      </p>
+                    </div>
+                  ) : (
+                    paquetes.map((paq) => {
+                      const totalItems = (paq.productos || []).reduce((acc, item) => {
+                        if (item.es_grupo && Array.isArray(item.productos)) return acc + item.productos.length;
+                        return acc + 1;
+                      }, 0);
+                      return (
+                        <div
+                          key={paq.id}
+                          style={{
+                            padding: "14px 16px", borderBottom: "1px solid #f3f4f6",
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            gap: 10, transition: "background 0.15s",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "#f0fdfa")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span style={{ fontWeight: 600, fontSize: 14, color: "var(--sw-texto)" }}>
+                                {paq.nombre}
+                              </span>
+                              <span style={{
+                                fontSize: 10, padding: "2px 8px", borderRadius: 20,
+                                background: "#f0fdfa", color: "#0891b2", fontWeight: 600,
+                              }}>
+                                {totalItems} items
+                              </span>
+                            </div>
+                            <div style={{
+                              fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 3,
+                              display: "flex", flexWrap: "wrap", gap: "4px 14px",
+                            }}>
+                              <span style={{ fontWeight: 600, color: "#059669" }}>{money(paq.precio_total)}</span>
+                              {paq.descripcion && <span style={{ color: "#9ca3af" }}>{paq.descripcion}</span>}
+                              <span style={{ color: "#d1d5db" }}>
+                                {new Date(paq.created_at).toLocaleDateString("es-CO")}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                            <button className="sw-btn-icono" onClick={() => abrirEditarPaquete(paq)} title="Editar paquete">
+                              ✏️
+                            </button>
+                            <button
+                              className="sw-btn-icono"
+                              onClick={() => eliminarPaquete(paq.id, paq.nombre)}
+                              title="Eliminar paquete"
+                              style={{ color: "#ef4444" }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+          <>
+          {/* ═══ KPI CARDS (productos) ═══ */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 12,
             marginBottom: 20
           }}>
             <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Artículos</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--sw-azul)", marginTop: 4 }}>{articulos.length}</div>
-            </div>
-            <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Servicios</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "#7c3aed", marginTop: 4 }}>{servicios.length}</div>
+              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Productos</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--sw-azul)", marginTop: 4 }}>{productos.length}</div>
             </div>
             <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Stock total</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: "var(--sw-verde)", marginTop: 4 }}>{stockTotal.toLocaleString("es-CO")}</div>
             </div>
             <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Valor real inventario</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--sw-morado)", marginTop: 4 }}>{money(valorReal)}</div>
-              {valorAlquiler > 0 && (
-                <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>Alquiler: {money(valorAlquiler)}</div>
-              )}
+              <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Valor inventario</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--sw-morado)", marginTop: 4 }}>{money(valorTotal)}</div>
             </div>
             <div className="sw-card" style={{ padding: "16px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", fontWeight: 500 }}>Sin stock</div>
@@ -392,7 +513,7 @@ export default function Inventario() {
           {/* ═══ ACCIONES ═══ */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
             <button className="sw-btn sw-btn-primario" onClick={() => { limpiarFormulario(); setMostrarFormulario(true); }}>
-              ＋ Nuevo artículo o servicio
+              ＋ Nuevo producto
             </button>
             <button className="sw-btn sw-btn-secundario" onClick={exportarExcel}>
               📊 Exportar Excel
@@ -413,44 +534,16 @@ export default function Inventario() {
           {/* ═══ FORMULARIO ═══ */}
           {mostrarFormulario && (
             <div className="sw-card" style={{ marginBottom: 16 }}>
-              <div className="sw-card-header" style={{ background: form.tipo === "servicio" ? "linear-gradient(135deg, #7c3aed, #6d28d9)" : "linear-gradient(135deg, var(--sw-cyan), var(--sw-azul))", borderBottom: "none" }}>
+              <div className="sw-card-header sw-card-header-cyan">
                 <h3 className="sw-card-titulo" style={{ color: "white", margin: 0 }}>
-                  {editandoId
-                    ? `✏️ Editar ${form.tipo === "servicio" ? "Servicio" : "Artículo"}`
-                    : `➕ Nuevo ${form.tipo === "servicio" ? "Servicio" : "Artículo"}`
-                  }
+                  {editandoId ? "✏️ Editar Producto" : "➕ Nuevo Producto"}
                 </h3>
               </div>
               <div className="sw-card-body">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-
-                  {/* Selector de tipo */}
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 6, display: "block" }}>Tipo *</label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[
-                        { id: "articulo", label: "📦 Artículo", desc: "Producto físico con stock" },
-                        { id: "servicio", label: "🔧 Servicio", desc: "Servicio sin stock físico" },
-                      ].map((t) => (
-                        <button key={t.id} type="button"
-                          onClick={() => setForm({ ...form, tipo: t.id, stock: t.id === "servicio" ? 999 : (form.tipo === "servicio" ? "" : form.stock) })}
-                          style={{
-                            flex: 1, padding: "10px 14px", borderRadius: 10, cursor: "pointer",
-                            border: form.tipo === t.id ? `2px solid ${t.id === "servicio" ? "#7c3aed" : "var(--sw-azul)"}` : "1px solid var(--sw-borde)",
-                            background: form.tipo === t.id ? (t.id === "servicio" ? "#f3e8ff" : "var(--sw-cyan-muy-claro)") : "white",
-                            transition: "all 0.15s",
-                          }}
-                        >
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{t.label}</div>
-                          <div style={{ fontSize: 11, color: "var(--sw-texto-terciario)", marginTop: 2 }}>{t.desc}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <div style={{ gridColumn: "1 / -1" }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Nombre *</label>
-                    <input type="text" placeholder={form.tipo === "servicio" ? "Ej: Montaje de evento, Arreglo de globos..." : "Nombre del producto"} value={form.nombre}
+                    <input type="text" placeholder="Nombre del producto" value={form.nombre}
                       onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                       style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
                     />
@@ -463,46 +556,22 @@ export default function Inventario() {
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Precio de venta *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Precio *</label>
                     <input type="number" placeholder="0" value={form.precio}
                       onChange={(e) => setForm({ ...form, precio: e.target.value })}
                       style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
                     />
                   </div>
-                  {form.tipo === "articulo" ? (
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Stock *</label>
-                      <input type="number" placeholder="0" value={form.stock}
-                        onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                        style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Stock</label>
-                      <input type="text" value="∞ Ilimitado" disabled
-                        style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "#f3f4f6", color: "#9ca3af" }}
-                      />
-                    </div>
-                  )}
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>
-                      Costo interno {form.tipo === "servicio" ? "(producción)" : "(opcional)"}
-                    </label>
-                    <input type="number" placeholder="0" value={form.costo}
-                      onChange={(e) => setForm({ ...form, costo: e.target.value })}
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Stock *</label>
+                    <input type="number" placeholder="0" value={form.stock}
+                      onChange={(e) => setForm({ ...form, stock: e.target.value })}
                       style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
                     />
-                    <div style={{ fontSize: 11, color: "var(--sw-texto-terciario)", marginTop: 3 }}>
-                      {form.tipo === "servicio"
-                        ? "Lo que te cuesta prestar este servicio (materiales, ayudantes, etc.)"
-                        : "Lo que te cuesta este artículo (compra, mantenimiento, etc.)"
-                      }
-                    </div>
                   </div>
-                  <div>
+                  <div style={{ gridColumn: "1 / -1" }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: "var(--sw-texto-secundario)", marginBottom: 4, display: "block" }}>Categoría</label>
-                    <input type="text" placeholder={form.tipo === "servicio" ? "Ej: Montaje, Decoración, Transporte..." : "Ej: Mobiliario, Decoración, Carpas..."} value={form.categoria}
+                    <input type="text" placeholder="Ej: Mobiliario, Decoración, Carpas..." value={form.categoria}
                       onChange={(e) => setForm({ ...form, categoria: e.target.value })}
                       list="categorias-list"
                       style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--sw-borde)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
@@ -512,75 +581,6 @@ export default function Inventario() {
                     </datalist>
                   </div>
                 </div>
-
-                {/* ═══ VALOR DE ADQUISICIÓN (solo artículos) ═══ */}
-                {form.tipo === "articulo" && (
-                  <div style={{
-                    marginTop: 12, padding: "14px", borderRadius: 10,
-                    background: "linear-gradient(135deg, #fefce8, #fef9c3)",
-                    border: "1px solid #fde68a",
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 10 }}>
-                      💰 Valor de adquisición
-                    </div>
-                    <div style={{ fontSize: 11, color: "#a16207", marginBottom: 10 }}>
-                      Registra cuánto pagaste por este artículo. Esto permite calcular el valor real de tu inventario.
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <div>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: "#92400e", marginBottom: 4, display: "block" }}>
-                          Valor por unidad ($)
-                        </label>
-                        <input type="number" placeholder="0" value={form.valor_adquisicion}
-                          onChange={(e) => setForm({ ...form, valor_adquisicion: e.target.value })}
-                          style={{ width: "100%", padding: "10px 12px", border: "1px solid #fde68a", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "white" }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: "#92400e", marginBottom: 4, display: "block" }}>
-                          Fecha de compra
-                        </label>
-                        <input type="date" value={form.fecha_adquisicion}
-                          onChange={(e) => setForm({ ...form, fecha_adquisicion: e.target.value })}
-                          style={{ width: "100%", padding: "10px 12px", border: "1px solid #fde68a", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "white" }}
-                        />
-                      </div>
-                    </div>
-                    {/* Checkbox registrar gasto */}
-                    {!editandoId && (
-                      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                        <input
-                          type="checkbox"
-                          id="registrar-gasto-check"
-                          checked={form.registrar_gasto_compra}
-                          onChange={(e) => setForm({ ...form, registrar_gasto_compra: e.target.checked })}
-                          style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#f59e0b" }}
-                        />
-                        <label htmlFor="registrar-gasto-check" style={{ fontSize: 12, color: "#92400e", cursor: "pointer" }}>
-                          Registrar como gasto en contabilidad (artículo nuevo, no existía antes)
-                        </label>
-                      </div>
-                    )}
-                    {form.registrar_gasto_compra && Number(form.valor_adquisicion || 0) > 0 && Number(form.stock || 0) > 0 && (
-                      <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 6, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 12, color: "#991b1b" }}>
-                        Se registrará un gasto de <strong>{money(Number(form.valor_adquisicion) * Number(form.stock))}</strong> en contabilidad al guardar
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Margen calculado */}
-                {Number(form.precio || 0) > 0 && Number(form.costo || 0) > 0 && (
-                  <div style={{
-                    marginTop: 12, padding: "10px 14px", borderRadius: 8,
-                    background: "#f0fdf4", border: "1px solid #bbf7d0",
-                    fontSize: 13, color: "#166534", display: "flex", gap: 16, flexWrap: "wrap",
-                  }}>
-                    <span>💰 Ganancia estimada: <strong>{money(Number(form.precio) - Number(form.costo))}</strong></span>
-                    <span>📊 Margen: <strong>{Math.round(((Number(form.precio) - Number(form.costo)) / Number(form.precio)) * 100)}%</strong></span>
-                  </div>
-                )}
-
                 <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
                   <button className="sw-btn sw-btn-primario" style={{ flex: 1 }} onClick={guardarProducto}>
                     {editandoId ? "💾 Actualizar" : "💾 Guardar"}
@@ -613,20 +613,6 @@ export default function Inventario() {
                     }}
                   />
                 </div>
-                {/* Filtro tipo */}
-                <select
-                  value={tipoFiltro}
-                  onChange={(e) => setTipoFiltro(e.target.value)}
-                  style={{
-                    padding: "10px 12px", border: "1px solid var(--sw-borde)",
-                    borderRadius: 8, fontSize: 14, background: "var(--sw-fondo)",
-                    color: "var(--sw-texto)", minWidth: 130
-                  }}
-                >
-                  <option value="">Todos los tipos</option>
-                  <option value="articulo">📦 Artículos</option>
-                  <option value="servicio">🔧 Servicios</option>
-                </select>
                 {/* Filtro categoría */}
                 <select
                   value={categoriaFiltro}
@@ -641,21 +627,23 @@ export default function Inventario() {
                   {categoriasUnicas.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
-              {(buscar || categoriaFiltro || tipoFiltro) && (
+              {(buscar || categoriaFiltro) && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: "var(--sw-texto-terciario)" }}>
-                    {productosFiltrados.length} de {productos.length} items
+                    {productosFiltrados.length} de {productos.length} productos
                   </span>
-                  <button
-                    onClick={() => { setBuscar(""); setCategoriaFiltro(""); setTipoFiltro(""); }}
-                    style={{
-                      fontSize: 11, padding: "2px 10px", borderRadius: 20,
-                      background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca",
-                      cursor: "pointer"
-                    }}
-                  >
-                    ✕ Limpiar filtros
-                  </button>
+                  {(buscar || categoriaFiltro) && (
+                    <button
+                      onClick={() => { setBuscar(""); setCategoriaFiltro(""); }}
+                      style={{
+                        fontSize: 11, padding: "2px 10px", borderRadius: 20,
+                        background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca",
+                        cursor: "pointer"
+                      }}
+                    >
+                      ✕ Limpiar filtros
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -665,7 +653,7 @@ export default function Inventario() {
           <div className="sw-card">
             <div className="sw-card-header">
               <h3 className="sw-card-titulo">
-                📋 {buscar || categoriaFiltro || tipoFiltro ? "Resultados" : "Inventario completo"} ({productosFiltrados.length})
+                📋 {buscar || categoriaFiltro ? "Resultados" : "Todos los productos"} ({productosFiltrados.length})
               </h3>
             </div>
             <div className="sw-card-body" style={{ padding: 0 }}>
@@ -677,92 +665,87 @@ export default function Inventario() {
                 <div style={{ padding: 40, textAlign: "center" }}>
                   <div style={{ fontSize: 40, marginBottom: 8 }}>📦</div>
                   <div style={{ fontSize: 14, color: "var(--sw-texto-terciario)" }}>
-                    {buscar || categoriaFiltro || tipoFiltro ? "No se encontraron items con esos filtros" : "No hay productos ni servicios registrados"}
+                    {buscar || categoriaFiltro ? "No se encontraron productos con esos filtros" : "No hay productos registrados"}
                   </div>
-                  {!buscar && !categoriaFiltro && !tipoFiltro && (
+                  {!buscar && !categoriaFiltro && (
                     <p style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 6 }}>
-                      Agrega tu primer artículo o servicio, o importa desde Excel
+                      Agrega tu primer producto o importa desde Excel
                     </p>
                   )}
                 </div>
               ) : (
-                productosFiltrados.map((p) => {
-                  const esServicio = p.tipo === "servicio";
-                  return (
-                    <div key={p.id} style={{
-                      padding: "14px 16px",
-                      borderBottom: "1px solid #f3f4f6",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 10,
-                      transition: "background 0.15s",
-                    }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <span style={{ fontWeight: 600, fontSize: 14, color: "var(--sw-texto)" }}>
-                            {p.nombre}
-                          </span>
+                productosFiltrados.map((p) => (
+                  <div key={p.id} style={{
+                    padding: "14px 16px",
+                    borderBottom: "1px solid #f3f4f6",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    transition: "background 0.15s",
+                  }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  >
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--sw-texto)" }}>
+                          {p.nombre}
+                        </span>
+                        {p.categoria && (
                           <span style={{
-                            fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 600,
-                            background: esServicio ? "#f3e8ff" : "#eff6ff",
-                            color: esServicio ? "#7c3aed" : "#2563eb",
+                            fontSize: 11, padding: "2px 8px", borderRadius: 20,
+                            background: "var(--sw-cyan-muy-claro)", color: "var(--sw-azul)",
+                            fontWeight: 500
                           }}>
-                            {esServicio ? "🔧 Servicio" : "📦 Artículo"}
+                            {p.categoria}
                           </span>
-                          {p.categoria && (
-                            <span style={{
-                              fontSize: 11, padding: "2px 8px", borderRadius: 20,
-                              background: "var(--sw-cyan-muy-claro)", color: "var(--sw-azul)",
-                              fontWeight: 500
-                            }}>
-                              {p.categoria}
-                            </span>
-                          )}
-                          {!esServicio && Number(p.stock || 0) === 0 && (
-                            <span style={{
-                              fontSize: 10, padding: "2px 8px", borderRadius: 20,
-                              background: "#fef2f2", color: "#ef4444", fontWeight: 600
-                            }}>
-                              Sin stock
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 3, display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>
-                          <span style={{ fontWeight: 600, color: "var(--sw-verde-oscuro)" }}>{money(p.precio)}</span>
-                          {!esServicio && <span>Stock: <strong>{Number(p.stock || 0)}</strong></span>}
-                          {Number(p.valor_adquisicion || 0) > 0 && <span style={{ color: "#b45309" }}>Adq: {money(p.valor_adquisicion)}</span>}
-                          {Number(p.costo || 0) > 0 && <span style={{ color: "#dc2626" }}>Costo: {money(p.costo)}</span>}
-                          {Number(p.costo || 0) > 0 && Number(p.precio || 0) > 0 && (
-                            <span style={{ color: "var(--sw-verde)", fontWeight: 500 }}>
-                              Margen: {Math.round(((Number(p.precio) - Number(p.costo)) / Number(p.precio)) * 100)}%
-                            </span>
-                          )}
-                          {p.descripcion && <span style={{ color: "#9ca3af" }}>{p.descripcion}</span>}
-                        </div>
+                        )}
+                        {Number(p.stock || 0) === 0 && (
+                          <span style={{
+                            fontSize: 10, padding: "2px 8px", borderRadius: 20,
+                            background: "#fef2f2", color: "#ef4444", fontWeight: 600
+                          }}>
+                            Sin stock
+                          </span>
+                        )}
                       </div>
-
-                      {/* Acciones */}
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                        <button className="sw-btn-icono" onClick={() => editarProducto(p)} title="Editar">
-                          ✏️
-                        </button>
-                        <button className="sw-btn-icono" onClick={() => eliminarProducto(p.id)} title="Eliminar"
-                          style={{ color: "#ef4444" }}
-                        >
-                          🗑️
-                        </button>
+                      <div style={{ fontSize: 12, color: "var(--sw-texto-terciario)", marginTop: 3, display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>
+                        <span style={{ fontWeight: 600, color: "var(--sw-verde-oscuro)" }}>{money(p.precio)}</span>
+                        <span>Stock: <strong>{Number(p.stock || 0)}</strong></span>
+                        {p.descripcion && <span style={{ color: "#9ca3af" }}>{p.descripcion}</span>}
                       </div>
                     </div>
-                  );
-                })
+
+                    {/* Acciones */}
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button className="sw-btn-icono" onClick={() => editarProducto(p)} title="Editar">
+                        ✏️
+                      </button>
+                      <button className="sw-btn-icono" onClick={() => eliminarProducto(p.id)} title="Eliminar"
+                        style={{ color: "#ef4444" }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>
+
+          </>
+          )}
+
+          {/* ═══ MODAL PAQUETE ═══ */}
+          {modalPaquete && (
+            <EditarPaqueteModal
+              paqueteEnEdicion={paqueteEditar}
+              onGuardar={obtenerPaquetes}
+              onClose={() => { setModalPaquete(false); setPaqueteEditar(null); }}
+            />
+          )}
 
         </div>
       </div>

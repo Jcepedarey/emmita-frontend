@@ -21,6 +21,7 @@ const FUNCIONES_DISPONIBLES = {
   actualizar_precio_producto: funciones.actualizar_precio_producto,
   articulos_mas_alquilados: funciones.articulos_mas_alquilados,
   clientes_mas_frecuentes: funciones.clientes_mas_frecuentes,
+  buscar_paquete: funciones.buscar_paquete,
 };
 
 export async function ejecutarFuncionAI(nombre, argumentos) {

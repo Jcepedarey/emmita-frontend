@@ -4,6 +4,7 @@
   import supabase from "../supabaseClient";
 
   import useLimites from "../hooks/useLimites";
+  import { useTenant } from "../context/TenantContext";
 
   import BuscarProductoModal from "../components/BuscarProductoModal";
   import AgregarGrupoModal from "../components/AgregarGrupoModal";
@@ -23,6 +24,24 @@
     const { documento, tipo } = location.state || {};
 
     const { puedeCrearDocumento, mensajeBloqueo, trialVencido } = useLimites();
+    const { tenant } = useTenant();
+
+// ── Insertar paquete (desempaquetar) ──
+const insertarPaquete = (itemsDelPaquete, nombrePaquete) => {
+  const nuevosItems = itemsDelPaquete.map((item) => ({
+    ...item,
+    multiplicarPorDias: multiDias ? true : undefined,
+  }));
+  const items = [...productosAgregados, ...nuevosItems];
+  setProductosAgregados(recomputarSubtotales(items));
+  Swal.fire({
+    icon: "success",
+    title: "Paquete insertado",
+    text: `"${nombrePaquete}" — ${itemsDelPaquete.length} items agregados`,
+    timer: 2000,
+    showConfirmButton: false,
+  });
+};
     
     // ✅ CONVERTIR A ESTADOS para poder actualizar después de guardar
     const [esEdicion, setEsEdicion] = useState(documento?.esEdicion || false);
@@ -1937,6 +1956,52 @@ mostrar_notas: mostrarNotas
               </button>
             )}
 
+            {/* 🎁 Guardar como Paquete - disponible para cotización y orden */}
+            {productosAgregados.length > 0 && (
+              <button
+                onClick={async () => {
+                  const { value: nombre } = await Swal.fire({
+                    title: "🎁 Guardar como Paquete",
+                    input: "text",
+                    inputLabel: "Nombre del paquete",
+                    inputPlaceholder: "Ej: Boda Vintage - Opción Media",
+                    showCancelButton: true,
+                    confirmButtonText: "Guardar",
+                    confirmButtonColor: "#0891b2",
+                    cancelButtonText: "Cancelar",
+                    inputValidator: (v) => !v?.trim() && "Escribe un nombre para el paquete",
+                  });
+                  if (!nombre) return;
+                  const total = productosAgregados.reduce((acc, p) => acc + (p.subtotal || 0), 0);
+                  const { error } = await supabase.from("paquetes_eventos").insert({
+                    tenant_id: tenant?.id,
+                    nombre: nombre.trim(),
+                    productos: productosAgregados,
+                    precio_total: total,
+                  });
+                  if (error) {
+                    console.error("Error guardando paquete:", error);
+                    Swal.fire("Error", "No se pudo guardar el paquete.", "error");
+                  } else {
+                    Swal.fire({
+                      icon: "success",
+                      title: "Paquete guardado",
+                      text: `"${nombre}" con ${productosAgregados.length} items`,
+                      timer: 2200,
+                      showConfirmButton: false,
+                    });
+                  }
+                }}
+                className="cd-btn"
+                style={{
+                  background: "linear-gradient(135deg, #0891b2, #0e7490)",
+                  boxShadow: "0 2px 6px rgba(8,145,178,0.25)",
+                }}
+              >
+                🎁 Guardar Paquete
+              </button>
+            )}
+
             <button
               className="cd-btn cd-btn-rojo"
               onClick={() => {
@@ -1962,11 +2027,12 @@ mostrar_notas: mostrarNotas
           {/* MODALES */}
   {modalBuscarProducto && (
     <BuscarProductoModal
-      persistOpen                  // ⬅️ NO se cierra al elegir; solo con “Cerrar”
-      onSelect={agregarProducto}   // agrega desde inventario
-      onAgregarProducto={agregarProductoTemporal} // “Nuevo” o “Temporal”
-      onClose={() => setModalBuscarProducto(false)}
-    />
+  persistOpen
+  onSelect={agregarProducto}
+  onAgregarProducto={agregarProductoTemporal}
+  onInsertarPaquete={insertarPaquete}
+  onClose={() => setModalBuscarProducto(false)}
+/>
   )}
 
   {modalGrupo && (

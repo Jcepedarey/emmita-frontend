@@ -161,8 +161,8 @@ export async function resumen_financiero({ mes, anio }) {
 // 7. CONTAR REGISTROS
 // ═══════════════════════════════════════════════════════════
 export async function contar_registros({ tipo }) {
-  const tablas = { clientes: "clientes", productos: "productos", pedidos: "ordenes_pedido", cotizaciones: "cotizaciones" };
-  const tabla = tablas[tipo]; if (!tabla) return `Tipo "${tipo}" no reconocido. Opciones: clientes, productos, pedidos, cotizaciones.`;
+  const tablas = { clientes: "clientes", productos: "productos", pedidos: "ordenes_pedido", cotizaciones: "cotizaciones", paquetes: "paquetes_eventos" };
+  const tabla = tablas[tipo]; if (!tabla) return `Tipo "${tipo}" no reconocido. Opciones: clientes, productos, pedidos, cotizaciones, paquetes.`;
   const { count, error } = await supabase.from(tabla).select("id", { count: "exact", head: true });
   if (error) return `Error al contar ${tipo}.`;
   return JSON.stringify({ tipo, total: count });
@@ -295,4 +295,77 @@ export async function clientes_mas_frecuentes({ limite }) {
   for (const o of ordenes) { const nom = o.clientes?.nombre || "Desconocido"; if (!conteo[nom]) conteo[nom] = { nombre: nom, pedidos: 0, total: 0 }; conteo[nom].pedidos += 1; conteo[nom].total += Number(o.total_neto || 0); }
   const ranking = Object.values(conteo).sort((a, b) => b.pedidos - a.pedidos).slice(0, limite || 10);
   return JSON.stringify({ ranking: ranking.map((r, i) => ({ posicion: i + 1, nombre: r.nombre, total_pedidos: r.pedidos, facturacion: money(r.total) })) });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 17. BUSCAR PAQUETE DE EVENTOS
+// ═══════════════════════════════════════════════════════════
+export async function buscar_paquete({ nombre }) {
+  const texto = nombre || "";
+  const textoNormal = sinTildes(texto);
+
+  // Búsqueda directa
+  let { data: paquetes } = await supabase
+    .from("paquetes_eventos")
+    .select("id, nombre, descripcion, productos, precio_total, created_at")
+    .or(`nombre.ilike.%${texto}%,nombre.ilike.%${textoNormal}%`)
+    .limit(5);
+
+  // Fallback: buscar por palabras individuales
+  if ((!paquetes || paquetes.length === 0) && texto.includes(" ")) {
+    const palabras = sinTildes(texto).toLowerCase().split(/\s+/).filter((p) => p.length > 2);
+    if (palabras.length > 0) {
+      let query = supabase.from("paquetes_eventos").select("id, nombre, descripcion, productos, precio_total, created_at");
+      for (const p of palabras) { query = query.ilike("nombre", `%${p}%`); }
+      const res = await query.limit(5);
+      paquetes = res.data;
+    }
+  }
+
+  // Si no hay búsqueda específica o no hay resultados, devolver todos (hasta 10)
+  if ((!paquetes || paquetes.length === 0) && !texto) {
+    const { data: todos } = await supabase
+      .from("paquetes_eventos")
+      .select("id, nombre, descripcion, productos, precio_total, created_at")
+      .order("nombre")
+      .limit(10);
+    paquetes = todos;
+  }
+
+  if (!paquetes || paquetes.length === 0) {
+    return texto
+      ? `No encontré paquetes que coincidan con "${texto}".`
+      : "No hay paquetes de eventos creados todavía.";
+  }
+
+  // Armar respuesta con contenido desglosado
+  const resultados = paquetes.map((p) => {
+    const items = p.productos || [];
+    const contenido = [];
+
+    for (const item of items) {
+      if (item.es_grupo && Array.isArray(item.productos)) {
+        const sub = item.productos.map((s) => `  • ${s.cantidad || 0}x ${s.nombre}`).join("\n");
+        contenido.push(`📦 Grupo: ${item.nombre} (x${item.cantidad || 1})\n${sub}`);
+      } else {
+        const emoji = item.es_servicio ? "🔧" : item.es_proveedor ? "🏢" : "📦";
+        contenido.push(`${emoji} ${item.cantidad || 0}x ${item.nombre} — ${money(item.precio)}`);
+      }
+    }
+
+    const totalItems = items.reduce((acc, it) => {
+      if (it.es_grupo && Array.isArray(it.productos)) return acc + it.productos.length;
+      return acc + 1;
+    }, 0);
+
+    return {
+      nombre: p.nombre,
+      descripcion: p.descripcion || "",
+      total_items: totalItems,
+      precio_total: money(p.precio_total),
+      contenido: contenido.join("\n"),
+    };
+  });
+
+  return JSON.stringify(resultados);
 }

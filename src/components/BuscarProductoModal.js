@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import supabase from "../supabaseClient";
 import { v4 as uuidv4 } from "uuid";
+import Swal from "sweetalert2";
 import "../estilos/ModalesEstilo.css";
 
 const DEBOUNCE_MS = 250;
@@ -10,6 +11,7 @@ const PAGE_LIMIT = 50;
 export default function BuscarProductoModal({
   onSelect,
   onAgregarProducto,
+  onInsertarPaquete,
   onClose,
   persistOpen = true,
 }) {
@@ -18,7 +20,7 @@ export default function BuscarProductoModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
-  const [filtroTipo, setFiltroTipo] = useState(""); // "" = todos, "articulo", "servicio"
+  const [filtroTipo, setFiltroTipo] = useState(""); // "" = todos, "articulo", "servicio", "paquete"
 
   const [form, setForm] = useState({
     nombre: "",
@@ -61,19 +63,31 @@ export default function BuscarProductoModal({
       }
       setLoading(true);
       try {
-        let query = supabase
-          .from("productos")
-          .select("*")
-          .ilike("nombre", `%${term}%`)
-          .order("nombre", { ascending: true })
-          .limit(PAGE_LIMIT);
+        let data, error;
 
-        // Filtrar por tipo si está seleccionado
-        if (filtroTipo) {
-          query = query.eq("tipo", filtroTipo);
+        if (filtroTipo === "paquete") {
+          // Buscar en paquetes_eventos
+          ({ data, error } = await supabase
+            .from("paquetes_eventos")
+            .select("*")
+            .ilike("nombre", `%${term}%`)
+            .order("nombre", { ascending: true })
+            .limit(PAGE_LIMIT));
+        } else {
+          // Buscar en productos (comportamiento original)
+          let query = supabase
+            .from("productos")
+            .select("*")
+            .ilike("nombre", `%${term}%`)
+            .order("nombre", { ascending: true })
+            .limit(PAGE_LIMIT);
+
+          if (filtroTipo) {
+            query = query.eq("tipo", filtroTipo);
+          }
+
+          ({ data, error } = await query);
         }
-
-        const { data, error } = await query;
 
         if (!cancel) {
           if (error) {
@@ -231,6 +245,7 @@ export default function BuscarProductoModal({
               { id: "", label: "Todos" },
               { id: "articulo", label: "📦 Artículos" },
               { id: "servicio", label: "🔧 Servicios" },
+              { id: "paquete", label: "🎁 Paquetes" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -239,9 +254,15 @@ export default function BuscarProductoModal({
                 style={{
                   flex: 1, padding: "7px 10px", borderRadius: 8, cursor: "pointer",
                   fontSize: 12, fontWeight: 600,
-                  border: filtroTipo === t.id ? "2px solid var(--sw-azul)" : "1px solid #e5e7eb",
-                  background: filtroTipo === t.id ? "var(--sw-cyan-muy-claro)" : "white",
-                  color: filtroTipo === t.id ? "var(--sw-azul)" : "#6b7280",
+                  border: filtroTipo === t.id
+                    ? (t.id === "paquete" ? "2px solid #0891b2" : "2px solid var(--sw-azul)")
+                    : "1px solid #e5e7eb",
+                  background: filtroTipo === t.id
+                    ? (t.id === "paquete" ? "#f0fdfa" : "var(--sw-cyan-muy-claro)")
+                    : "white",
+                  color: filtroTipo === t.id
+                    ? (t.id === "paquete" ? "#0e7490" : "var(--sw-azul)")
+                    : "#6b7280",
                   transition: "all 0.15s",
                 }}
               >
@@ -256,7 +277,7 @@ export default function BuscarProductoModal({
             <input
               ref={inputRef}
               type="text"
-              placeholder={filtroTipo === "servicio" ? "Buscar servicios..." : filtroTipo === "articulo" ? "Buscar artículos..." : "Buscar artículos y servicios..."}
+              placeholder={filtroTipo === "servicio" ? "Buscar servicios..." : filtroTipo === "articulo" ? "Buscar artículos..." : filtroTipo === "paquete" ? "Buscar paquetes de eventos..." : "Buscar artículos y servicios..."}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={onKeyDownBuscar}
@@ -267,8 +288,64 @@ export default function BuscarProductoModal({
           {loading && <div style={{ color: "#6b7280", marginBottom: 12 }}>Cargando...</div>}
           {error && <div style={{ color: "#dc2626", marginBottom: 12 }}>{error}</div>}
 
-          {/* Resultados */}
-          {q && resultados.length > 0 && (
+          {/* Resultados de PAQUETES */}
+          {filtroTipo === "paquete" && q && resultados.length > 0 && (
+            <div className="modal-seccion">
+              <div className="modal-seccion-titulo" style={{ color: "#0e7490" }}>🎁 Paquetes encontrados ({resultados.length})</div>
+              {resultados.map((paq) => {
+                const totalItems = (paq.productos || []).reduce((acc, item) => {
+                  if (item.es_grupo && Array.isArray(item.productos)) return acc + item.productos.length;
+                  return acc + 1;
+                }, 0);
+                return (
+                  <div key={paq.id} className="item-card" style={{
+                    background: "linear-gradient(135deg, #f0fdfa, #ccfbf1)",
+                    borderLeft: "3px solid #0891b2",
+                  }}>
+                    <div className="item-card-info">
+                      <div className="item-card-titulo" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {paq.nombre}
+                        <span style={{
+                          fontSize: 10, padding: "1px 7px", borderRadius: 20, fontWeight: 600,
+                          background: "#f0fdfa", color: "#0891b2",
+                        }}>
+                          🎁 {totalItems} items
+                        </span>
+                      </div>
+                      <div className="item-card-subtitulo">
+                        Total: ${Number(paq.precio_total || 0).toLocaleString("es-CO")}
+                        {paq.descripcion && ` · ${paq.descripcion}`}
+                      </div>
+                    </div>
+                    <div className="item-card-acciones">
+                      <button
+                        onClick={() => {
+                          if (onInsertarPaquete) {
+                            onInsertarPaquete(paq.productos || [], paq.nombre);
+                            if (persistOpen) {
+                              limpiarYContinuar();
+                            } else {
+                              onClose?.();
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: "6px 14px", borderRadius: 6, border: "none", cursor: "pointer",
+                          fontWeight: 600, fontSize: 12, color: "white",
+                          background: "linear-gradient(135deg, #0891b2, #0e7490)",
+                        }}
+                      >
+                        📥 Insertar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Resultados de PRODUCTOS */}
+          {filtroTipo !== "paquete" && q && resultados.length > 0 && (
             <div className="modal-seccion">
               <div className="modal-seccion-titulo">📋 Resultados ({resultados.length})</div>
               {resultados.map((p) => {
@@ -319,10 +396,13 @@ export default function BuscarProductoModal({
           {q && resultados.length === 0 && !loading && (
             <div className="mensaje-vacio">
               <div className="mensaje-vacio-icono">🔍</div>
-              <div className="mensaje-vacio-texto">No se encontraron {filtroTipo === "servicio" ? "servicios" : filtroTipo === "articulo" ? "artículos" : "productos"} con "{q}"</div>
+              <div className="mensaje-vacio-texto">No se encontraron {filtroTipo === "servicio" ? "servicios" : filtroTipo === "articulo" ? "artículos" : filtroTipo === "paquete" ? "paquetes" : "productos"} con "{q}"</div>
             </div>
           )}
 
+          {/* Formulario para crear nuevos (oculto en modo paquete) */}
+          {filtroTipo !== "paquete" && (
+          <>
           <hr className="modal-separador" />
 
           {/* Botón para mostrar formulario */}
@@ -477,6 +557,8 @@ export default function BuscarProductoModal({
                 </button>
               </div>
             </div>
+          )}
+          </>
           )}
         </div>
 
