@@ -73,19 +73,29 @@ router.get("/tenants", verificarToken, verificarSuperAdmin, async (req, res) => 
       }
     });
 
+    // Contar paquetes por tenant
+    const { data: paqCounts } = await supabase
+      .from("paquetes_eventos")
+      .select("tenant_id");
+
+    const conteoPaquetes = {};
+    (paqCounts || []).forEach((p) => {
+      conteoPaquetes[p.tenant_id] = (conteoPaquetes[p.tenant_id] || 0) + 1;
+    });
+
     // Combinar datos
     const resultado = (tenants || []).map((t) => {
       const admin = todosAdmins.find((a) => a.tenant_id === t.id);
       
-      // Calcular días restantes
+      // Calcular días restantes (puede ser negativo si está vencido)
       let diasRestantes = null;
       if (t.plan === "trial" && t.fecha_registro) {
         const inicio = new Date(t.fecha_registro);
         const ahora = new Date();
-        diasRestantes = Math.max(0, 14 - Math.floor((ahora - inicio) / (1000 * 60 * 60 * 24)));
+        diasRestantes = 14 - Math.floor((ahora - inicio) / (1000 * 60 * 60 * 24));
       } else if (t.plan !== "trial" && t.fecha_vencimiento) {
         const venc = new Date(t.fecha_vencimiento);
-        diasRestantes = Math.max(0, Math.ceil((venc - new Date()) / (1000 * 60 * 60 * 24)));
+        diasRestantes = Math.ceil((venc - new Date()) / (1000 * 60 * 60 * 24));
       }
 
       return {
@@ -106,6 +116,7 @@ router.get("/tenants", verificarToken, verificarSuperAdmin, async (req, res) => 
         usuarios: conteoUsuarios[t.id] || 0,
         articulos: conteoProductos[t.id] || 0,
         servicios: conteoServicios[t.id] || 0,
+        paquetes: conteoPaquetes[t.id] || 0,
         consultas_ia_hoy: t.consultas_ia_mes || 0,
         consultas_ia_reset: t.consultas_ia_ultimo_reset,
         dias_restantes: diasRestantes,
@@ -169,7 +180,7 @@ router.put("/tenants/:id/plan", verificarToken, verificarSuperAdmin, async (req,
 
     const PLANES = {
       trial:        { max_usuarios: 1,  max_productos: 50,     dias: 14 },
-      basico:       { max_usuarios: 2,  max_productos: 200,    dias: 30 },
+      basico:       { max_usuarios: 3,  max_productos: 500,    dias: 30 },
       profesional:  { max_usuarios: 10, max_productos: 999999, dias: 30 },
     };
 

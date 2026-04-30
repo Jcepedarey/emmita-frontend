@@ -60,15 +60,15 @@ const PLANES = [
   },
   {
     nombre: "Básico",
-    precio: "$59.000",
+    precio: "$39.000",
     periodo: "COP / mes",
     color: "#0077B6",
     destacado: false,
     caracteristicas: [
-      "200 productos",
+      "500 productos",
       "Clientes ilimitados",
       "Documentos ilimitados",
-      "2 usuarios",
+      "3 usuarios",
       "PDFs personalizados",
       "Contabilidad automática",
       "Soporte prioritario",
@@ -76,12 +76,12 @@ const PLANES = [
   },
   {
     nombre: "Profesional",
-    precio: "$89.000",
+    precio: "$69.000",
     periodo: "COP / mes",
     color: "#00B4D8",
     destacado: true,
     caracteristicas: [
-      "1.000 productos",
+      "Productos ilimitados",
       "Clientes ilimitados",
       "Documentos ilimitados",
       "10 usuarios",

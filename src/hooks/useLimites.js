@@ -20,8 +20,8 @@ const PLANES = {
   basico: {
     nombre: "Básico",
     duracionDias: null,
-    maxProductos: 200,
-    maxUsuarios: 2,
+    maxProductos: 500,
+    maxUsuarios: 3,
     maxClientes: Infinity,
     maxDocumentos: Infinity,
   },

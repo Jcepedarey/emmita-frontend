@@ -103,26 +103,38 @@ export default function SuperAdmin() {
 
   // ─── Acciones ───
   const cambiarPlan = async (tenant) => {
+    const planesHTML = [
+      { key: "trial", emoji: "🆓", nombre: "Trial", desc: "14 días, 50 productos, 1 usuario" },
+      { key: "basico", emoji: "⭐", nombre: "Básico", desc: "30 días, 500 productos, 3 usuarios" },
+      { key: "profesional", emoji: "💎", nombre: "Profesional", desc: "30 días, ilimitado, 10 usuarios" },
+    ].map((p) => `
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:2px solid ${p.key === tenant.plan ? '#0077B6' : '#e5e7eb'};border-radius:10px;cursor:pointer;margin-bottom:8px;background:${p.key === tenant.plan ? '#f0f9ff' : 'white'};transition:all 0.15s;">
+        <input type="radio" name="plan-radio" value="${p.key}" ${p.key === tenant.plan ? "checked" : ""} style="accent-color:#0077B6;width:16px;height:16px;">
+        <div>
+          <div style="font-weight:600;font-size:14px;">${p.emoji} ${p.nombre}</div>
+          <div style="font-size:11px;color:#6b7280;">${p.desc}</div>
+        </div>
+      </label>
+    `).join("");
+
     const { value: plan } = await Swal.fire({
       title: `Cambiar plan de ${tenant.nombre}`,
       html: `
-        <div style="text-align:left;font-size:13px;">
+        <div style="text-align:left;font-size:13px;margin-bottom:12px;">
           <p>Plan actual: <strong>${tenant.plan}</strong></p>
-          <p>Selecciona el nuevo plan:</p>
         </div>
+        <div style="text-align:left;">${planesHTML}</div>
       `,
-      input: "select",
-      inputOptions: {
-        trial: "🆓 Trial (14 días, 50 productos, 1 usuario)",
-        basico: "⭐ Básico (30 días, 200 productos, 2 usuarios)",
-        profesional: "💎 Profesional (30 días, ilimitado, 10 usuarios)",
-      },
-      inputValue: tenant.plan,
       showCancelButton: true,
       confirmButtonText: "Cambiar plan",
       cancelButtonText: "Cancelar",
       confirmButtonColor: "#0077B6",
-      width: 500,
+      width: 460,
+      preConfirm: () => {
+        const checked = document.querySelector('input[name="plan-radio"]:checked');
+        if (!checked) { Swal.showValidationMessage("Selecciona un plan"); return false; }
+        return checked.value;
+      },
     });
 
     if (!plan) return;
@@ -353,7 +365,7 @@ export default function SuperAdmin() {
                 const estadoInfo = ESTADOS_INFO[t.estado || "activo"] || ESTADOS_INFO.activo;
                 const esActivo = (t.estado || "activo") === "activo";
                 const porVencer = t.dias_restantes !== null && t.dias_restantes <= 5 && t.dias_restantes > 0;
-                const vencido = t.dias_restantes !== null && t.dias_restantes <= 0 && t.plan !== "trial";
+                const vencido = t.dias_restantes !== null && t.dias_restantes <= 0;
 
                 return (
                   <div key={t.id} style={{
@@ -409,6 +421,7 @@ export default function SuperAdmin() {
                           <span>👥 {t.usuarios} usuario{t.usuarios !== 1 ? "s" : ""}</span>
                           <span>📦 {t.articulos} artículo{t.articulos !== 1 ? "s" : ""}</span>
 <span>🛠️ {t.servicios} servicio{t.servicios !== 1 ? "s" : ""}</span>
+                          {t.paquetes > 0 && <span>🎁 {t.paquetes} paquete{t.paquetes !== 1 ? "s" : ""}</span>}
                           <span>🤖 IA hoy: {t.consultas_ia_hoy ?? 0}</span>
                         </div>
                       </div>
